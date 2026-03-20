@@ -19,6 +19,7 @@ export default function TasksPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [filterCategory, setFilterCategory] = useState<Category | "all">("all");
+  const [filterSubcategory, setFilterSubcategory] = useState<string | "all">("all");
   const [filterPriority, setFilterPriority] = useState<Priority | "all">("all");
   const [filterStatus, setFilterStatus] = useState<TaskStatus | "all">("all");
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -115,6 +116,7 @@ export default function TasksPage() {
 
   const filteredTasks = tasks.filter((t) => {
     if (filterCategory !== "all" && t.category !== filterCategory) return false;
+    if (filterSubcategory !== "all" && t.subcategory !== filterSubcategory) return false;
     if (filterPriority !== "all" && t.priority !== filterPriority) return false;
     if (filterStatus !== "all" && t.status !== filterStatus) return false;
     return true;
@@ -162,9 +164,11 @@ export default function TasksPage() {
 
           <TaskFilters
             selectedCategory={filterCategory}
+            selectedSubcategory={filterSubcategory}
             selectedPriority={filterPriority}
             selectedStatus={filterStatus}
             onCategoryChange={setFilterCategory}
+            onSubcategoryChange={setFilterSubcategory}
             onPriorityChange={setFilterPriority}
             onStatusChange={setFilterStatus}
           />
