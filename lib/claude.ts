@@ -1,18 +1,22 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { Category } from "./types";
+import { getSubcategories } from "./subcategories";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-const SYSTEM_PROMPT = `Eres un asistente de productividad experto en organizar brain dumps masivos. Analiza el texto y extrae CADA item individual (tarea, idea, link, nota).
+function buildSystemPrompt(subcategories: Record<Category, string[]>): string {
+  const subcatLines = Object.entries(subcategories)
+    .map(([cat, subs]) => `   - ${cat}: ${subs.join(", ")}`)
+    .join("\n");
+
+  return `Eres un asistente de productividad experto en organizar brain dumps masivos. Analiza el texto y extrae CADA item individual (tarea, idea, link, nota).
 
 Para CADA item:
 1. Clasifícalo en una categoría: trabajo, aprendizaje, lifestyle, proyectos
 2. Asigna una subcategoría de estas opciones:
-   - trabajo: Crypto / Memecoin, App Building (QOVE), Gastro Bar Ops, Web Marketing AI, Content Creation, Client Work / Freelance
-   - aprendizaje: Historia Colombia / LatAm, Historia Mundial, Astronomía / Ciencia, Política / Geopolítica, Filosofía, Vocabulario / Idiomas
-   - lifestyle: Gym / Fitness, Meditación / Mindfulness, Salud Mental, Nutrición, Social / Networking, Descanso / Recovery
-   - proyectos: Memecoin Intel, AI Hype Engine, WhatsApp Reservation Bot, QOVE Platform, Gastro Bar Digital, Side Projects
+${subcatLines}
 3. Genera un título claro y accionable (máximo 60 caracteres)
 4. Sugiere ROI (1-10) basado en potencial de generar dinero o progreso tangible
 5. Sugiere Disfrute (1-10) basado en el tipo de actividad
@@ -31,6 +35,7 @@ Formato exacto:
 El campo "url" debe ser un string con la URL o null si no hay URL.
 
 Contexto del usuario: Dueño de gastro bar/nightclub en Bucaramanga Colombia, desarrollador de apps con Next.js, trader de crypto/memecoins, estudiante autodidacta de historia y ciencia, creador de contenido.`;
+}
 
 const BATCH_SIZE = 50;
 
@@ -125,11 +130,15 @@ function extractJsonArray(text: string): unknown[] {
   );
 }
 
-async function parseBatch(batchText: string, retries = 1): Promise<unknown[]> {
+async function parseBatch(
+  batchText: string,
+  systemPrompt: string,
+  retries = 1
+): Promise<unknown[]> {
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
     max_tokens: 16000,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: [
       {
         role: "user",
@@ -148,24 +157,30 @@ async function parseBatch(batchText: string, retries = 1): Promise<unknown[]> {
   } catch (err) {
     if (retries > 0) {
       console.warn("Retry parseBatch after parse failure, retries left:", retries);
-      return parseBatch(batchText, retries - 1);
+      return parseBatch(batchText, systemPrompt, retries - 1);
     }
     throw err;
   }
 }
 
 export async function parseInboxText(rawText: string) {
+  // Load dynamic subcategories from DB
+  const subcategories = await getSubcategories();
+  const systemPrompt = buildSystemPrompt(subcategories);
+
   const batches = splitIntoBatches(rawText);
 
   if (batches.length === 1) {
-    return parseBatch(batches[0]);
+    return parseBatch(batches[0], systemPrompt);
   }
 
   // Process batches in parallel (max 3 concurrent)
   const results: unknown[][] = [];
   for (let i = 0; i < batches.length; i += 3) {
     const chunk = batches.slice(i, i + 3);
-    const batchResults = await Promise.all(chunk.map(parseBatch));
+    const batchResults = await Promise.all(
+      chunk.map((b) => parseBatch(b, systemPrompt))
+    );
     results.push(...batchResults);
   }
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { CATEGORIES, Category, Priority, PRIORITY_CONFIG } from "@/lib/types";
 import { calculateFlowScore, calculateXP } from "@/lib/scoring";
+import { useSubcategories } from "@/lib/hooks/useSubcategories";
 
 interface AddTaskModalProps {
   isOpen: boolean;
@@ -50,6 +51,7 @@ export default function AddTaskModal({
   const [recurringType, setRecurringType] = useState<"daily" | "weekly" | "custom">(
     "daily"
   );
+  const { subcategories: dynamicSubs } = useSubcategories();
 
   useEffect(() => {
     if (editTask) {
@@ -66,17 +68,18 @@ export default function AddTaskModal({
       setTitle("");
       setDescription("");
       setCategory("trabajo");
-      setSubcategory(CATEGORIES.trabajo.subcategories[0]);
+      setSubcategory((dynamicSubs.trabajo || CATEGORIES.trabajo.subcategories)[0]);
       setPriority(2);
       setRoi(5);
       setJoy(5);
       setIsRecurring(false);
     }
-  }, [editTask, isOpen]);
+  }, [editTask, isOpen, dynamicSubs]);
 
   useEffect(() => {
-    setSubcategory(CATEGORIES[category].subcategories[0]);
-  }, [category]);
+    const subs = dynamicSubs[category] || CATEGORIES[category].subcategories;
+    setSubcategory(subs[0]);
+  }, [category, dynamicSubs]);
 
   const flowScore = calculateFlowScore(roi, joy);
   const xp = calculateXP(flowScore, category);
@@ -193,7 +196,7 @@ export default function AddTaskModal({
               onChange={(e) => setSubcategory(e.target.value)}
               className="w-full px-3 py-2.5 rounded-lg bg-bg-tertiary border border-white/5 text-text-primary focus:outline-none focus:border-accent-purple/50 text-sm"
             >
-              {CATEGORIES[category].subcategories.map((sub) => (
+              {(dynamicSubs[category] || CATEGORIES[category].subcategories).map((sub) => (
                 <option key={sub} value={sub}>
                   {sub}
                 </option>

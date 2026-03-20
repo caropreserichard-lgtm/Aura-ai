@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Send, Loader2, Check, X, Pencil } from "lucide-react";
 import { CATEGORIES, Category, PRIORITY_CONFIG } from "@/lib/types";
 import { calculateFlowScore, calculateXP } from "@/lib/scoring";
+import { useSubcategories } from "@/lib/hooks/useSubcategories";
 
 interface ParsedItem {
   title: string;
@@ -241,8 +242,12 @@ function EditItemForm({
 }) {
   const [title, setTitle] = useState(item.title);
   const [category, setCategory] = useState<Category>(item.category);
+  const [subcategory, setSubcategory] = useState(item.subcategory);
   const [roi, setRoi] = useState(item.roi);
   const [joy, setJoy] = useState(item.joy);
+  const { subcategories: dynamicSubs } = useSubcategories();
+
+  const currentSubs = dynamicSubs[category] || CATEGORIES[category].subcategories;
 
   return (
     <div className="space-y-3">
@@ -252,11 +257,15 @@ function EditItemForm({
         onChange={(e) => setTitle(e.target.value)}
         className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-white/5 text-text-primary text-sm focus:outline-none focus:border-accent-purple/50"
       />
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {(Object.keys(CATEGORIES) as Category[]).map((cat) => (
           <button
             key={cat}
-            onClick={() => setCategory(cat)}
+            onClick={() => {
+              setCategory(cat);
+              const subs = dynamicSubs[cat] || CATEGORIES[cat].subcategories;
+              setSubcategory(subs[0]);
+            }}
             className={`px-2 py-1 rounded-md text-xs font-medium ${
               category === cat
                 ? "bg-accent-purple/20 text-accent-purple"
@@ -267,6 +276,17 @@ function EditItemForm({
           </button>
         ))}
       </div>
+      <select
+        value={subcategory}
+        onChange={(e) => setSubcategory(e.target.value)}
+        className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-white/5 text-text-primary text-sm focus:outline-none focus:border-accent-purple/50"
+      >
+        {currentSubs.map((sub) => (
+          <option key={sub} value={sub}>
+            {sub}
+          </option>
+        ))}
+      </select>
       <div className="flex gap-4">
         <div className="flex-1">
           <label className="text-xs text-text-muted">ROI: {roi}</label>
@@ -297,7 +317,7 @@ function EditItemForm({
             onSave({
               title,
               category,
-              subcategory: CATEGORIES[category].subcategories[0],
+              subcategory,
               roi,
               joy,
             })
