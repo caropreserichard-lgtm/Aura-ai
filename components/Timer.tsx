@@ -50,9 +50,9 @@ export default function Timer({
   ];
 
   return (
-    <div className="rounded-xl bg-bg-secondary border border-white/5 p-5">
+    <div className="rounded-lg bg-bg-secondary border border-border p-5">
       <h3 className="font-heading font-bold text-sm text-text-secondary mb-4 flex items-center gap-2">
-        <Clock size={16} className="text-accent-purple" />
+        <Clock size={16} className="text-accent" />
         TIMER
       </h3>
 
@@ -64,7 +64,7 @@ export default function Timer({
             onClick={() => timer.switchMode(m)}
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-all ${
               timer.mode === m
-                ? "bg-accent-purple text-white"
+                ? "bg-accent text-text-inverse"
                 : "text-text-muted hover:text-text-secondary"
             }`}
           >
@@ -83,7 +83,7 @@ export default function Timer({
               onClick={() => timer.setDuration(d.minutes)}
               className={`px-3 py-1 rounded-md text-xs font-mono font-medium transition-all ${
                 timer.seconds === d.minutes * 60 || (timer.isRunning)
-                  ? "bg-white/10 text-text-primary"
+                  ? "bg-bg-hover text-text-primary"
                   : "text-text-muted hover:text-text-secondary"
               }`}
             >
@@ -105,21 +105,21 @@ export default function Timer({
         {!timer.isRunning ? (
           <button
             onClick={timer.start}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-lg xp-gradient text-white font-medium text-sm hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-accent text-text-inverse font-medium text-sm hover:opacity-90 transition-opacity"
           >
             <Play size={18} /> Iniciar
           </button>
         ) : (
           <button
             onClick={handlePause}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-accent-amber/20 text-accent-amber font-medium text-sm hover:bg-accent-amber/30 transition-colors"
+            className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-warning/20 text-warning font-medium text-sm hover:bg-warning/30 transition-colors"
           >
             <Pause size={18} /> Pausar
           </button>
         )}
         <button
           onClick={handleReset}
-          className="p-2.5 rounded-lg bg-white/5 text-text-muted hover:text-text-secondary hover:bg-white/10 transition-colors"
+          className="p-2.5 rounded-lg bg-bg-tertiary text-text-muted hover:text-text-secondary hover:bg-bg-hover transition-colors"
         >
           <RotateCcw size={18} />
         </button>
@@ -133,7 +133,7 @@ export default function Timer({
         <select
           value={activeTaskId || ""}
           onChange={(e) => onSetActiveTask(e.target.value || null)}
-          className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-white/5 text-text-primary text-sm focus:outline-none focus:border-accent-purple/50"
+          className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-border text-text-primary text-sm focus:outline-none focus:border-accent/50"
         >
           <option value="">Sin tarea</option>
           {pendingTasks.map((t) => (
@@ -143,7 +143,7 @@ export default function Timer({
           ))}
         </select>
         {activeTask && (
-          <p className="mt-1 text-xs text-accent-purple">
+          <p className="mt-1 text-xs text-accent">
             Enfocado en: {activeTask.title}
           </p>
         )}

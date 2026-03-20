@@ -29,7 +29,7 @@ export default function StatsPage() {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 md:ml-20 lg:ml-56">
+      <main className="flex-1 md:ml-60">
         <TopBar onAddTask={() => {}} />
         <div className="p-4 md:p-6 pb-24 md:pb-6">
           <h1 className="font-heading font-bold text-xl mb-6">Estadísticas</h1>
@@ -38,7 +38,7 @@ export default function StatsPage() {
               {[1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="h-48 rounded-xl bg-bg-secondary border border-white/5 animate-pulse"
+                  className="h-48 rounded-lg bg-bg-secondary border border-border animate-pulse"
                 />
               ))}
             </div>

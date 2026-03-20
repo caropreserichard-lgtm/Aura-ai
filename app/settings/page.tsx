@@ -160,7 +160,7 @@ function SubcategoriesManager() {
 
   if (loading) {
     return (
-      <div className="rounded-xl bg-bg-secondary border border-white/5 p-4">
+      <div className="rounded-lg bg-bg-secondary border border-border p-4">
         <div className="h-60 rounded-lg bg-bg-tertiary animate-pulse" />
       </div>
     );
@@ -169,12 +169,12 @@ function SubcategoriesManager() {
   const categories = Object.keys(CATEGORIES) as Category[];
 
   return (
-    <div className="rounded-xl bg-bg-secondary border border-white/5 overflow-hidden">
-      <div className="p-4 border-b border-white/5">
+    <div className="rounded-lg bg-bg-secondary border border-border overflow-hidden">
+      <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-accent-purple/10 flex items-center justify-center">
-              <Tags size={20} className="text-accent-purple" />
+            <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+              <Tags size={20} className="text-accent" />
             </div>
             <div>
               <h2 className="font-heading font-bold text-sm">Subcategorias</h2>
@@ -184,7 +184,7 @@ function SubcategoriesManager() {
             </div>
           </div>
           {feedback && (
-            <span className="text-xs text-accent-emerald font-medium animate-pulse max-w-[200px] text-right">
+            <span className="text-xs text-success font-medium animate-pulse max-w-[200px] text-right">
               {feedback}
             </span>
           )}
@@ -201,7 +201,7 @@ function SubcategoriesManager() {
               return (
                 <div
                   key={cat}
-                  className="rounded-lg border border-white/5 overflow-hidden"
+                  className="rounded-lg border border-border overflow-hidden"
                 >
                   {/* Column header */}
                   <div
@@ -235,7 +235,7 @@ function SubcategoriesManager() {
                         {...provided.droppableProps}
                         className={`p-2 min-h-[120px] space-y-1 transition-colors ${
                           snapshot.isDraggingOver
-                            ? "bg-white/5"
+                            ? "bg-bg-tertiary"
                             : "bg-bg-primary/50"
                         }`}
                       >
@@ -255,7 +255,7 @@ function SubcategoriesManager() {
                                   {...provided.draggableProps}
                                   className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md group transition-all ${
                                     snapshot.isDragging
-                                      ? "bg-bg-secondary shadow-lg border border-white/10"
+                                      ? "bg-bg-secondary shadow-lg border border-border-strong"
                                       : "bg-bg-tertiary hover:bg-bg-secondary"
                                   }`}
                                 >
@@ -274,13 +274,13 @@ function SubcategoriesManager() {
                                             setEditingKey(null);
                                         }}
                                         autoFocus
-                                        className="flex-1 px-1.5 py-0.5 rounded bg-bg-primary border border-white/10 text-text-primary text-xs focus:outline-none focus:border-accent-purple/50"
+                                        className="flex-1 px-1.5 py-0.5 rounded bg-bg-primary border border-border-strong text-text-primary text-xs focus:outline-none focus:border-accent/50"
                                       />
                                       <button
                                         onClick={() =>
                                           handleSaveEdit(cat, idx)
                                         }
-                                        className="p-0.5 text-accent-emerald"
+                                        className="p-0.5 text-success"
                                       >
                                         <Check size={12} />
                                       </button>
@@ -315,7 +315,7 @@ function SubcategoriesManager() {
                                           handleRemove(cat, idx)
                                         }
                                         disabled={subs.length <= 1}
-                                        className="p-0.5 text-text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-20"
+                                        className="p-0.5 text-text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-20"
                                       >
                                         <X size={10} />
                                       </button>
@@ -348,12 +348,12 @@ function SubcategoriesManager() {
                           }}
                           autoFocus
                           placeholder="Nombre..."
-                          className="flex-1 px-2 py-1 rounded bg-bg-tertiary border border-white/5 text-text-primary text-xs placeholder:text-text-muted focus:outline-none focus:border-accent-purple/50"
+                          className="flex-1 px-2 py-1 rounded bg-bg-tertiary border border-border text-text-primary text-xs placeholder:text-text-muted focus:outline-none focus:border-accent/50"
                         />
                         <button
                           onClick={() => handleAdd(cat)}
                           disabled={saving || !newSub.trim()}
-                          className="px-2 py-1 rounded text-xs font-medium bg-accent-purple/10 text-accent-purple disabled:opacity-40"
+                          className="px-2 py-1 rounded text-xs font-medium bg-accent/10 text-accent disabled:opacity-40"
                         >
                           <Check size={12} />
                         </button>
@@ -373,7 +373,7 @@ function SubcategoriesManager() {
                           setAddingTo(cat);
                           setNewSub("");
                         }}
-                        className="flex items-center gap-1 w-full px-2 py-1 rounded text-xs text-text-muted hover:text-text-secondary hover:bg-white/5 transition-colors"
+                        className="flex items-center gap-1 w-full px-2 py-1 rounded text-xs text-text-muted hover:text-text-secondary hover:bg-bg-tertiary transition-colors"
                       >
                         <Plus size={12} /> Agregar
                       </button>
@@ -438,7 +438,7 @@ function SettingsContent() {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 md:ml-20 lg:ml-56">
+      <main className="flex-1 md:ml-60">
         <TopBar onAddTask={() => {}} />
 
         <div className="p-4 md:p-6 max-w-5xl space-y-6 pb-24 md:pb-6">
@@ -446,13 +446,13 @@ function SettingsContent() {
 
           {/* Success/Error messages */}
           {success === "connected" && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-accent-emerald/10 border border-accent-emerald/20 text-accent-emerald text-sm">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-success/10 border border-success/20 text-success text-sm">
               <CheckCircle2 size={16} />
               Google Calendar conectado exitosamente
             </div>
           )}
           {error && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-danger-subtle border border-red-500/20 text-danger text-sm">
               <AlertCircle size={16} />
               Error al conectar: {error.replace(/_/g, " ")}
             </div>
@@ -462,11 +462,11 @@ function SettingsContent() {
           <SubcategoriesManager />
 
           {/* Google Calendar section */}
-          <div className="rounded-xl bg-bg-secondary border border-white/5 overflow-hidden max-w-2xl">
-            <div className="p-4 border-b border-white/5">
+          <div className="rounded-lg bg-bg-secondary border border-border overflow-hidden max-w-2xl">
+            <div className="p-4 border-b border-border">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-accent-blue/10 flex items-center justify-center">
-                  <Calendar size={20} className="text-accent-blue" />
+                <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
+                  <Calendar size={20} className="text-secondary" />
                 </div>
                 <div>
                   <h2 className="font-heading font-bold text-sm">
@@ -484,8 +484,8 @@ function SettingsContent() {
                 <div className="h-12 rounded-lg bg-bg-tertiary animate-pulse" />
               ) : calendarStatus.connected ? (
                 <>
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-accent-emerald/5 border border-accent-emerald/10">
-                    <div className="w-2 h-2 rounded-full bg-accent-emerald animate-pulse" />
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-success/5 border border-success/10">
+                    <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
                     <div className="flex-1">
                       <p className="text-sm text-text-primary">Conectado</p>
                       <p className="text-xs text-text-muted">
@@ -498,7 +498,7 @@ function SettingsContent() {
                     <button
                       onClick={handleSync}
                       disabled={syncing}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-accent-purple/10 text-accent-purple hover:bg-accent-purple/20 text-sm font-medium transition-colors disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 text-sm font-medium transition-colors disabled:opacity-50"
                     >
                       <RefreshCw
                         size={16}
@@ -508,7 +508,7 @@ function SettingsContent() {
                     </button>
                     <button
                       onClick={handleDisconnect}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-sm font-medium transition-colors"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-danger-subtle text-danger hover:bg-red-500/20 text-sm font-medium transition-colors"
                     >
                       <Unlink size={16} />
                       Desconectar
@@ -516,7 +516,7 @@ function SettingsContent() {
                   </div>
 
                   {syncResult && (
-                    <p className="text-xs text-text-muted bg-white/5 p-2 rounded-lg">
+                    <p className="text-xs text-text-muted bg-bg-tertiary p-2 rounded-lg">
                       {syncResult}
                     </p>
                   )}
@@ -529,13 +529,13 @@ function SettingsContent() {
                   </p>
                   <a
                     href="/api/calendar/auth"
-                    className="flex items-center justify-center gap-2 w-full py-3 rounded-lg bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/20 font-medium text-sm transition-colors border border-accent-blue/20"
+                    className="flex items-center justify-center gap-2 w-full py-3 rounded-lg bg-secondary/10 text-secondary hover:bg-secondary/20 font-medium text-sm transition-colors border border-secondary/20"
                   >
                     <Link2 size={16} />
                     Conectar Google Calendar
                   </a>
 
-                  <div className="p-3 rounded-lg bg-white/5 space-y-1">
+                  <div className="p-3 rounded-lg bg-bg-tertiary space-y-1">
                     <p className="text-xs text-text-muted font-medium">
                       Requisitos:
                     </p>
@@ -546,7 +546,7 @@ function SettingsContent() {
                       </li>
                       <li>
                         Crea un proyecto en{" "}
-                        <span className="text-accent-blue">
+                        <span className="text-secondary">
                           Google Cloud Console
                         </span>
                       </li>
@@ -559,7 +559,7 @@ function SettingsContent() {
           </div>
 
           {/* App info */}
-          <div className="rounded-xl bg-bg-secondary border border-white/5 p-4 max-w-2xl">
+          <div className="rounded-lg bg-bg-secondary border border-border p-4 max-w-2xl">
             <h2 className="font-heading font-bold text-sm mb-2">
               Acerca de RICKY FLOW
             </h2>
@@ -582,7 +582,7 @@ export default function SettingsPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-bg-primary">
-          <div className="w-10 h-10 border-4 border-accent-purple/30 border-t-accent-purple rounded-full animate-spin" />
+          <div className="w-10 h-10 border-4 border-accent/30 border-t-accent rounded-full animate-spin" />
         </div>
       }
     >

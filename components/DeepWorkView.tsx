@@ -156,7 +156,7 @@ export default function DeepWorkView() {
       {deepWork.state === "idle" && (
         <div className="w-full max-w-md px-6 space-y-8">
           <div className="text-center">
-            <h1 className="font-heading font-extrabold text-3xl text-transparent bg-clip-text xp-gradient">
+            <h1 className="font-heading font-extrabold text-3xl text-transparent bg-clip-text bg-accent">
               Deep Work
             </h1>
             <p className="text-text-muted text-sm mt-2">
@@ -170,7 +170,7 @@ export default function DeepWorkView() {
             <select
               value={selectedTaskId}
               onChange={(e) => setSelectedTaskId(e.target.value)}
-              className="w-full bg-bg-secondary border border-white/10 rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent-purple"
+              className="w-full bg-bg-secondary border border-border-strong rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent"
             >
               <option value="">Sin tarea</option>
               {allTasks.map((t) => (
@@ -195,8 +195,8 @@ export default function DeepWorkView() {
                   }
                   className={`flex-1 py-2.5 rounded-lg font-mono text-sm font-bold transition-colors ${
                     deepWork.config.sessionMinutes === m
-                      ? "bg-accent-purple/20 text-accent-purple border border-accent-purple/30"
-                      : "bg-bg-secondary border border-white/5 text-text-secondary hover:border-white/10"
+                      ? "bg-accent/20 text-accent border border-accent/30"
+                      : "bg-bg-secondary border border-border text-text-secondary hover:border-border-strong"
                   }`}
                 >
                   {m}m
@@ -219,8 +219,8 @@ export default function DeepWorkView() {
                   }
                   className={`flex-1 py-2.5 rounded-lg font-mono text-sm font-bold transition-colors ${
                     deepWork.config.totalSessions === n
-                      ? "bg-accent-purple/20 text-accent-purple border border-accent-purple/30"
-                      : "bg-bg-secondary border border-white/5 text-text-secondary hover:border-white/10"
+                      ? "bg-accent/20 text-accent border border-accent/30"
+                      : "bg-bg-secondary border border-border text-text-secondary hover:border-border-strong"
                   }`}
                 >
                   {n}
@@ -241,8 +241,8 @@ export default function DeepWorkView() {
                   }
                   className={`flex-1 py-2.5 rounded-lg font-mono text-sm font-bold transition-colors ${
                     deepWork.config.breakMinutes === m
-                      ? "bg-accent-emerald/20 text-accent-emerald border border-accent-emerald/30"
-                      : "bg-bg-secondary border border-white/5 text-text-secondary hover:border-white/10"
+                      ? "bg-success/20 text-success border border-success/30"
+                      : "bg-bg-secondary border border-border text-text-secondary hover:border-border-strong"
                   }`}
                 >
                   {m}m
@@ -254,7 +254,7 @@ export default function DeepWorkView() {
           {/* Start button */}
           <button
             onClick={handleStart}
-            className="w-full py-4 rounded-xl xp-gradient text-white font-heading font-bold text-lg transition-transform hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full py-4 rounded-lg bg-accent text-text-inverse font-heading font-bold text-lg transition-transform hover:scale-[1.02] active:scale-[0.98]"
           >
             Comenzar Deep Work
           </button>
@@ -275,10 +275,10 @@ export default function DeepWorkView() {
                 key={i}
                 className={`w-3 h-3 rounded-full transition-colors ${
                   i < deepWork.currentSession - 1
-                    ? "bg-accent-purple"
+                    ? "bg-accent"
                     : i === deepWork.currentSession - 1
-                    ? "bg-accent-pink animate-pulse"
-                    : "bg-white/10"
+                    ? "bg-secondary animate-pulse"
+                    : "bg-bg-hover"
                 }`}
               />
             ))}
@@ -294,9 +294,9 @@ export default function DeepWorkView() {
               {formatTimer(deepWork.secondsLeft)}
             </p>
             {/* Progress bar under timer */}
-            <div className="mt-4 h-1 bg-white/5 rounded-full overflow-hidden max-w-xs mx-auto">
+            <div className="mt-4 h-1 bg-bg-tertiary rounded-full overflow-hidden max-w-xs mx-auto">
               <div
-                className="h-full xp-gradient rounded-full transition-all duration-1000"
+                className="h-full bg-accent rounded-full transition-all duration-1000"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -314,28 +314,28 @@ export default function DeepWorkView() {
             {deepWork.isPaused ? (
               <button
                 onClick={deepWork.resume}
-                className="w-16 h-16 rounded-full xp-gradient flex items-center justify-center text-white transition-transform hover:scale-110"
+                className="w-16 h-16 rounded-full bg-accent flex items-center justify-center text-text-inverse transition-transform hover:scale-110"
               >
                 <Play size={28} />
               </button>
             ) : (
               <button
                 onClick={deepWork.pause}
-                className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-text-primary transition-transform hover:scale-110 hover:bg-white/15"
+                className="w-16 h-16 rounded-full bg-bg-hover flex items-center justify-center text-text-primary transition-transform hover:scale-110 hover:bg-white/15"
               >
                 <Pause size={28} />
               </button>
             )}
             <button
               onClick={deepWork.stop}
-              className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-400 transition-transform hover:scale-110 hover:bg-red-500/20"
+              className="w-12 h-12 rounded-full bg-danger-subtle flex items-center justify-center text-danger transition-transform hover:scale-110 hover:bg-red-500/20"
             >
               <Square size={20} />
             </button>
           </div>
 
           {deepWork.isPaused && (
-            <p className="text-accent-amber text-sm animate-pulse">En pausa</p>
+            <p className="text-warning text-sm animate-pulse">En pausa</p>
           )}
         </div>
       )}
@@ -343,9 +343,9 @@ export default function DeepWorkView() {
       {/* BREAK — Rest screen */}
       {deepWork.state === "break" && (
         <div className="text-center space-y-6">
-          <p className="text-accent-emerald text-sm font-medium">Descanso</p>
+          <p className="text-success text-sm font-medium">Descanso</p>
 
-          <p className="font-mono text-7xl md:text-8xl font-bold text-accent-emerald tracking-wider">
+          <p className="font-mono text-7xl md:text-8xl font-bold text-success tracking-wider">
             {formatTimer(deepWork.secondsLeft)}
           </p>
 
@@ -355,16 +355,16 @@ export default function DeepWorkView() {
           </p>
 
           {/* Progress bar */}
-          <div className="h-1 bg-white/5 rounded-full overflow-hidden max-w-xs mx-auto">
+          <div className="h-1 bg-bg-tertiary rounded-full overflow-hidden max-w-xs mx-auto">
             <div
-              className="h-full bg-accent-emerald rounded-full transition-all duration-1000"
+              className="h-full bg-success rounded-full transition-all duration-1000"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
 
           <button
             onClick={deepWork.skipBreak}
-            className="flex items-center gap-2 mx-auto px-4 py-2 rounded-lg bg-white/5 text-text-secondary hover:bg-white/10 text-sm transition-colors"
+            className="flex items-center gap-2 mx-auto px-4 py-2 rounded-lg bg-bg-tertiary text-text-secondary hover:bg-bg-hover text-sm transition-colors"
           >
             <SkipForward size={16} />
             Saltar descanso
@@ -376,20 +376,20 @@ export default function DeepWorkView() {
       {deepWork.state === "completed" && (
         <div className="text-center space-y-6 max-w-sm px-6">
           <div className="text-5xl">{"🎯"}</div>
-          <h2 className="font-heading font-extrabold text-2xl text-transparent bg-clip-text xp-gradient">
+          <h2 className="font-heading font-extrabold text-2xl text-transparent bg-clip-text bg-accent">
             Sesión completada
           </h2>
 
           {/* Stats */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-4 rounded-xl bg-bg-secondary border border-white/5">
-              <p className="font-mono text-2xl font-bold text-accent-purple">
+            <div className="p-4 rounded-lg bg-bg-secondary border border-border">
+              <p className="font-mono text-2xl font-bold text-accent">
                 {formatTime(deepWork.totalTimeWorked)}
               </p>
               <p className="text-xs text-text-muted mt-1">Tiempo total</p>
             </div>
-            <div className="p-4 rounded-xl bg-bg-secondary border border-white/5">
-              <p className="font-mono text-2xl font-bold text-accent-pink">
+            <div className="p-4 rounded-lg bg-bg-secondary border border-border">
+              <p className="font-mono text-2xl font-bold text-secondary">
                 {deepWork.currentSession}
               </p>
               <p className="text-xs text-text-muted mt-1">Sesiones</p>
@@ -404,7 +404,7 @@ export default function DeepWorkView() {
             {(selectedTaskId || task?._id) && (
               <button
                 onClick={handleCompleteTask}
-                className="w-full py-3 rounded-xl xp-gradient text-white font-medium flex items-center justify-center gap-2 transition-transform hover:scale-[1.02]"
+                className="w-full py-3 rounded-lg bg-accent text-text-inverse font-medium flex items-center justify-center gap-2 transition-transform hover:scale-[1.02]"
               >
                 <CheckCircle2 size={18} />
                 Completar tarea
@@ -412,7 +412,7 @@ export default function DeepWorkView() {
             )}
             <button
               onClick={handleSaveAndLeave}
-              className="w-full py-3 rounded-xl bg-white/5 text-text-secondary hover:bg-white/10 font-medium text-sm transition-colors"
+              className="w-full py-3 rounded-lg bg-bg-tertiary text-text-secondary hover:bg-bg-hover font-medium text-sm transition-colors"
             >
               Guardar tiempo y volver
             </button>

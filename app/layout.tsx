@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import ThemeProvider from "@/components/ThemeProvider";
 import PWARegister from "@/components/PWARegister";
 import "./globals.css";
 
@@ -24,7 +25,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#0F0F1A",
+  themeColor: "#1a1a1a",
 };
 
 export const metadata: Metadata = {
@@ -50,11 +51,14 @@ export default function RootLayout({
   return (
     <html
       lang="es"
+      data-theme="dark"
       className={`${inter.variable} ${jakarta.variable} ${jetbrains.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-bg-primary text-text-primary font-sans">
-        <PWARegister />
-        {children}
+        <ThemeProvider>
+          <PWARegister />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

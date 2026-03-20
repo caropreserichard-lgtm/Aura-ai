@@ -23,9 +23,7 @@ export default function TasksPage() {
   const [filterPriority, setFilterPriority] = useState<Priority | "all">("all");
   const [filterStatus, setFilterStatus] = useState<TaskStatus | "all">("all");
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem("ricky-view-mode") as ViewMode) || "list";
-    }
+    if (typeof window !== "undefined") return (localStorage.getItem("ricky-view-mode") as ViewMode) || "list";
     return "list";
   });
 
@@ -41,78 +39,41 @@ export default function TasksPage() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+  useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
   const handleAddTask = async (taskData: Record<string, unknown>) => {
     try {
       if (editingTask?._id) {
-        await fetch(`/api/tasks/${editingTask._id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(taskData),
-        });
+        await fetch(`/api/tasks/${editingTask._id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(taskData) });
       } else {
-        await fetch("/api/tasks", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(taskData),
-        });
+        await fetch("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(taskData) });
       }
       setEditingTask(null);
       fetchTasks();
-    } catch (error) {
-      console.error("Error saving task:", error);
-    }
+    } catch (error) { console.error("Error saving task:", error); }
   };
 
   const handleComplete = async (id: string) => {
-    confetti({
-      particleCount: 30,
-      spread: 50,
-      origin: { y: 0.7 },
-      colors: ["#8B5CF6", "#EC4899"],
-    });
-
+    confetti({ particleCount: 20, spread: 40, origin: { y: 0.7 }, colors: ["#4a9e7e", "#6b8aaf"] });
     try {
-      await fetch(`/api/tasks/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "done" }),
-      });
+      await fetch(`/api/tasks/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "done" }) });
       fetchTasks();
-    } catch (error) {
-      console.error("Error completing task:", error);
-    }
+    } catch (error) { console.error("Error completing task:", error); }
   };
 
   const handleDelete = async (id: string) => {
-    try {
-      await fetch(`/api/tasks/${id}`, { method: "DELETE" });
-      fetchTasks();
-    } catch (error) {
-      console.error("Error deleting task:", error);
-    }
+    try { await fetch(`/api/tasks/${id}`, { method: "DELETE" }); fetchTasks(); }
+    catch (error) { console.error("Error deleting task:", error); }
   };
 
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
     try {
-      await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
+      await fetch(`/api/tasks/${taskId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: newStatus }) });
       fetchTasks();
-    } catch (error) {
-      console.error("Error updating status:", error);
-    }
+    } catch (error) { console.error("Error updating status:", error); }
   };
 
-  const toggleView = (mode: ViewMode) => {
-    setViewMode(mode);
-    localStorage.setItem("ricky-view-mode", mode);
-  };
+  const toggleView = (mode: ViewMode) => { setViewMode(mode); localStorage.setItem("ricky-view-mode", mode); };
 
   const filteredTasks = tasks.filter((t) => {
     if (filterCategory !== "all" && t.category !== filterCategory) return false;
@@ -125,104 +86,36 @@ export default function TasksPage() {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 md:ml-20 lg:ml-56">
+      <main className="flex-1 md:ml-60">
         <TopBar onAddTask={() => setShowAddModal(true)} />
-
         <div className="p-4 md:p-6 space-y-4 pb-24 md:pb-6">
           <div className="flex items-center justify-between">
-            <h1 className="font-heading font-bold text-xl">Todas las Tareas</h1>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-text-muted">
-                {filteredTasks.length} tarea{filteredTasks.length !== 1 ? "s" : ""}
-              </span>
-              <div className="flex bg-bg-secondary rounded-lg border border-white/5 p-0.5">
-                <button
-                  onClick={() => toggleView("list")}
-                  className={`p-1.5 rounded-md transition-colors ${
-                    viewMode === "list"
-                      ? "bg-accent-purple/20 text-accent-purple"
-                      : "text-text-muted hover:text-text-secondary"
-                  }`}
-                  title="Vista lista"
-                >
-                  <List size={16} />
-                </button>
-                <button
-                  onClick={() => toggleView("kanban")}
-                  className={`p-1.5 rounded-md transition-colors ${
-                    viewMode === "kanban"
-                      ? "bg-accent-purple/20 text-accent-purple"
-                      : "text-text-muted hover:text-text-secondary"
-                  }`}
-                  title="Vista Kanban"
-                >
-                  <Columns3 size={16} />
-                </button>
+            <h1 className="font-heading font-semibold text-lg">All Tasks</h1>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-text-muted">{filteredTasks.length} task{filteredTasks.length !== 1 ? "s" : ""}</span>
+              <div className="flex bg-bg-secondary rounded-lg border border-border p-0.5">
+                <button onClick={() => toggleView("list")} className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-accent-subtle text-accent-text" : "text-text-muted hover:text-text-secondary"}`}><List size={15} /></button>
+                <button onClick={() => toggleView("kanban")} className={`p-1.5 rounded-md transition-colors ${viewMode === "kanban" ? "bg-accent-subtle text-accent-text" : "text-text-muted hover:text-text-secondary"}`}><Columns3 size={15} /></button>
               </div>
             </div>
           </div>
 
-          <TaskFilters
-            selectedCategory={filterCategory}
-            selectedSubcategory={filterSubcategory}
-            selectedPriority={filterPriority}
-            selectedStatus={filterStatus}
-            onCategoryChange={setFilterCategory}
-            onSubcategoryChange={setFilterSubcategory}
-            onPriorityChange={setFilterPriority}
-            onStatusChange={setFilterStatus}
-          />
+          <TaskFilters selectedCategory={filterCategory} selectedSubcategory={filterSubcategory} selectedPriority={filterPriority} selectedStatus={filterStatus}
+            onCategoryChange={setFilterCategory} onSubcategoryChange={setFilterSubcategory} onPriorityChange={setFilterPriority} onStatusChange={setFilterStatus} />
 
           {loading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-20 rounded-xl bg-bg-secondary border border-white/5 animate-pulse"
-                />
-              ))}
-            </div>
+            <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-16 rounded-lg bg-bg-secondary border border-border animate-pulse" />)}</div>
           ) : filteredTasks.length === 0 ? (
-            <div className="text-center py-12 rounded-xl bg-bg-secondary border border-white/5">
-              <p className="text-text-muted">No hay tareas con estos filtros</p>
-            </div>
+            <div className="text-center py-12 rounded-lg bg-bg-secondary border border-border"><p className="text-text-muted text-sm">No tasks match these filters</p></div>
           ) : viewMode === "kanban" ? (
-            <KanbanBoard
-              tasks={filteredTasks}
-              onStatusChange={handleStatusChange}
-              onEditTask={(t) => {
-                setEditingTask(t);
-                setShowAddModal(true);
-              }}
-            />
+            <KanbanBoard tasks={filteredTasks} onStatusChange={handleStatusChange} onEditTask={(t) => { setEditingTask(t); setShowAddModal(true); }} />
           ) : (
-            <div className="space-y-2">
-              {filteredTasks.map((task) => (
-                <TaskCard
-                  key={task._id}
-                  task={task}
-                  onComplete={handleComplete}
-                  onDelete={handleDelete}
-                  onFocus={() => {}}
-                  onEdit={(t) => {
-                    setEditingTask(t);
-                    setShowAddModal(true);
-                  }}
-                />
-              ))}
-            </div>
+            <div className="space-y-1">{filteredTasks.map((task) => (
+              <TaskCard key={task._id} task={task} onComplete={handleComplete} onDelete={handleDelete} onFocus={() => {}} onEdit={(t) => { setEditingTask(t); setShowAddModal(true); }} />
+            ))}</div>
           )}
         </div>
-
-        <AddTaskModal
-          isOpen={showAddModal}
-          onClose={() => {
-            setShowAddModal(false);
-            setEditingTask(null);
-          }}
-          onSave={handleAddTask}
-          editTask={editingTask}
-        />
+        <AddTaskModal isOpen={showAddModal} onClose={() => { setShowAddModal(false); setEditingTask(null); }} onSave={handleAddTask} editTask={editingTask} />
       </main>
     </div>
   );

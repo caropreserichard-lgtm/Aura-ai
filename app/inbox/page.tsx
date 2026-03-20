@@ -45,7 +45,7 @@ export default function InboxPage() {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 md:ml-20 lg:ml-56">
+      <main className="flex-1 md:ml-60">
         <TopBar onAddTask={() => {}} />
         <div className="p-4 md:p-6 pb-24 md:pb-6">
           <InboxParser onCreateTasks={handleCreateTasks} />

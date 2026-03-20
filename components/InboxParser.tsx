@@ -81,7 +81,7 @@ export default function InboxParser({ onCreateTasks }: InboxParserProps) {
   return (
     <div className="space-y-6">
       {/* Input area */}
-      <div className="rounded-xl bg-bg-secondary border border-white/5 p-5">
+      <div className="rounded-lg bg-bg-secondary border border-border p-5">
         <h2 className="font-heading font-bold text-lg mb-3">Inbox inteligente</h2>
         <p className="text-sm text-text-muted mb-4">
           Pega links, ideas, notas o textos sueltos. Claude los clasifica por ti.
@@ -91,7 +91,7 @@ export default function InboxParser({ onCreateTasks }: InboxParserProps) {
           onChange={(e) => setRawText(e.target.value)}
           placeholder={"Pega aquí tus ideas, links, notas...\n\nEjemplos:\n- https://articulo-sobre-memecoins.com\n- Investigar nueva estrategia de marketing para el gastro bar\n- Leer sobre la historia de la Gran Colombia\n- Empezar a meditar 10 min diarios"}
           rows={10}
-          className="w-full px-4 py-3 rounded-lg bg-bg-tertiary border border-white/5 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-purple/50 text-sm resize-none"
+          className="w-full px-4 py-3 rounded-lg bg-bg-tertiary border border-border text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 text-sm resize-none"
         />
         <div className="flex items-center justify-between mt-3">
           <span className="text-xs text-text-muted">
@@ -102,7 +102,7 @@ export default function InboxParser({ onCreateTasks }: InboxParserProps) {
           <button
             onClick={handleParse}
             disabled={loading || !rawText.trim()}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg xp-gradient text-white font-medium text-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent text-text-inverse font-medium text-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
           >
             {loading ? (
               <>
@@ -116,7 +116,7 @@ export default function InboxParser({ onCreateTasks }: InboxParserProps) {
           </button>
         </div>
         {error && (
-          <p className="mt-3 text-sm text-red-400 bg-red-500/10 px-3 py-2 rounded-lg">
+          <p className="mt-3 text-sm text-danger bg-danger-subtle px-3 py-2 rounded-lg">
             {error}
           </p>
         )}
@@ -132,7 +132,7 @@ export default function InboxParser({ onCreateTasks }: InboxParserProps) {
             <button
               onClick={handleApprove}
               disabled={selected.size === 0}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-emerald/20 text-accent-emerald font-medium text-sm hover:bg-accent-emerald/30 transition-colors disabled:opacity-40"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-success/20 text-success font-medium text-sm hover:bg-success/30 transition-colors disabled:opacity-40"
             >
               <Check size={16} /> Crear {selected.size} tarea{selected.size !== 1 ? "s" : ""}
             </button>
@@ -148,10 +148,10 @@ export default function InboxParser({ onCreateTasks }: InboxParserProps) {
             return (
               <div
                 key={idx}
-                className={`rounded-xl border p-4 transition-all ${
+                className={`rounded-lg border p-4 transition-all ${
                   isSelected
-                    ? "bg-bg-secondary border-accent-purple/30"
-                    : "bg-bg-secondary/50 border-white/5 opacity-50"
+                    ? "bg-bg-secondary border-accent/30"
+                    : "bg-bg-secondary/50 border-border opacity-50"
                 }`}
               >
                 {isEditing ? (
@@ -166,12 +166,12 @@ export default function InboxParser({ onCreateTasks }: InboxParserProps) {
                       onClick={() => toggleSelect(idx)}
                       className={`mt-0.5 w-5 h-5 rounded-md border-2 flex-shrink-0 transition-all flex items-center justify-center ${
                         isSelected
-                          ? "bg-accent-purple border-accent-purple"
+                          ? "bg-accent border-accent"
                           : "border-text-muted"
                       }`}
                     >
                       {isSelected && (
-                        <Check size={12} className="text-white" />
+                        <Check size={12} className="text-text-inverse" />
                       )}
                     </button>
 
@@ -192,12 +192,12 @@ export default function InboxParser({ onCreateTasks }: InboxParserProps) {
                         <span className="text-xs text-text-muted">
                           ROI: {item.roi} · Joy: {item.joy} · Flow: {flowScore}
                         </span>
-                        <span className="font-mono text-xs text-accent-pink font-medium">
+                        <span className="font-mono text-xs text-secondary font-medium">
                           +{xp}XP
                         </span>
                       </div>
                       {item.url && (
-                        <p className="text-xs text-accent-blue mt-1 truncate">
+                        <p className="text-xs text-secondary mt-1 truncate">
                           {item.url}
                         </p>
                       )}
@@ -206,7 +206,7 @@ export default function InboxParser({ onCreateTasks }: InboxParserProps) {
                     <div className="flex gap-1">
                       <button
                         onClick={() => setEditingIdx(idx)}
-                        className="p-1.5 rounded-md hover:bg-white/5 text-text-muted"
+                        className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-muted"
                       >
                         <Pencil size={14} />
                       </button>
@@ -215,7 +215,7 @@ export default function InboxParser({ onCreateTasks }: InboxParserProps) {
                           setItems((prev) => prev.filter((_, i) => i !== idx));
                           selected.delete(idx);
                         }}
-                        className="p-1.5 rounded-md hover:bg-red-500/10 text-text-muted hover:text-red-400"
+                        className="p-1.5 rounded-md hover:bg-danger-subtle text-text-muted hover:text-danger"
                       >
                         <X size={14} />
                       </button>
@@ -255,7 +255,7 @@ function EditItemForm({
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-white/5 text-text-primary text-sm focus:outline-none focus:border-accent-purple/50"
+        className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-border text-text-primary text-sm focus:outline-none focus:border-accent/50"
       />
       <div className="flex flex-wrap gap-2">
         {(Object.keys(CATEGORIES) as Category[]).map((cat) => (
@@ -268,8 +268,8 @@ function EditItemForm({
             }}
             className={`px-2 py-1 rounded-md text-xs font-medium ${
               category === cat
-                ? "bg-accent-purple/20 text-accent-purple"
-                : "bg-white/5 text-text-muted"
+                ? "bg-accent/20 text-accent"
+                : "bg-bg-tertiary text-text-muted"
             }`}
           >
             {CATEGORIES[cat].icon} {CATEGORIES[cat].label}
@@ -279,7 +279,7 @@ function EditItemForm({
       <select
         value={subcategory}
         onChange={(e) => setSubcategory(e.target.value)}
-        className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-white/5 text-text-primary text-sm focus:outline-none focus:border-accent-purple/50"
+        className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-border text-text-primary text-sm focus:outline-none focus:border-accent/50"
       >
         {currentSubs.map((sub) => (
           <option key={sub} value={sub}>
@@ -296,7 +296,7 @@ function EditItemForm({
             max={10}
             value={roi}
             onChange={(e) => setRoi(Number(e.target.value))}
-            className="w-full accent-accent-amber"
+            className="w-full accent-warning"
           />
         </div>
         <div className="flex-1">
@@ -307,7 +307,7 @@ function EditItemForm({
             max={10}
             value={joy}
             onChange={(e) => setJoy(Number(e.target.value))}
-            className="w-full accent-accent-emerald"
+            className="w-full accent-success"
           />
         </div>
       </div>
@@ -322,13 +322,13 @@ function EditItemForm({
               joy,
             })
           }
-          className="px-3 py-1.5 rounded-md bg-accent-emerald/20 text-accent-emerald text-xs font-medium"
+          className="px-3 py-1.5 rounded-md bg-success/20 text-success text-xs font-medium"
         >
           Guardar
         </button>
         <button
           onClick={onCancel}
-          className="px-3 py-1.5 rounded-md bg-white/5 text-text-muted text-xs font-medium"
+          className="px-3 py-1.5 rounded-md bg-bg-tertiary text-text-muted text-xs font-medium"
         >
           Cancelar
         </button>

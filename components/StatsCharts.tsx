@@ -111,7 +111,7 @@ export default function StatsCharts({ tasks }: StatsChartsProps) {
 
   if (tasks.length === 0) {
     return (
-      <div className="text-center py-12 rounded-xl bg-bg-secondary border border-white/5">
+      <div className="text-center py-12 rounded-lg bg-bg-secondary border border-border">
         <p className="text-4xl mb-3">{"📊"}</p>
         <p className="text-text-secondary">
           Completa algunas tareas para ver tus estadísticas
@@ -124,16 +124,16 @@ export default function StatsCharts({ tasks }: StatsChartsProps) {
     <div className="space-y-6">
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <StatCard label="Completadas" value={totalDone.toString()} color="text-accent-purple" />
-        <StatCard label="XP Total" value={totalXP.toLocaleString()} color="text-accent-pink" />
-        <StatCard label="Tiempo total" value={formatTime(totalTime)} color="text-accent-emerald" />
-        <StatCard label="Flow promedio" value={avgFlowScore.toString()} color="text-accent-amber" />
-        <StatCard label="Balance" value={`${balanceScore}%`} color="text-accent-blue" />
+        <StatCard label="Completadas" value={totalDone.toString()} color="text-accent" />
+        <StatCard label="XP Total" value={totalXP.toLocaleString()} color="text-secondary" />
+        <StatCard label="Tiempo total" value={formatTime(totalTime)} color="text-success" />
+        <StatCard label="Flow promedio" value={avgFlowScore.toString()} color="text-warning" />
+        <StatCard label="Balance" value={`${balanceScore}%`} color="text-secondary" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Tasks by category bar chart */}
-        <div className="rounded-xl bg-bg-secondary border border-white/5 p-5">
+        <div className="rounded-lg bg-bg-secondary border border-border p-5">
           <h3 className="font-heading font-bold text-sm text-text-secondary mb-4">
             Tareas por categoría
           </h3>
@@ -165,7 +165,7 @@ export default function StatsCharts({ tasks }: StatsChartsProps) {
         </div>
 
         {/* Distribution pie */}
-        <div className="rounded-xl bg-bg-secondary border border-white/5 p-5">
+        <div className="rounded-lg bg-bg-secondary border border-border p-5">
           <h3 className="font-heading font-bold text-sm text-text-secondary mb-4">
             Distribución de tareas
           </h3>
@@ -206,7 +206,7 @@ export default function StatsCharts({ tasks }: StatsChartsProps) {
 
         {/* XP timeline */}
         {xpAccumulated.length > 0 && (
-          <div className="rounded-xl bg-bg-secondary border border-white/5 p-5">
+          <div className="rounded-lg bg-bg-secondary border border-border p-5">
             <h3 className="font-heading font-bold text-sm text-text-secondary mb-4">
               XP acumulado
             </h3>
@@ -246,7 +246,7 @@ export default function StatsCharts({ tasks }: StatsChartsProps) {
 
         {/* Time by category */}
         {timeData.length > 0 && (
-          <div className="rounded-xl bg-bg-secondary border border-white/5 p-5">
+          <div className="rounded-lg bg-bg-secondary border border-border p-5">
             <h3 className="font-heading font-bold text-sm text-text-secondary mb-4">
               Tiempo invertido (minutos)
             </h3>
@@ -298,7 +298,7 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="p-3 rounded-xl bg-bg-secondary border border-white/5 text-center">
+    <div className="p-3 rounded-lg bg-bg-secondary border border-border text-center">
       <p className={`font-mono text-xl font-bold ${color}`}>{value}</p>
       <p className="text-xs text-text-muted mt-1">{label}</p>
     </div>

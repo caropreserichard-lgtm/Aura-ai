@@ -37,7 +37,6 @@ export default function Dashboard() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [activeTimerTask, setActiveTimerTask] = useState<string | null>(null);
   const [levelUpLevel, setLevelUpLevel] = useState<number | null>(null);
-
   const [dbError, setDbError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -54,7 +53,7 @@ export default function Dashboard() {
         setDbError(null);
       } else {
         setTasks([]);
-        setDbError(tasksData?.error || "Error al conectar con la base de datos");
+        setDbError(tasksData?.error || "Error connecting to database");
       }
 
       if (statsRes.ok && !statsData?.error) {
@@ -63,7 +62,7 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error fetching data:", error);
       setTasks([]);
-      setDbError("No se pudo conectar con el servidor");
+      setDbError("Could not connect to server");
     } finally {
       setLoading(false);
     }
@@ -97,15 +96,7 @@ export default function Dashboard() {
 
   const handleComplete = async (id: string) => {
     const previousLevel = stats?.level || 1;
-
-    // Mini confetti on task complete
-    confetti({
-      particleCount: 30,
-      spread: 50,
-      origin: { y: 0.7 },
-      colors: ["#8B5CF6", "#EC4899"],
-    });
-
+    confetti({ particleCount: 20, spread: 40, origin: { y: 0.7 }, colors: ["#4a9e7e", "#6b8aaf"] });
     try {
       await fetch(`/api/tasks/${id}`, {
         method: "PATCH",
@@ -113,8 +104,6 @@ export default function Dashboard() {
         body: JSON.stringify({ status: "done" }),
       });
       await fetchData();
-
-      // Check for level up
       if (stats && stats.level > previousLevel) {
         setLevelUpLevel(stats.level);
       }
@@ -161,8 +150,8 @@ export default function Dashboard() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-accent-purple/30 border-t-accent-purple rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-text-muted text-sm">Cargando tu flow...</p>
+          <div className="w-10 h-10 border-2 border-accent/30 border-t-accent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-text-muted text-sm">Loading...</p>
         </div>
       </div>
     );
@@ -172,157 +161,84 @@ export default function Dashboard() {
     <div className="min-h-screen">
       <TopBar onAddTask={() => setShowAddModal(true)} />
 
-      <div className="p-4 md:p-6 space-y-6 pb-24 md:pb-6">
+      <div className="p-4 md:p-6 space-y-5 pb-24 md:pb-6">
         {dbError && (
-          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-            <p className="font-medium">Error de conexión</p>
-            <p className="text-red-400/70 mt-1">{dbError}</p>
-            <p className="text-red-400/50 mt-2 text-xs">
-              Verifica tu MONGODB_URI en .env.local y que el usuario tenga acceso.
-            </p>
+          <div className="p-3 rounded-lg bg-danger-subtle border border-danger/20 text-danger text-sm">
+            <p className="font-medium">Connection error</p>
+            <p className="text-danger/70 mt-1 text-xs">{dbError}</p>
           </div>
         )}
-        {/* Header: Progress + Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Progress Ring */}
-          <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-bg-secondary border border-white/5">
-            <ProgressRing
-              progress={stats?.today.progress || 0}
-              label="completado hoy"
-            />
-            <p className="mt-2 text-xs text-text-muted">
-              {doneTodayCount}/{tasks.length} tareas
-            </p>
+
+        {/* Header stats row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-bg-secondary border border-border">
+            <ProgressRing progress={stats?.today.progress || 0} label="today" />
+            <p className="mt-2 text-[11px] text-text-muted">{doneTodayCount}/{tasks.length} tasks</p>
           </div>
 
-          {/* XP + Level */}
-          <div className="flex flex-col justify-center p-4 rounded-xl bg-bg-secondary border border-white/5">
-            <XPBar
-              level={stats?.level || 1}
-              progress={stats?.levelProgress || 0}
-              xpInLevel={stats?.xpInLevel || 0}
-              totalXP={stats?.totalXP || 0}
-            />
-            <div className="mt-3 flex items-center gap-3">
-              <StreakBadge streak={stats?.streak || 0} />
-            </div>
+          <div className="flex flex-col justify-center p-4 rounded-lg bg-bg-secondary border border-border">
+            <XPBar level={stats?.level || 1} progress={stats?.levelProgress || 0} xpInLevel={stats?.xpInLevel || 0} totalXP={stats?.totalXP || 0} />
+            <div className="mt-3"><StreakBadge streak={stats?.streak || 0} /></div>
           </div>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-xl bg-bg-secondary border border-white/5 text-center">
-              <p className="font-mono text-2xl font-bold text-accent-purple">
-                {stats?.today.tasksCompleted || 0}
-              </p>
-              <p className="text-xs text-text-muted mt-1">Hechas hoy</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-3 rounded-lg bg-bg-secondary border border-border text-center">
+              <p className="font-mono text-2xl font-bold text-accent">{stats?.today.tasksCompleted || 0}</p>
+              <p className="text-[10px] text-text-muted mt-1">Done today</p>
             </div>
-            <div className="p-3 rounded-xl bg-bg-secondary border border-white/5 text-center">
-              <p className="font-mono text-2xl font-bold text-accent-amber">
-                {todayTasks.length}
-              </p>
-              <p className="text-xs text-text-muted mt-1">Pendientes</p>
+            <div className="p-3 rounded-lg bg-bg-secondary border border-border text-center">
+              <p className="font-mono text-2xl font-bold text-warning">{todayTasks.length}</p>
+              <p className="text-[10px] text-text-muted mt-1">Pending</p>
             </div>
-            <div className="col-span-2 p-3 rounded-xl bg-bg-secondary border border-white/5 text-center">
-              <p className="font-mono text-lg font-bold text-accent-emerald">
-                {formatTime(stats?.today.timeSpent || 0)}
-              </p>
-              <p className="text-xs text-text-muted mt-1">Tiempo hoy</p>
+            <div className="col-span-2 p-3 rounded-lg bg-bg-secondary border border-border text-center">
+              <p className="font-mono text-lg font-bold text-secondary">{formatTime(stats?.today.timeSpent || 0)}</p>
+              <p className="text-[10px] text-text-muted mt-1">Time today</p>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Tasks */}
-          <div className="lg:col-span-2 space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="font-heading font-bold text-lg">
-                Foco del día
-              </h2>
-              <span className="text-xs text-text-muted">
-                Ordenado por Flow Score
-              </span>
+              <h2 className="font-heading font-semibold text-base text-text-primary">Today&apos;s Focus</h2>
+              <span className="text-[11px] text-text-muted">Sorted by Flow Score</span>
             </div>
 
             {tasks.length === 0 ? (
-              <div className="text-center py-12 rounded-xl bg-bg-secondary border border-white/5">
-                <p className="text-4xl mb-3">{"\uD83D\uDE80"}</p>
-                <p className="text-text-secondary mb-4">
-                  No tienes tareas aún
-                </p>
+              <div className="text-center py-12 rounded-lg bg-bg-secondary border border-border">
+                <p className="text-text-muted mb-4 text-sm">No tasks yet</p>
                 <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    className="px-4 py-2 rounded-lg xp-gradient text-white font-medium text-sm"
-                  >
-                    Crear primera tarea
-                  </button>
-                  <button
-                    onClick={handleSeedData}
-                    className="px-4 py-2 rounded-lg bg-white/5 text-text-secondary hover:bg-white/10 font-medium text-sm transition-colors"
-                  >
-                    Cargar tareas de ejemplo
-                  </button>
+                  <button onClick={() => setShowAddModal(true)} className="px-4 py-2 rounded-lg bg-accent text-text-inverse font-medium text-sm hover:bg-accent-hover transition-colors">Create first task</button>
+                  <button onClick={handleSeedData} className="px-4 py-2 rounded-lg bg-bg-tertiary text-text-secondary font-medium text-sm hover:bg-bg-hover transition-colors">Load samples</button>
                 </div>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {todayTasks.map((task) => (
-                  <TaskCard
-                    key={task._id}
-                    task={task}
-                    onComplete={handleComplete}
-                    onDelete={handleDelete}
+                  <TaskCard key={task._id} task={task} onComplete={handleComplete} onDelete={handleDelete}
                     onFocus={(t) => setActiveTimerTask(t._id || null)}
-                    onEdit={(t) => {
-                      setEditingTask(t);
-                      setShowAddModal(true);
-                    }}
-                  />
+                    onEdit={(t) => { setEditingTask(t); setShowAddModal(true); }} />
                 ))}
                 {tasks.filter((t) => t.status !== "done").length > 5 && (
-                  <a
-                    href="/tasks"
-                    className="block text-center py-2 text-sm text-accent-purple hover:text-accent-purple/80 transition-colors"
-                  >
-                    Ver todas las tareas ({tasks.filter((t) => t.status !== "done").length})
+                  <a href="/tasks" className="block text-center py-2 text-sm text-accent-text hover:text-accent transition-colors">
+                    View all tasks ({tasks.filter((t) => t.status !== "done").length})
                   </a>
                 )}
               </div>
             )}
           </div>
 
-          {/* Timer */}
-          <div>
-            <Timer
-              tasks={tasks}
-              activeTaskId={activeTimerTask}
-              onTimeUpdate={handleTimeUpdate}
-              onSetActiveTask={setActiveTimerTask}
-            />
-          </div>
-
-          {/* Calendar Events */}
-          <div>
+          <div className="space-y-4">
+            <Timer tasks={tasks} activeTaskId={activeTimerTask} onTimeUpdate={handleTimeUpdate} onSetActiveTask={setActiveTimerTask} />
             <CalendarEvents />
           </div>
         </div>
       </div>
 
-      <AddTaskModal
-        isOpen={showAddModal}
-        onClose={() => {
-          setShowAddModal(false);
-          setEditingTask(null);
-        }}
-        onSave={handleAddTask}
-        editTask={editingTask}
-      />
+      <AddTaskModal isOpen={showAddModal} onClose={() => { setShowAddModal(false); setEditingTask(null); }}
+        onSave={handleAddTask} editTask={editingTask} />
 
-      <LevelUpModal
-        level={levelUpLevel || 1}
-        isOpen={levelUpLevel !== null}
-        onClose={() => setLevelUpLevel(null)}
-      />
+      <LevelUpModal level={levelUpLevel || 1} isOpen={levelUpLevel !== null} onClose={() => setLevelUpLevel(null)} />
     </div>
   );
 }

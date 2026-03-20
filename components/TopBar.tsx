@@ -1,31 +1,32 @@
 "use client";
 
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Sun, Moon } from "lucide-react";
+import { useTheme } from "./ThemeProvider";
 
 interface TopBarProps {
   onAddTask: () => void;
 }
 
 export default function TopBar({ onAddTask }: TopBarProps) {
+  const { theme, toggleTheme } = useTheme();
+
   return (
-    <header className="flex items-center justify-between px-4 md:px-6 py-3 bg-bg-secondary/50 backdrop-blur-sm border-b border-white/5 sticky top-0 z-30">
-      <h2 className="md:hidden font-heading font-extrabold text-lg">
-        <span className="text-accent-purple">RICKY</span>{" "}
-        <span className="text-accent-pink">FLOW</span>
-      </h2>
-
+    <header className="flex items-center justify-between px-4 md:px-6 py-3 bg-bg-secondary/80 backdrop-blur-sm border-b border-border sticky top-0 z-30">
+      <h2 className="md:hidden font-heading font-bold text-base text-text-primary">Ricky Flow</h2>
       <div className="hidden md:block" />
-
-      <div className="flex items-center gap-2">
-        <button className="p-2 rounded-lg hover:bg-white/5 text-text-secondary hover:text-text-primary transition-colors">
-          <Search size={20} />
+      <div className="flex items-center gap-1.5">
+        <button className="p-2 rounded-lg hover:bg-bg-hover text-text-muted hover:text-text-secondary transition-colors">
+          <Search size={18} />
         </button>
-        <button
-          onClick={onAddTask}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-purple hover:bg-accent-purple/80 text-white font-medium text-sm transition-colors"
-        >
-          <Plus size={18} />
-          <span className="hidden sm:inline">Nueva Tarea</span>
+        <button onClick={toggleTheme}
+          className="p-2 rounded-lg hover:bg-bg-hover text-text-muted hover:text-text-secondary transition-colors"
+          title={theme === "dark" ? "Light mode" : "Dark mode"}>
+          {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+        <button onClick={onAddTask}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse font-medium text-sm transition-colors">
+          <Plus size={16} />
+          <span className="hidden sm:inline">New Task</span>
         </button>
       </div>
     </header>

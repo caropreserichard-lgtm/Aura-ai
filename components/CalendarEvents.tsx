@@ -29,11 +29,11 @@ export default function CalendarEvents() {
 
   if (loading) {
     return (
-      <div className="rounded-xl bg-bg-secondary border border-white/5 p-4">
-        <div className="h-6 w-32 bg-white/5 rounded animate-pulse mb-3" />
+      <div className="rounded-lg bg-bg-secondary border border-border p-4">
+        <div className="h-6 w-32 bg-bg-tertiary rounded animate-pulse mb-3" />
         <div className="space-y-2">
-          <div className="h-10 bg-white/5 rounded-lg animate-pulse" />
-          <div className="h-10 bg-white/5 rounded-lg animate-pulse" />
+          <div className="h-10 bg-bg-tertiary rounded-lg animate-pulse" />
+          <div className="h-10 bg-bg-tertiary rounded-lg animate-pulse" />
         </div>
       </div>
     );
@@ -41,14 +41,14 @@ export default function CalendarEvents() {
 
   if (!connected) {
     return (
-      <div className="rounded-xl bg-bg-secondary border border-white/5 p-4">
+      <div className="rounded-lg bg-bg-secondary border border-border p-4">
         <div className="flex items-center gap-2 mb-2">
-          <Calendar size={16} className="text-accent-blue" />
+          <Calendar size={16} className="text-secondary" />
           <h3 className="font-heading font-bold text-sm">Calendario</h3>
         </div>
         <a
           href="/settings"
-          className="text-xs text-accent-blue hover:underline"
+          className="text-xs text-secondary hover:underline"
         >
           Conectar Google Calendar →
         </a>
@@ -57,10 +57,10 @@ export default function CalendarEvents() {
   }
 
   return (
-    <div className="rounded-xl bg-bg-secondary border border-white/5 p-4">
+    <div className="rounded-lg bg-bg-secondary border border-border p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Calendar size={16} className="text-accent-blue" />
+          <Calendar size={16} className="text-secondary" />
           <h3 className="font-heading font-bold text-sm">Pr&oacute;ximos eventos</h3>
         </div>
         <span className="text-xs text-text-muted">{events.length}</span>
@@ -82,8 +82,8 @@ export default function CalendarEvents() {
                 key={event.id}
                 className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
                   event.isRickyFlow
-                    ? "bg-accent-purple/5 border border-accent-purple/10"
-                    : "bg-white/5"
+                    ? "bg-accent/5 border border-accent/10"
+                    : "bg-bg-tertiary"
                 }`}
               >
                 <div className="text-center min-w-[40px]">
@@ -107,7 +107,7 @@ export default function CalendarEvents() {
                   </p>
                 </div>
                 {event.isRickyFlow && (
-                  <span className="text-[10px] text-accent-purple bg-accent-purple/10 px-1.5 py-0.5 rounded">
+                  <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded">
                     RF
                   </span>
                 )}
