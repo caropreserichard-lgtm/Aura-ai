@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseInboxText } from "@/lib/claude";
 
+// Allow up to 120 seconds for large brain dumps with multiple batches
+export const maxDuration = 120;
+
 export async function POST(req: NextRequest) {
   try {
     const { rawText } = await req.json();

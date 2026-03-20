@@ -89,13 +89,13 @@ export default function InboxParser({ onCreateTasks }: InboxParserProps) {
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
           placeholder={"Pega aquí tus ideas, links, notas...\n\nEjemplos:\n- https://articulo-sobre-memecoins.com\n- Investigar nueva estrategia de marketing para el gastro bar\n- Leer sobre la historia de la Gran Colombia\n- Empezar a meditar 10 min diarios"}
-          rows={6}
+          rows={10}
           className="w-full px-4 py-3 rounded-lg bg-bg-tertiary border border-white/5 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-purple/50 text-sm resize-none"
         />
         <div className="flex items-center justify-between mt-3">
           <span className="text-xs text-text-muted">
             {rawText.length > 0
-              ? `${rawText.split("\n").filter((l) => l.trim()).length} items detectados`
+              ? `${rawText.split("\n").filter((l) => l.trim()).length} líneas detectadas`
               : ""}
           </span>
           <button
