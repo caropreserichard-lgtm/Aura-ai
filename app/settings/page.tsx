@@ -14,53 +14,121 @@ import {
   X,
   Pencil,
   Check,
-  RotateCcw,
+  GripVertical,
   Tags,
 } from "lucide-react";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from "@hello-pangea/dnd";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import { CATEGORIES, Category } from "@/lib/types";
 import { useSubcategories } from "@/lib/hooks/useSubcategories";
 
 function SubcategoriesManager() {
-  const { subcategories, loading, updateSubcategories, resetToDefaults } =
-    useSubcategories();
-  const [activeCategory, setActiveCategory] = useState<Category>("trabajo");
+  const { subcategories, loading, updateSubcategories } = useSubcategories();
+  const [addingTo, setAddingTo] = useState<Category | null>(null);
   const [newSub, setNewSub] = useState("");
-  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const currentSubs = subcategories[activeCategory] || [];
-
   const showFeedback = (msg: string) => {
     setFeedback(msg);
-    setTimeout(() => setFeedback(null), 2000);
+    setTimeout(() => setFeedback(null), 3000);
   };
 
-  const handleAdd = async () => {
-    const val = newSub.trim();
-    if (!val || currentSubs.includes(val)) return;
+  const handleDragEnd = async (result: DropResult) => {
+    const { source, destination } = result;
+    if (!destination) return;
+
+    const fromCat = source.droppableId as Category;
+    const toCat = destination.droppableId as Category;
+    const fromSubs = [...(subcategories[fromCat] || [])];
+    const subName = fromSubs[source.index];
+
+    if (fromCat === toCat) {
+      // Reorder within same category
+      fromSubs.splice(source.index, 1);
+      fromSubs.splice(destination.index, 0, subName);
+      setSaving(true);
+      try {
+        await updateSubcategories(fromCat, fromSubs);
+      } catch {
+        showFeedback("Error al reordenar");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Move between categories — call the move API (updates subcats + tasks)
     setSaving(true);
     try {
-      await updateSubcategories(activeCategory, [...currentSubs, val]);
-      setNewSub("");
-      showFeedback("Agregada");
+      const res = await fetch("/api/subcategories/move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subcategory: subName,
+          fromCategory: fromCat,
+          toCategory: toCat,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      // Refresh subcategories from server
+      const refreshRes = await fetch("/api/subcategories");
+      const refreshData = await refreshRes.json();
+      if (refreshData.subcategories) {
+        for (const cat of Object.keys(refreshData.subcategories) as Category[]) {
+          await updateSubcategories(cat, refreshData.subcategories[cat]);
+        }
+      }
+
+      showFeedback(
+        `"${subName}" movida a ${CATEGORIES[toCat].label} (${data.tasksMoved} tarea${data.tasksMoved !== 1 ? "s" : ""} migrada${data.tasksMoved !== 1 ? "s" : ""})`
+      );
     } catch {
-      showFeedback("Error al guardar");
+      showFeedback("Error al mover subcategoria");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleRemove = async (idx: number) => {
-    if (currentSubs.length <= 1) return;
+  const handleAdd = async (cat: Category) => {
+    const val = newSub.trim();
+    if (!val) return;
+    const subs = subcategories[cat] || [];
+    if (subs.includes(val)) return;
     setSaving(true);
     try {
-      const updated = currentSubs.filter((_, i) => i !== idx);
-      await updateSubcategories(activeCategory, updated);
-      showFeedback("Eliminada");
+      await updateSubcategories(cat, [...subs, val]);
+      setNewSub("");
+      setAddingTo(null);
+      showFeedback(`"${val}" agregada a ${CATEGORIES[cat].label}`);
+    } catch {
+      showFeedback("Error al agregar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemove = async (cat: Category, idx: number) => {
+    const subs = subcategories[cat] || [];
+    if (subs.length <= 1) return;
+    const name = subs[idx];
+    setSaving(true);
+    try {
+      await updateSubcategories(
+        cat,
+        subs.filter((_: string, i: number) => i !== idx)
+      );
+      showFeedback(`"${name}" eliminada`);
     } catch {
       showFeedback("Error al eliminar");
     } finally {
@@ -68,21 +136,20 @@ function SubcategoriesManager() {
     }
   };
 
-  const handleStartEdit = (idx: number) => {
-    setEditingIdx(idx);
-    setEditValue(currentSubs[idx]);
+  const handleStartEdit = (cat: Category, idx: number) => {
+    setEditingKey(`${cat}-${idx}`);
+    setEditValue((subcategories[cat] || [])[idx]);
   };
 
-  const handleSaveEdit = async () => {
-    if (editingIdx === null) return;
+  const handleSaveEdit = async (cat: Category, idx: number) => {
     const val = editValue.trim();
     if (!val) return;
     setSaving(true);
     try {
-      const updated = [...currentSubs];
-      updated[editingIdx] = val;
-      await updateSubcategories(activeCategory, updated);
-      setEditingIdx(null);
+      const updated = [...(subcategories[cat] || [])];
+      updated[idx] = val;
+      await updateSubcategories(cat, updated);
+      setEditingKey(null);
       showFeedback("Renombrada");
     } catch {
       showFeedback("Error al renombrar");
@@ -91,168 +158,232 @@ function SubcategoriesManager() {
     }
   };
 
-  const handleReset = async () => {
-    setSaving(true);
-    try {
-      await resetToDefaults(activeCategory);
-      showFeedback("Restaurado a defaults");
-    } catch {
-      showFeedback("Error al restaurar");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="rounded-xl bg-bg-secondary border border-white/5 p-4">
-        <div className="h-40 rounded-lg bg-bg-tertiary animate-pulse" />
+        <div className="h-60 rounded-lg bg-bg-tertiary animate-pulse" />
       </div>
     );
   }
 
+  const categories = Object.keys(CATEGORIES) as Category[];
+
   return (
     <div className="rounded-xl bg-bg-secondary border border-white/5 overflow-hidden">
       <div className="p-4 border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-accent-purple/10 flex items-center justify-center">
-            <Tags size={20} className="text-accent-purple" />
-          </div>
-          <div>
-            <h2 className="font-heading font-bold text-sm">Subcategorias</h2>
-            <p className="text-xs text-text-muted">
-              Personaliza las subcategorias de cada categoria
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-4 space-y-4">
-        {/* Category tabs */}
-        <div className="flex flex-wrap gap-2">
-          {(Object.keys(CATEGORIES) as Category[]).map((cat) => {
-            const config = CATEGORIES[cat];
-            const isActive = activeCategory === cat;
-            return (
-              <button
-                key={cat}
-                onClick={() => {
-                  setActiveCategory(cat);
-                  setEditingIdx(null);
-                  setNewSub("");
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  isActive ? "border-2" : "border border-white/5 hover:border-white/10"
-                }`}
-                style={
-                  isActive
-                    ? {
-                        borderColor: config.color,
-                        backgroundColor: `${config.color}15`,
-                        color: config.color,
-                      }
-                    : {}
-                }
-              >
-                {config.icon} {config.label}
-                <span className="opacity-60">({(subcategories[cat] || []).length})</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Subcategory list */}
-        <div className="space-y-1.5">
-          {currentSubs.map((sub, idx) => (
-            <div
-              key={`${activeCategory}-${idx}`}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-tertiary group"
-            >
-              {editingIdx === idx ? (
-                <>
-                  <input
-                    type="text"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSaveEdit();
-                      if (e.key === "Escape") setEditingIdx(null);
-                    }}
-                    autoFocus
-                    className="flex-1 px-2 py-1 rounded bg-bg-primary border border-white/10 text-text-primary text-sm focus:outline-none focus:border-accent-purple/50"
-                  />
-                  <button
-                    onClick={handleSaveEdit}
-                    disabled={saving}
-                    className="p-1 rounded hover:bg-accent-emerald/10 text-accent-emerald"
-                  >
-                    <Check size={14} />
-                  </button>
-                  <button
-                    onClick={() => setEditingIdx(null)}
-                    className="p-1 rounded hover:bg-white/5 text-text-muted"
-                  >
-                    <X size={14} />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className="flex-1 text-sm text-text-primary">{sub}</span>
-                  <button
-                    onClick={() => handleStartEdit(idx)}
-                    className="p-1 rounded hover:bg-white/5 text-text-muted opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Pencil size={12} />
-                  </button>
-                  <button
-                    onClick={() => handleRemove(idx)}
-                    disabled={currentSubs.length <= 1}
-                    className="p-1 rounded hover:bg-red-500/10 text-text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-20"
-                  >
-                    <X size={12} />
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Add new */}
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newSub}
-            onChange={(e) => setNewSub(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleAdd();
-            }}
-            placeholder="Nueva subcategoria..."
-            className="flex-1 px-3 py-2 rounded-lg bg-bg-tertiary border border-white/5 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-purple/50 text-sm"
-          />
-          <button
-            onClick={handleAdd}
-            disabled={saving || !newSub.trim()}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent-purple/10 text-accent-purple hover:bg-accent-purple/20 text-sm font-medium transition-colors disabled:opacity-40"
-          >
-            <Plus size={14} /> Agregar
-          </button>
-        </div>
-
-        {/* Reset + feedback */}
         <div className="flex items-center justify-between">
-          <button
-            onClick={handleReset}
-            disabled={saving}
-            className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-secondary transition-colors disabled:opacity-40"
-          >
-            <RotateCcw size={12} /> Restaurar defaults
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-accent-purple/10 flex items-center justify-center">
+              <Tags size={20} className="text-accent-purple" />
+            </div>
+            <div>
+              <h2 className="font-heading font-bold text-sm">Subcategorias</h2>
+              <p className="text-xs text-text-muted">
+                Arrastra subcategorias entre columnas para moverlas con sus tareas
+              </p>
+            </div>
+          </div>
           {feedback && (
-            <span className="text-xs text-accent-emerald animate-pulse">
+            <span className="text-xs text-accent-emerald font-medium animate-pulse max-w-[200px] text-right">
               {feedback}
             </span>
           )}
         </div>
+      </div>
+
+      <div className="p-4">
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            {categories.map((cat) => {
+              const config = CATEGORIES[cat];
+              const subs = subcategories[cat] || [];
+
+              return (
+                <div
+                  key={cat}
+                  className="rounded-lg border border-white/5 overflow-hidden"
+                >
+                  {/* Column header */}
+                  <div
+                    className="px-3 py-2 border-b"
+                    style={{
+                      borderColor: `${config.color}30`,
+                      backgroundColor: `${config.color}08`,
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className="text-xs font-bold"
+                        style={{ color: config.color }}
+                      >
+                        {config.icon} {config.label}
+                      </span>
+                      <span
+                        className="text-xs opacity-50"
+                        style={{ color: config.color }}
+                      >
+                        {subs.length}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Droppable area */}
+                  <Droppable droppableId={cat}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`p-2 min-h-[120px] space-y-1 transition-colors ${
+                          snapshot.isDraggingOver
+                            ? "bg-white/5"
+                            : "bg-bg-primary/50"
+                        }`}
+                      >
+                        {subs.map((sub: string, idx: number) => {
+                          const key = `${cat}-${idx}`;
+                          const isEditing = editingKey === key;
+
+                          return (
+                            <Draggable
+                              key={`${cat}-${sub}`}
+                              draggableId={`${cat}::${sub}`}
+                              index={idx}
+                            >
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md group transition-all ${
+                                    snapshot.isDragging
+                                      ? "bg-bg-secondary shadow-lg border border-white/10"
+                                      : "bg-bg-tertiary hover:bg-bg-secondary"
+                                  }`}
+                                >
+                                  {isEditing ? (
+                                    <>
+                                      <input
+                                        type="text"
+                                        value={editValue}
+                                        onChange={(e) =>
+                                          setEditValue(e.target.value)
+                                        }
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter")
+                                            handleSaveEdit(cat, idx);
+                                          if (e.key === "Escape")
+                                            setEditingKey(null);
+                                        }}
+                                        autoFocus
+                                        className="flex-1 px-1.5 py-0.5 rounded bg-bg-primary border border-white/10 text-text-primary text-xs focus:outline-none focus:border-accent-purple/50"
+                                      />
+                                      <button
+                                        onClick={() =>
+                                          handleSaveEdit(cat, idx)
+                                        }
+                                        className="p-0.5 text-accent-emerald"
+                                      >
+                                        <Check size={12} />
+                                      </button>
+                                      <button
+                                        onClick={() => setEditingKey(null)}
+                                        className="p-0.5 text-text-muted"
+                                      >
+                                        <X size={12} />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span
+                                        {...provided.dragHandleProps}
+                                        className="text-text-muted/40 hover:text-text-muted cursor-grab active:cursor-grabbing"
+                                      >
+                                        <GripVertical size={12} />
+                                      </span>
+                                      <span className="flex-1 text-xs text-text-primary truncate">
+                                        {sub}
+                                      </span>
+                                      <button
+                                        onClick={() =>
+                                          handleStartEdit(cat, idx)
+                                        }
+                                        className="p-0.5 text-text-muted opacity-0 group-hover:opacity-100 transition-opacity"
+                                      >
+                                        <Pencil size={10} />
+                                      </button>
+                                      <button
+                                        onClick={() =>
+                                          handleRemove(cat, idx)
+                                        }
+                                        disabled={subs.length <= 1}
+                                        className="p-0.5 text-text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-20"
+                                      >
+                                        <X size={10} />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </Draggable>
+                          );
+                        })}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+
+                  {/* Add button */}
+                  <div className="px-2 pb-2">
+                    {addingTo === cat ? (
+                      <div className="flex gap-1">
+                        <input
+                          type="text"
+                          value={newSub}
+                          onChange={(e) => setNewSub(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleAdd(cat);
+                            if (e.key === "Escape") {
+                              setAddingTo(null);
+                              setNewSub("");
+                            }
+                          }}
+                          autoFocus
+                          placeholder="Nombre..."
+                          className="flex-1 px-2 py-1 rounded bg-bg-tertiary border border-white/5 text-text-primary text-xs placeholder:text-text-muted focus:outline-none focus:border-accent-purple/50"
+                        />
+                        <button
+                          onClick={() => handleAdd(cat)}
+                          disabled={saving || !newSub.trim()}
+                          className="px-2 py-1 rounded text-xs font-medium bg-accent-purple/10 text-accent-purple disabled:opacity-40"
+                        >
+                          <Check size={12} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setAddingTo(null);
+                            setNewSub("");
+                          }}
+                          className="px-1 py-1 rounded text-xs text-text-muted"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setAddingTo(cat);
+                          setNewSub("");
+                        }}
+                        className="flex items-center gap-1 w-full px-2 py-1 rounded text-xs text-text-muted hover:text-text-secondary hover:bg-white/5 transition-colors"
+                      >
+                        <Plus size={12} /> Agregar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </DragDropContext>
       </div>
     </div>
   );
@@ -310,8 +441,8 @@ function SettingsContent() {
       <main className="flex-1 md:ml-20 lg:ml-56">
         <TopBar onAddTask={() => {}} />
 
-        <div className="p-4 md:p-6 max-w-2xl space-y-6 pb-24 md:pb-6">
-          <h1 className="font-heading font-bold text-xl">Configuraci&oacute;n</h1>
+        <div className="p-4 md:p-6 max-w-5xl space-y-6 pb-24 md:pb-6">
+          <h1 className="font-heading font-bold text-xl">Configuracion</h1>
 
           {/* Success/Error messages */}
           {success === "connected" && (
@@ -331,7 +462,7 @@ function SettingsContent() {
           <SubcategoriesManager />
 
           {/* Google Calendar section */}
-          <div className="rounded-xl bg-bg-secondary border border-white/5 overflow-hidden">
+          <div className="rounded-xl bg-bg-secondary border border-white/5 overflow-hidden max-w-2xl">
             <div className="p-4 border-b border-white/5">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-accent-blue/10 flex items-center justify-center">
@@ -353,7 +484,6 @@ function SettingsContent() {
                 <div className="h-12 rounded-lg bg-bg-tertiary animate-pulse" />
               ) : calendarStatus.connected ? (
                 <>
-                  {/* Connected state */}
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-accent-emerald/5 border border-accent-emerald/10">
                     <div className="w-2 h-2 rounded-full bg-accent-emerald animate-pulse" />
                     <div className="flex-1">
@@ -393,10 +523,9 @@ function SettingsContent() {
                 </>
               ) : (
                 <>
-                  {/* Disconnected state */}
                   <p className="text-sm text-text-muted">
                     Conecta tu cuenta de Google para sincronizar tareas con fecha
-                    a tu calendario autom&aacute;ticamente.
+                    a tu calendario automaticamente.
                   </p>
                   <a
                     href="/api/calendar/auth"
@@ -430,12 +559,12 @@ function SettingsContent() {
           </div>
 
           {/* App info */}
-          <div className="rounded-xl bg-bg-secondary border border-white/5 p-4">
+          <div className="rounded-xl bg-bg-secondary border border-white/5 p-4 max-w-2xl">
             <h2 className="font-heading font-bold text-sm mb-2">
               Acerca de RICKY FLOW
             </h2>
             <div className="space-y-1 text-xs text-text-muted">
-              <p>Versi&oacute;n: 1.0.0 (Fase 3)</p>
+              <p>Version: 1.0.0 (Fase 3)</p>
               <p>Stack: Next.js + MongoDB + Claude AI</p>
               <p>
                 Features: Kanban, Deep Work, PWA, Google Calendar
