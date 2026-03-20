@@ -25,8 +25,10 @@ IMPORTANTE:
 - Convierte cada bullet point en una tarea accionable
 - NO omitas items — procesa TODO el texto
 
-Responde SOLO en JSON array, sin markdown, sin backticks, sin explicación:
-[{"title":"...","category":"...","subcategory":"...","roi":N,"joy":N,"url":"..." o null}]
+Responde SOLO con un JSON array válido. Sin markdown, sin backticks, sin texto antes o después del JSON.
+Formato exacto:
+[{"title":"string","category":"string","subcategory":"string","roi":number,"joy":number,"url":null}]
+El campo "url" debe ser un string con la URL o null si no hay URL.
 
 Contexto del usuario: Dueño de gastro bar/nightclub en Bucaramanga Colombia, desarrollador de apps con Next.js, trader de crypto/memecoins, estudiante autodidacta de historia y ciencia, creador de contenido.`;
 
@@ -69,7 +71,61 @@ function splitIntoBatches(text: string): string[] {
   return batches;
 }
 
-async function parseBatch(batchText: string): Promise<unknown[]> {
+function extractJsonArray(text: string): unknown[] {
+  // Step 1: Strip markdown fences (```json ... ``` or ``` ... ```)
+  let cleaned = text.trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+
+  // Step 2: Try direct parse first
+  try {
+    const parsed = JSON.parse(cleaned);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    // continue to fallback strategies
+  }
+
+  // Step 3: Find the JSON array in the text using bracket matching
+  const startIdx = cleaned.indexOf("[");
+  if (startIdx !== -1) {
+    let depth = 0;
+    let endIdx = -1;
+    for (let i = startIdx; i < cleaned.length; i++) {
+      if (cleaned[i] === "[") depth++;
+      else if (cleaned[i] === "]") {
+        depth--;
+        if (depth === 0) {
+          endIdx = i;
+          break;
+        }
+      }
+    }
+
+    if (endIdx !== -1) {
+      const jsonStr = cleaned.substring(startIdx, endIdx + 1);
+      try {
+        const parsed = JSON.parse(jsonStr);
+        return Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        // Step 4: Try fixing common issues — trailing commas before ]
+        const fixed = jsonStr
+          .replace(/,\s*]/g, "]")
+          .replace(/,\s*}/g, "}");
+        try {
+          const parsed = JSON.parse(fixed);
+          return Array.isArray(parsed) ? parsed : [parsed];
+        } catch {
+          // continue
+        }
+      }
+    }
+  }
+
+  throw new Error(
+    "No se pudo parsear la respuesta de Claude. Intenta con menos texto o dividido en partes."
+  );
+}
+
+async function parseBatch(batchText: string, retries = 1): Promise<unknown[]> {
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
     max_tokens: 16000,
@@ -87,16 +143,14 @@ async function parseBatch(batchText: string): Promise<unknown[]> {
     throw new Error("Respuesta inesperada de Claude");
   }
 
-  let text = content.text.trim();
-  if (text.startsWith("```")) {
-    text = text.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
-  }
-
   try {
-    const parsed = JSON.parse(text);
-    return Array.isArray(parsed) ? parsed : [parsed];
-  } catch {
-    throw new Error("No se pudo parsear la respuesta de Claude: " + text.substring(0, 200));
+    return extractJsonArray(content.text);
+  } catch (err) {
+    if (retries > 0) {
+      console.warn("Retry parseBatch after parse failure, retries left:", retries);
+      return parseBatch(batchText, retries - 1);
+    }
+    throw err;
   }
 }
 
