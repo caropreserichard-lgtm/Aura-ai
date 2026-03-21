@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import AddTaskModal from "@/components/AddTaskModal";
@@ -37,11 +38,16 @@ function isToday(d: Date) {
   return isSameDay(d, new Date());
 }
 
+function toDateKey(d: Date) {
+  return d.toISOString().split("T")[0];
+}
+
 export default function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [weekOffset, setWeekOffset] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [addModalDate, setAddModalDate] = useState<string | undefined>(undefined);
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -60,9 +66,13 @@ export default function HomePage() {
   const weekDates = getWeekDates(weekOffset);
   const pendingTasks = tasks.filter((t) => t.status !== "done");
 
-  // Group tasks by subcategory for weekly view
+  // Backlog = pending tasks with NO dueDate (or dueDate outside this week)
+  const weekKeys = new Set(weekDates.map(toDateKey));
+  const backlogTasks = pendingTasks.filter((t) => !t.dueDate || !weekKeys.has(t.dueDate.split("T")[0]));
+
+  // Group backlog by subcategory
   const subcategoryGroups: Record<string, Task[]> = {};
-  pendingTasks.forEach((t) => {
+  backlogTasks.forEach((t) => {
     const key = t.subcategory || "Other";
     if (!subcategoryGroups[key]) subcategoryGroups[key] = [];
     subcategoryGroups[key].push(t);
@@ -71,8 +81,8 @@ export default function HomePage() {
   // Tasks with due dates mapped to days
   const tasksByDay: Record<string, Task[]> = {};
   weekDates.forEach((d) => {
-    const key = d.toISOString().split("T")[0];
-    tasksByDay[key] = tasks.filter((t) => t.dueDate && t.dueDate.startsWith(key));
+    const key = toDateKey(d);
+    tasksByDay[key] = tasks.filter((t) => t.dueDate && t.dueDate.startsWith(key) && t.status !== "done");
   });
 
   const handleComplete = async (id: string) => {
@@ -97,13 +107,56 @@ export default function HomePage() {
     } catch (e) { console.error(e); }
   };
 
+  const handleUpdateDueDate = async (taskId: string, newDueDate: string | null) => {
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) => (t._id === taskId ? { ...t, dueDate: newDueDate || undefined } : t))
+    );
+    try {
+      await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dueDate: newDueDate }),
+      });
+    } catch (e) {
+      console.error(e);
+      fetchTasks(); // Revert on error
+    }
+  };
+
+  const handleDragEnd = (result: DropResult) => {
+    const { draggableId, source, destination } = result;
+    if (!destination) return;
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+
+    const taskId = draggableId;
+    const destId = destination.droppableId;
+
+    if (destId === "backlog") {
+      handleUpdateDueDate(taskId, null);
+    } else {
+      // destId is a date key like "2026-03-20"
+      handleUpdateDueDate(taskId, destId);
+    }
+  };
+
+  const openAddForDay = (dateKey: string) => {
+    setAddModalDate(dateKey);
+    setShowAddModal(true);
+  };
+
+  const openAddGeneral = () => {
+    setAddModalDate(undefined);
+    setShowAddModal(true);
+  };
+
   const monthLabel = weekDates[0].toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   return (
     <div className="flex min-h-screen">
       <Sidebar />
       <main className="flex-1 md:ml-60">
-        <TopBar onAddTask={() => setShowAddModal(true)} />
+        <TopBar onAddTask={openAddGeneral} />
 
         <div className="p-4 md:p-6 pb-24 md:pb-6">
           {/* Week navigation */}
@@ -127,88 +180,154 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Weekly columns */}
-          <div className="grid grid-cols-7 gap-2 mb-6">
-            {weekDates.map((date, i) => {
-              const key = date.toISOString().split("T")[0];
-              const dayTasks = tasksByDay[key] || [];
-              const today = isToday(date);
+          <DragDropContext onDragEnd={handleDragEnd}>
+            {/* Weekly columns */}
+            <div className="grid grid-cols-7 gap-2 mb-6">
+              {weekDates.map((date, i) => {
+                const key = toDateKey(date);
+                const dayTasks = tasksByDay[key] || [];
+                const today = isToday(date);
 
-              return (
-                <div key={key} className={`min-h-[300px] rounded-lg border ${today ? "border-accent/40 bg-accent-subtle" : "border-border bg-bg-secondary"}`}>
-                  {/* Day header */}
-                  <div className={`px-2.5 py-2 border-b ${today ? "border-accent/20" : "border-border"}`}>
-                    <div className="flex items-center justify-between">
-                      <span className={`text-[11px] font-semibold ${today ? "text-accent-text" : "text-text-secondary"}`}>{DAYS[i]}</span>
-                      <span className={`text-[11px] ${today ? "text-accent-text font-bold" : "text-text-muted"}`}>
-                        {date.getDate()}
-                      </span>
-                    </div>
-                    {dayTasks.length > 0 && (
-                      <div className="mt-1">
-                        <span className="text-[10px] text-text-muted">{dayTasks.length} task{dayTasks.length > 1 ? "s" : ""}</span>
+                return (
+                  <Droppable key={key} droppableId={key}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`min-h-[300px] rounded-lg border transition-colors ${
+                          snapshot.isDraggingOver
+                            ? "border-accent bg-accent-subtle/60"
+                            : today
+                            ? "border-accent/40 bg-accent-subtle"
+                            : "border-border bg-bg-secondary"
+                        }`}
+                      >
+                        {/* Day header */}
+                        <div className={`px-2.5 py-2 border-b ${today ? "border-accent/20" : "border-border"}`}>
+                          <div className="flex items-center justify-between">
+                            <span className={`text-[11px] font-semibold ${today ? "text-accent-text" : "text-text-secondary"}`}>{DAYS[i]}</span>
+                            <div className="flex items-center gap-1">
+                              <span className={`text-[11px] ${today ? "text-accent-text font-bold" : "text-text-muted"}`}>
+                                {date.getDate()}
+                              </span>
+                              <button
+                                onClick={() => openAddForDay(key)}
+                                className="w-4 h-4 rounded flex items-center justify-center hover:bg-bg-hover text-text-muted hover:text-accent transition-colors"
+                                title="Add task"
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
+                          </div>
+                          {dayTasks.length > 0 && (
+                            <div className="mt-1">
+                              <span className="text-[10px] text-text-muted">{dayTasks.length} task{dayTasks.length > 1 ? "s" : ""}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Day tasks */}
+                        <div className="p-1.5 space-y-1">
+                          {dayTasks.map((task, index) => {
+                            const color = CAT_COLORS[task.category] || "#666";
+                            return (
+                              <Draggable key={task._id} draggableId={task._id!} index={index}>
+                                {(dragProvided, dragSnapshot) => (
+                                  <div
+                                    ref={dragProvided.innerRef}
+                                    {...dragProvided.draggableProps}
+                                    {...dragProvided.dragHandleProps}
+                                    className={`group p-1.5 rounded-md border transition-all cursor-grab active:cursor-grabbing ${
+                                      dragSnapshot.isDragging
+                                        ? "bg-bg-elevated border-accent/30 shadow-lg"
+                                        : "bg-bg-primary/50 hover:bg-bg-hover border-transparent hover:border-border"
+                                    }`}
+                                  >
+                                    <div className="flex items-start gap-1.5">
+                                      <button onClick={() => handleComplete(task._id!)}
+                                        className="mt-0.5 w-3.5 h-3.5 rounded-full border border-text-muted hover:border-accent flex-shrink-0 transition-colors" />
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-[11px] text-text-primary leading-tight truncate">{task.title}</p>
+                                        <span className="text-[9px] font-medium" style={{ color }}>
+                                          # {task.subcategory}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </Draggable>
+                            );
+                          })}
+                          {provided.placeholder}
+                        </div>
                       </div>
                     )}
-                  </div>
+                  </Droppable>
+                );
+              })}
+            </div>
 
-                  {/* Day tasks */}
-                  <div className="p-1.5 space-y-1">
-                    {dayTasks.map((task) => {
-                      const color = CAT_COLORS[task.category] || "#666";
+            {/* Backlog by subcategory — droppable */}
+            <div>
+              <h2 className="font-heading font-semibold text-sm text-text-secondary mb-3">Backlog</h2>
+              <Droppable droppableId="backlog">
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 min-h-[80px] rounded-lg p-1 transition-colors ${
+                      snapshot.isDraggingOver ? "bg-accent-subtle/40 ring-1 ring-accent/30" : ""
+                    }`}
+                  >
+                    {Object.entries(subcategoryGroups).sort((a, b) => b[1].length - a[1].length).slice(0, 9).map(([sub, subTasks]) => {
+                      const cat = subTasks[0]?.category || "trabajo";
+                      const color = CAT_COLORS[cat] || "#666";
                       return (
-                        <div key={task._id} className="group p-1.5 rounded-md bg-bg-primary/50 hover:bg-bg-hover border border-transparent hover:border-border transition-all cursor-pointer">
-                          <div className="flex items-start gap-1.5">
-                            <button onClick={() => handleComplete(task._id!)}
-                              className="mt-0.5 w-3.5 h-3.5 rounded-full border border-text-muted hover:border-accent flex-shrink-0 transition-colors" />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[11px] text-text-primary leading-tight truncate">{task.title}</p>
-                              <span className="text-[9px] font-medium" style={{ color }}>
-                                # {task.subcategory}
-                              </span>
-                            </div>
+                        <div key={sub} className="rounded-lg border border-border bg-bg-secondary p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[12px] font-semibold" style={{ color }}># {sub}</span>
+                            <span className="text-[10px] text-text-muted font-mono">{subTasks.length}</span>
+                          </div>
+                          <div className="space-y-1">
+                            {subTasks.slice(0, 4).map((task, index) => (
+                              <Draggable key={task._id} draggableId={task._id!} index={index}>
+                                {(dragProvided, dragSnapshot) => (
+                                  <div
+                                    ref={dragProvided.innerRef}
+                                    {...dragProvided.draggableProps}
+                                    {...dragProvided.dragHandleProps}
+                                    className={`flex items-center gap-2 group p-1 rounded-md transition-all cursor-grab active:cursor-grabbing ${
+                                      dragSnapshot.isDragging ? "bg-bg-elevated shadow-lg border border-accent/30" : "hover:bg-bg-hover"
+                                    }`}
+                                  >
+                                    <button onClick={() => handleComplete(task._id!)}
+                                      className="w-3 h-3 rounded-full border border-text-muted hover:border-accent flex-shrink-0 transition-colors" />
+                                    <p className="text-[11px] text-text-secondary truncate group-hover:text-text-primary transition-colors">{task.title}</p>
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))}
+                            {subTasks.length > 4 && (
+                              <p className="text-[10px] text-text-muted pl-5">+{subTasks.length - 4} more</p>
+                            )}
                           </div>
                         </div>
                       );
                     })}
+                    {provided.placeholder}
                   </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Backlog by subcategory */}
-          <div>
-            <h2 className="font-heading font-semibold text-sm text-text-secondary mb-3">Backlog by Project</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {Object.entries(subcategoryGroups).sort((a, b) => b[1].length - a[1].length).slice(0, 9).map(([sub, subTasks]) => {
-                const cat = subTasks[0]?.category || "trabajo";
-                const color = CAT_COLORS[cat] || "#666";
-                return (
-                  <div key={sub} className="rounded-lg border border-border bg-bg-secondary p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[12px] font-semibold" style={{ color }}># {sub}</span>
-                      <span className="text-[10px] text-text-muted font-mono">{subTasks.length}</span>
-                    </div>
-                    <div className="space-y-1">
-                      {subTasks.slice(0, 4).map((task) => (
-                        <div key={task._id} className="flex items-center gap-2 group">
-                          <button onClick={() => handleComplete(task._id!)}
-                            className="w-3 h-3 rounded-full border border-text-muted hover:border-accent flex-shrink-0 transition-colors" />
-                          <p className="text-[11px] text-text-secondary truncate group-hover:text-text-primary transition-colors">{task.title}</p>
-                        </div>
-                      ))}
-                      {subTasks.length > 4 && (
-                        <p className="text-[10px] text-text-muted pl-5">+{subTasks.length - 4} more</p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                )}
+              </Droppable>
             </div>
-          </div>
+          </DragDropContext>
         </div>
 
-        <AddTaskModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onSave={handleAddTask} />
+        <AddTaskModal
+          isOpen={showAddModal}
+          onClose={() => { setShowAddModal(false); setAddModalDate(undefined); }}
+          onSave={handleAddTask}
+          initialDate={addModalDate}
+        />
       </main>
     </div>
   );

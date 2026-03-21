@@ -26,6 +26,7 @@ interface AddTaskModalProps {
     joy: number;
     recurring: { type: "daily" | "weekly" | "custom"; days?: number[] } | null;
     tags: string[];
+    dueDate?: string;
   }) => void;
   editTask?: {
     _id?: string;
@@ -38,10 +39,12 @@ interface AddTaskModalProps {
     joy: number;
     recurring?: { type: "daily" | "weekly" | "custom"; days?: number[] } | null;
     tags?: string[];
+    dueDate?: string;
   } | null;
+  initialDate?: string;
 }
 
-export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddTaskModalProps) {
+export default function AddTaskModal({ isOpen, onClose, onSave, editTask, initialDate }: AddTaskModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<Category>("trabajo");
@@ -49,6 +52,7 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddT
   const [priority, setPriority] = useState<Priority>(2);
   const [roi, setRoi] = useState(5);
   const [joy, setJoy] = useState(5);
+  const [dueDate, setDueDate] = useState("");
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringType, setRecurringType] = useState<"daily" | "weekly" | "custom">("daily");
   const { subcategories: dynamicSubs } = useSubcategories();
@@ -62,6 +66,7 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddT
       setPriority(editTask.priority);
       setRoi(editTask.roi);
       setJoy(editTask.joy);
+      setDueDate(editTask.dueDate || "");
       setIsRecurring(!!editTask.recurring);
       if (editTask.recurring) setRecurringType(editTask.recurring.type);
     } else {
@@ -72,9 +77,10 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddT
       setPriority(2);
       setRoi(5);
       setJoy(5);
+      setDueDate(initialDate || "");
       setIsRecurring(false);
     }
-  }, [editTask, isOpen, dynamicSubs]);
+  }, [editTask, isOpen, dynamicSubs, initialDate]);
 
   useEffect(() => {
     const subs = dynamicSubs[category] || CATEGORIES[category].subcategories;
@@ -87,7 +93,7 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddT
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onSave({ title: title.trim(), description: description.trim(), category, subcategory, priority, roi, joy, recurring: isRecurring ? { type: recurringType } : null, tags: [] });
+    onSave({ title: title.trim(), description: description.trim(), category, subcategory, priority, roi, joy, recurring: isRecurring ? { type: recurringType } : null, tags: [], ...(dueDate ? { dueDate } : {}) });
     onClose();
   };
 
@@ -108,6 +114,12 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddT
 
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" rows={2}
             className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-border text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent text-sm resize-none" />
+
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1.5 uppercase tracking-wide">Due Date</label>
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-border text-text-primary focus:outline-none focus:border-accent text-sm" />
+          </div>
 
           <div>
             <label className="block text-[11px] text-text-muted mb-1.5 uppercase tracking-wide">Category</label>
