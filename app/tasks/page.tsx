@@ -9,6 +9,7 @@ import TaskCard from "@/components/TaskCard";
 import TaskFilters from "@/components/TaskFilters";
 import AddTaskModal from "@/components/AddTaskModal";
 import KanbanBoard from "@/components/KanbanBoard";
+import TaskDetailPanel from "@/components/TaskDetailPanel";
 import { Task, Category, Priority, TaskStatus } from "@/lib/types";
 
 type ViewMode = "list" | "kanban";
@@ -18,6 +19,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [filterCategory, setFilterCategory] = useState<Category | "all">("all");
   const [filterSubcategory, setFilterSubcategory] = useState<string | "all">("all");
   const [filterPriority, setFilterPriority] = useState<Priority | "all">("all");
@@ -73,6 +75,16 @@ export default function TasksPage() {
     } catch (error) { console.error("Error updating status:", error); }
   };
 
+  const handleTaskUpdate = async (taskId: string, updates: Record<string, unknown>) => {
+    try {
+      await fetch(`/api/tasks/${taskId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updates) });
+      fetchTasks();
+      if (selectedTask?._id === taskId) {
+        setSelectedTask((prev) => prev ? { ...prev, ...updates } as Task : null);
+      }
+    } catch (error) { console.error("Error updating task:", error); }
+  };
+
   const toggleView = (mode: ViewMode) => { setViewMode(mode); localStorage.setItem("ricky-view-mode", mode); };
 
   const filteredTasks = tasks.filter((t) => {
@@ -111,11 +123,22 @@ export default function TasksPage() {
             <KanbanBoard tasks={filteredTasks} onStatusChange={handleStatusChange} onEditTask={(t) => { setEditingTask(t); setShowAddModal(true); }} />
           ) : (
             <div className="space-y-0.5">{filteredTasks.map((task) => (
-              <TaskCard key={task._id} task={task} onComplete={handleComplete} onDelete={handleDelete} onFocus={() => {}} onEdit={(t) => { setEditingTask(t); setShowAddModal(true); }} />
+              <TaskCard key={task._id} task={task} onComplete={handleComplete} onDelete={handleDelete} onFocus={() => setSelectedTask(task)} onEdit={(t) => { setEditingTask(t); setShowAddModal(true); }} onClick={() => setSelectedTask(task)} />
             ))}</div>
           )}
         </div>
         <AddTaskModal isOpen={showAddModal} onClose={() => { setShowAddModal(false); setEditingTask(null); }} onSave={handleAddTask} editTask={editingTask} />
+
+        {selectedTask && (
+          <TaskDetailPanel
+            task={selectedTask}
+            onClose={() => setSelectedTask(null)}
+            onUpdate={(updates) => handleTaskUpdate(selectedTask._id!, updates)}
+            onComplete={() => { handleComplete(selectedTask._id!); setSelectedTask(null); }}
+            onDelete={() => { handleDelete(selectedTask._id!); setSelectedTask(null); }}
+            onStartTimer={() => {}}
+          />
+        )}
       </main>
     </div>
   );

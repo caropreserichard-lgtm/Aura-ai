@@ -25,9 +25,10 @@ interface TaskCardProps {
   onDelete: (id: string) => void;
   onFocus: (task: Task) => void;
   onEdit: (task: Task) => void;
+  onClick?: () => void;
 }
 
-export default function TaskCard({ task, onComplete, onDelete, onFocus, onEdit }: TaskCardProps) {
+export default function TaskCard({ task, onComplete, onDelete, onFocus, onEdit, onClick }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [xpAnimation, setXpAnimation] = useState(false);
 
@@ -64,7 +65,7 @@ export default function TaskCard({ task, onComplete, onDelete, onFocus, onEdit }
             )}
           </button>
 
-          <button onClick={() => setExpanded(!expanded)} className="flex-1 min-w-0 text-left">
+          <button onClick={() => onClick ? onClick() : setExpanded(!expanded)} className="flex-1 min-w-0 text-left">
             <span className={`text-[13px] leading-tight ${isDone ? "line-through text-text-muted" : "text-text-primary"}`}>
               {task.title}
             </span>
