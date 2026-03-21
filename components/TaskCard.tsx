@@ -51,7 +51,7 @@ export default function TaskCard({ task, onComplete, onDelete, onFocus, onEdit }
         </div>
       )}
 
-      <div className="px-3 py-2.5">
+      <div className="px-3 py-2">
         <div className="flex items-center gap-3">
           <button onClick={handleComplete} disabled={isDone}
             className={`w-[18px] h-[18px] rounded-full border-[1.5px] flex-shrink-0 transition-all duration-200 flex items-center justify-center ${

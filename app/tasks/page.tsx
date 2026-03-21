@@ -88,7 +88,7 @@ export default function TasksPage() {
       <Sidebar />
       <main className="flex-1 md:ml-60">
         <TopBar onAddTask={() => setShowAddModal(true)} />
-        <div className="p-4 md:p-6 space-y-4 pb-24 md:pb-6">
+        <div className="p-4 md:p-6 space-y-2 pb-24 md:pb-6">
           <div className="flex items-center justify-between">
             <h1 className="font-heading font-semibold text-lg">All Tasks</h1>
             <div className="flex items-center gap-2">
@@ -110,7 +110,7 @@ export default function TasksPage() {
           ) : viewMode === "kanban" ? (
             <KanbanBoard tasks={filteredTasks} onStatusChange={handleStatusChange} onEditTask={(t) => { setEditingTask(t); setShowAddModal(true); }} />
           ) : (
-            <div className="space-y-1">{filteredTasks.map((task) => (
+            <div className="space-y-0.5">{filteredTasks.map((task) => (
               <TaskCard key={task._id} task={task} onComplete={handleComplete} onDelete={handleDelete} onFocus={() => {}} onEdit={(t) => { setEditingTask(t); setShowAddModal(true); }} />
             ))}</div>
           )}
