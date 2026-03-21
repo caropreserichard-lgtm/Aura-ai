@@ -2,17 +2,21 @@
 
 import { useState, useEffect, useCallback } from "react";
 import confetti from "canvas-confetti";
+import { Plus, Check, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Task } from "@/lib/types";
-import { sortTasksForToday, formatTime } from "@/lib/scoring";
+import { formatTime } from "@/lib/scoring";
 import TopBar from "./TopBar";
-import TaskCard from "./TaskCard";
 import AddTaskModal from "./AddTaskModal";
-import ProgressRing from "./ProgressRing";
-import XPBar from "./XPBar";
-import StreakBadge from "./StreakBadge";
 import Timer from "./Timer";
 import LevelUpModal from "./LevelUpModal";
-import CalendarEvents from "./CalendarEvents";
+import TaskDetailPanel from "./TaskDetailPanel";
+
+const CAT_COLORS: Record<string, string> = {
+  trabajo: "#d4a04e",
+  aprendizaje: "#8b7ec8",
+  lifestyle: "#4a9e7e",
+  proyectos: "#6b8aaf",
+};
 
 interface Stats {
   totalXP: number;
@@ -29,6 +33,28 @@ interface Stats {
   };
 }
 
+interface Objective {
+  _id: string;
+  text: string;
+  done: boolean;
+  weekStart: string;
+}
+
+function getWeekStart(date: Date): string {
+  const d = new Date(date);
+  const day = d.getDay();
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return d.toISOString().split("T")[0];
+}
+
+function getWeekRange(weekStart: string): string {
+  const start = new Date(weekStart + "T00:00:00");
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return `${fmt(start)} - ${fmt(end)}`;
+}
+
 export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -38,6 +64,12 @@ export default function Dashboard() {
   const [activeTimerTask, setActiveTimerTask] = useState<string | null>(null);
   const [levelUpLevel, setLevelUpLevel] = useState<number | null>(null);
   const [dbError, setDbError] = useState<string | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  // Objectives
+  const [objectives, setObjectives] = useState<Objective[]>([]);
+  const [newObjective, setNewObjective] = useState("");
+  const weekStart = getWeekStart(new Date());
 
   const fetchData = useCallback(async () => {
     try {
@@ -68,9 +100,17 @@ export default function Dashboard() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const fetchObjectives = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/objectives?weekStart=${weekStart}`);
+      const data = await res.json();
+      if (Array.isArray(data)) setObjectives(data);
+    } catch (e) {
+      console.error("Error fetching objectives:", e);
+    }
+  }, [weekStart]);
+
+  useEffect(() => { fetchData(); fetchObjectives(); }, [fetchData, fetchObjectives]);
 
   const handleAddTask = async (taskData: Record<string, unknown>) => {
     try {
@@ -81,10 +121,12 @@ export default function Dashboard() {
           body: JSON.stringify(taskData),
         });
       } else {
+        // Set dueDate to today if not set
+        const today = new Date().toISOString().split("T")[0];
         await fetch("/api/tasks", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(taskData),
+          body: JSON.stringify({ ...taskData, dueDate: taskData.dueDate || today }),
         });
       }
       setEditingTask(null);
@@ -134,6 +176,23 @@ export default function Dashboard() {
     }
   };
 
+  const handleTaskUpdate = async (taskId: string, updates: Record<string, unknown>) => {
+    try {
+      await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      fetchData();
+      // Update selected task in panel
+      if (selectedTask?._id === taskId) {
+        setSelectedTask((prev) => prev ? { ...prev, ...updates } as Task : null);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleSeedData = async () => {
     try {
       await fetch("/api/seed", { method: "POST" });
@@ -143,8 +202,49 @@ export default function Dashboard() {
     }
   };
 
-  const todayTasks = sortTasksForToday(tasks).slice(0, 5);
-  const doneTodayCount = tasks.filter((t) => t.status === "done").length;
+  const addObjective = async () => {
+    if (!newObjective.trim()) return;
+    try {
+      await fetch("/api/objectives", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: newObjective, weekStart }),
+      });
+      setNewObjective("");
+      fetchObjectives();
+    } catch (e) { console.error(e); }
+  };
+
+  const toggleObjective = async (id: string) => {
+    try {
+      await fetch("/api/objectives", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggle", id }),
+      });
+      fetchObjectives();
+    } catch (e) { console.error(e); }
+  };
+
+  const deleteObjective = async (id: string) => {
+    try {
+      await fetch("/api/objectives", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", id }),
+      });
+      fetchObjectives();
+    } catch (e) { console.error(e); }
+  };
+
+  const today = new Date().toISOString().split("T")[0];
+  const todayTasks = tasks.filter((t) => t.dueDate && t.dueDate.startsWith(today) && t.status !== "done");
+  const todayDone = tasks.filter((t) => t.dueDate && t.dueDate.startsWith(today) && t.status === "done");
+  const totalTimeToday = [...todayTasks, ...todayDone].reduce((s, t) => s + (t.timeSpent || 0), 0);
+
+  const todayDate = new Date();
+  const dayName = todayDate.toLocaleDateString("en-US", { weekday: "long" });
+  const dateLabel = todayDate.toLocaleDateString("en-US", { month: "long", day: "numeric" });
 
   if (loading) {
     return (
@@ -161,82 +261,194 @@ export default function Dashboard() {
     <div className="min-h-screen">
       <TopBar onAddTask={() => setShowAddModal(true)} />
 
-      <div className="p-4 md:p-6 space-y-5 pb-24 md:pb-6">
+      <div className="p-4 md:p-6 pb-24 md:pb-6">
         {dbError && (
-          <div className="p-3 rounded-lg bg-danger-subtle border border-danger/20 text-danger text-sm">
+          <div className="p-3 rounded-lg bg-danger-subtle border border-danger/20 text-danger text-sm mb-4">
             <p className="font-medium">Connection error</p>
             <p className="text-danger/70 mt-1 text-xs">{dbError}</p>
           </div>
         )}
 
-        {/* Header stats row */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-bg-secondary border border-border">
-            <ProgressRing progress={stats?.today.progress || 0} label="today" />
-            <p className="mt-2 text-[11px] text-text-muted">{doneTodayCount}/{tasks.length} tasks</p>
-          </div>
-
-          <div className="flex flex-col justify-center p-4 rounded-lg bg-bg-secondary border border-border">
-            <XPBar level={stats?.level || 1} progress={stats?.levelProgress || 0} xpInLevel={stats?.xpInLevel || 0} totalXP={stats?.totalXP || 0} />
-            <div className="mt-3"><StreakBadge streak={stats?.streak || 0} /></div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="p-3 rounded-lg bg-bg-secondary border border-border text-center">
-              <p className="font-mono text-2xl font-bold text-accent">{stats?.today.tasksCompleted || 0}</p>
-              <p className="text-[10px] text-text-muted mt-1">Done today</p>
-            </div>
-            <div className="p-3 rounded-lg bg-bg-secondary border border-border text-center">
-              <p className="font-mono text-2xl font-bold text-warning">{todayTasks.length}</p>
-              <p className="text-[10px] text-text-muted mt-1">Pending</p>
-            </div>
-            <div className="col-span-2 p-3 rounded-lg bg-bg-secondary border border-border text-center">
-              <p className="font-mono text-lg font-bold text-secondary">{formatTime(stats?.today.timeSpent || 0)}</p>
-              <p className="text-[10px] text-text-muted mt-1">Time today</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="lg:col-span-2 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="font-heading font-semibold text-base text-text-primary">Today&apos;s Focus</h2>
-              <span className="text-[11px] text-text-muted">Sorted by Flow Score</span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left: Today's tasks */}
+          <div className="lg:col-span-2">
+            <div className="mb-4">
+              <h1 className="font-heading font-bold text-xl">{dayName}</h1>
+              <p className="text-text-muted text-[13px]">{dateLabel}</p>
             </div>
 
-            {tasks.length === 0 ? (
-              <div className="text-center py-12 rounded-lg bg-bg-secondary border border-border">
-                <p className="text-text-muted mb-4 text-sm">No tasks yet</p>
-                <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                  <button onClick={() => setShowAddModal(true)} className="px-4 py-2 rounded-lg bg-accent text-text-inverse font-medium text-sm hover:bg-accent-hover transition-colors">Create first task</button>
-                  <button onClick={handleSeedData} className="px-4 py-2 rounded-lg bg-bg-tertiary text-text-secondary font-medium text-sm hover:bg-bg-hover transition-colors">Load samples</button>
-                </div>
+            {/* Progress bar */}
+            {(todayTasks.length > 0 || todayDone.length > 0) && (
+              <div className="h-1.5 rounded-full bg-bg-tertiary mb-4 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-accent transition-all duration-500"
+                  style={{ width: `${todayDone.length / (todayTasks.length + todayDone.length) * 100}%` }}
+                />
               </div>
-            ) : (
-              <div className="space-y-1">
-                {todayTasks.map((task) => (
-                  <TaskCard key={task._id} task={task} onComplete={handleComplete} onDelete={handleDelete}
-                    onFocus={(t) => setActiveTimerTask(t._id || null)}
-                    onEdit={(t) => { setEditingTask(t); setShowAddModal(true); }} />
-                ))}
-                {tasks.filter((t) => t.status !== "done").length > 5 && (
-                  <a href="/tasks" className="block text-center py-2 text-sm text-accent-text hover:text-accent transition-colors">
-                    View all tasks ({tasks.filter((t) => t.status !== "done").length})
-                  </a>
-                )}
+            )}
+
+            {/* Add task button */}
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border bg-bg-secondary hover:bg-bg-hover text-text-muted text-[13px] transition-colors mb-3"
+            >
+              <Plus size={16} />
+              <span>Add task</span>
+              {totalTimeToday > 0 && (
+                <span className="ml-auto font-mono text-accent text-[12px]">{formatTime(totalTimeToday)}</span>
+              )}
+            </button>
+
+            {/* Today's pending tasks */}
+            <div className="space-y-1">
+              {todayTasks.map((task) => {
+                const color = CAT_COLORS[task.category] || "#666";
+                return (
+                  <div
+                    key={task._id}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-bg-secondary border border-border hover:bg-bg-hover transition-colors cursor-pointer group"
+                    onClick={() => setSelectedTask(task)}
+                  >
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleComplete(task._id!); }}
+                      className="w-[18px] h-[18px] rounded-full border-[1.5px] border-text-muted hover:border-accent flex-shrink-0 transition-colors"
+                    />
+                    <span className="text-[13px] text-text-primary flex-1 min-w-0 truncate">{task.title}</span>
+                    {task.timeSpent > 0 && (
+                      <span className="font-mono text-[11px] text-text-muted">{formatTime(task.timeSpent)}</span>
+                    )}
+                    <span className="text-[11px] font-medium" style={{ color }}>
+                      # {task.subcategory}
+                    </span>
+                  </div>
+                );
+              })}
+
+              {/* Done tasks */}
+              {todayDone.map((task) => {
+                const color = CAT_COLORS[task.category] || "#666";
+                return (
+                  <div
+                    key={task._id}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-bg-secondary/50 border border-border/50 transition-colors cursor-pointer opacity-50"
+                    onClick={() => setSelectedTask(task)}
+                  >
+                    <div className="w-[18px] h-[18px] rounded-full bg-accent border-[1.5px] border-accent flex-shrink-0 flex items-center justify-center">
+                      <Check size={10} className="text-text-inverse" />
+                    </div>
+                    <span className="text-[13px] text-text-muted line-through flex-1 min-w-0 truncate">{task.title}</span>
+                    {task.timeSpent > 0 && (
+                      <span className="font-mono text-[11px] text-text-muted">{formatTime(task.timeSpent)}</span>
+                    )}
+                    <span className="text-[11px] font-medium opacity-60" style={{ color }}>
+                      # {task.subcategory}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {todayTasks.length === 0 && todayDone.length === 0 && (
+              <div className="text-center py-12 rounded-lg bg-bg-secondary border border-border">
+                <p className="text-text-muted mb-4 text-sm">No tasks scheduled for today</p>
+                <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                  <button onClick={() => setShowAddModal(true)} className="px-4 py-2 rounded-lg bg-accent text-text-inverse font-medium text-sm hover:bg-accent-hover transition-colors">Add a task</button>
+                  {tasks.length === 0 && (
+                    <button onClick={handleSeedData} className="px-4 py-2 rounded-lg bg-bg-tertiary text-text-secondary font-medium text-sm hover:bg-bg-hover transition-colors">Load samples</button>
+                  )}
+                </div>
               </div>
             )}
           </div>
 
+          {/* Right: Weekly Objectives + Timer */}
           <div className="space-y-4">
+            {/* Weekly Objectives */}
+            <div className="rounded-lg border border-border bg-bg-secondary p-4">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="font-heading font-semibold text-sm">Weekly objectives</h2>
+              </div>
+              <p className="text-[11px] text-text-muted mb-3">{getWeekRange(weekStart)}</p>
+
+              {/* Objectives progress */}
+              {objectives.length > 0 && (
+                <div className="h-1 rounded-full bg-bg-tertiary mb-3 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-accent transition-all"
+                    style={{ width: `${(objectives.filter(o => o.done).length / objectives.length) * 100}%` }}
+                  />
+                </div>
+              )}
+
+              {/* Add objective */}
+              <div className="flex items-center gap-2 mb-3">
+                <button
+                  onClick={addObjective}
+                  className="w-4 h-4 rounded flex items-center justify-center text-text-muted hover:text-accent transition-colors flex-shrink-0"
+                >
+                  <Plus size={14} />
+                </button>
+                <input
+                  type="text"
+                  value={newObjective}
+                  onChange={(e) => setNewObjective(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addObjective()}
+                  placeholder="Add objective"
+                  className="flex-1 bg-transparent text-[12px] text-text-primary placeholder:text-text-muted focus:outline-none"
+                />
+              </div>
+
+              {/* Objectives list */}
+              <div className="space-y-1">
+                {objectives.map((obj) => (
+                  <div key={obj._id} className="flex items-center gap-2 group">
+                    <button
+                      onClick={() => toggleObjective(obj._id)}
+                      className={`w-4 h-4 rounded-full border-[1.5px] flex-shrink-0 flex items-center justify-center transition-colors ${
+                        obj.done ? "bg-accent border-accent" : "border-text-muted hover:border-accent"
+                      }`}
+                    >
+                      {obj.done && <Check size={8} className="text-text-inverse" />}
+                    </button>
+                    <span className={`text-[12px] flex-1 ${obj.done ? "line-through text-text-muted" : "text-text-secondary"}`}>
+                      {obj.text}
+                    </span>
+                    <button
+                      onClick={() => deleteObjective(obj._id)}
+                      className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger transition-all"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Timer */}
             <Timer tasks={tasks} activeTaskId={activeTimerTask} onTimeUpdate={handleTimeUpdate} onSetActiveTask={setActiveTimerTask} />
-            <CalendarEvents />
           </div>
         </div>
       </div>
 
-      <AddTaskModal isOpen={showAddModal} onClose={() => { setShowAddModal(false); setEditingTask(null); }}
-        onSave={handleAddTask} editTask={editingTask} />
+      {/* Task Detail Panel */}
+      {selectedTask && (
+        <TaskDetailPanel
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onUpdate={(updates) => handleTaskUpdate(selectedTask._id!, updates)}
+          onComplete={() => { handleComplete(selectedTask._id!); setSelectedTask(null); }}
+          onDelete={() => { handleDelete(selectedTask._id!); setSelectedTask(null); }}
+          onStartTimer={() => setActiveTimerTask(selectedTask._id || null)}
+        />
+      )}
+
+      <AddTaskModal
+        isOpen={showAddModal}
+        onClose={() => { setShowAddModal(false); setEditingTask(null); }}
+        onSave={handleAddTask}
+        editTask={editingTask}
+        initialDate={today}
+      />
 
       <LevelUpModal level={levelUpLevel || 1} isOpen={levelUpLevel !== null} onClose={() => setLevelUpLevel(null)} />
     </div>

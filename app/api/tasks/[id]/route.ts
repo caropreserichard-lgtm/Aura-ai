@@ -32,6 +32,7 @@ export async function PATCH(
       "dueDate",
       "recurring",
       "tags",
+      "subtasks",
     ];
 
     for (const field of allowedFields) {

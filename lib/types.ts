@@ -20,6 +20,7 @@ export interface Task {
     type: "daily" | "weekly" | "custom";
     days?: number[];
   };
+  subtasks?: { text: string; done: boolean }[];
   tags: string[];
   sourceUrl?: string;
   calendarEventId?: string;

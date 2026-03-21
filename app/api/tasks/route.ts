@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
       tags,
       dueDate,
       sourceUrl,
+      subtasks,
     } = body;
 
     if (!title || !category || !subcategory || !priority || !roi || !joy) {
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
       dueDate: dueDate || null,
       recurring: recurring || null,
       tags: tags || [],
+      subtasks: subtasks || [],
       sourceUrl: sourceUrl || null,
       createdAt: new Date().toISOString(),
       completedAt: null,

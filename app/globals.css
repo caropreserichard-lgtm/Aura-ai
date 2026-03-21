@@ -147,6 +147,12 @@ body {
 }
 .animate-float-up { animation: float-up 1.5s ease-out forwards; }
 
+@keyframes slide-in-right {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(0); }
+}
+.animate-slide-in-right { animation: slide-in-right 0.2s ease-out forwards; }
+
 .task-checkbox { transition: all 0.2s ease; }
 .task-checkbox:checked { background: var(--accent); }
 
