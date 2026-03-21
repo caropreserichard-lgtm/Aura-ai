@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { Settings } from "lucide-react";
 import { CATEGORIES, Category, PRIORITY_CONFIG, Priority, TaskStatus } from "@/lib/types";
 import { useSubcategories } from "@/lib/hooks/useSubcategories";
 
@@ -27,8 +29,10 @@ export default function TaskFilters({
 }: TaskFiltersProps) {
   const { subcategories: dynamicSubs } = useSubcategories();
 
+  // Build subcategory list filtered by selected category
   const allSubcategories: { name: string; category: Category }[] = [];
-  (Object.keys(CATEGORIES) as Category[]).forEach((cat) => {
+  const cats = selectedCategory !== "all" ? [selectedCategory] : (Object.keys(CATEGORIES) as Category[]);
+  cats.forEach((cat) => {
     const subs = dynamicSubs[cat] || CATEGORIES[cat].subcategories;
     subs.forEach((sub) => allSubcategories.push({ name: sub, category: cat }));
   });
@@ -36,44 +40,15 @@ export default function TaskFilters({
   const handleSubTabClick = (sub: { name: string; category: Category }) => {
     if (selectedSubcategory === sub.name) {
       onSubcategoryChange("all");
-      onCategoryChange("all");
     } else {
-      onCategoryChange(sub.category);
+      if (selectedCategory === "all") onCategoryChange(sub.category);
       onSubcategoryChange(sub.name);
     }
   };
 
   return (
-    <div className="space-y-2.5">
-      <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
-        <button
-          onClick={() => { onCategoryChange("all"); onSubcategoryChange("all"); }}
-          className={`px-3 py-1.5 rounded-lg text-[12px] font-medium whitespace-nowrap transition-all border flex-shrink-0 ${
-            selectedCategory === "all" && selectedSubcategory === "all"
-              ? "bg-bg-elevated border-border-strong text-text-primary"
-              : "border-transparent text-text-muted hover:text-text-secondary hover:bg-bg-hover"
-          }`}
-        >
-          All
-        </button>
-        {allSubcategories.map((sub) => {
-          const isSelected = selectedSubcategory === sub.name;
-          const color = CAT_COLORS[sub.category];
-          return (
-            <button
-              key={`${sub.category}-${sub.name}`}
-              onClick={() => handleSubTabClick(sub)}
-              className={`px-3 py-1.5 rounded-lg text-[12px] font-medium whitespace-nowrap transition-all border flex-shrink-0 ${
-                isSelected ? "" : "border-transparent text-text-muted hover:text-text-secondary hover:bg-bg-hover"
-              }`}
-              style={isSelected ? { backgroundColor: `${color}15`, color, borderColor: `${color}30` } : {}}
-            >
-              {sub.name}
-            </button>
-          );
-        })}
-      </div>
-
+    <div className="space-y-2">
+      {/* Row 1: Category buttons + Status + Priority */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex flex-wrap gap-1.5">
           {(Object.keys(CATEGORIES) as Category[]).map((cat) => {
@@ -112,6 +87,44 @@ export default function TaskFilters({
             ))}
           </select>
         </div>
+      </div>
+
+      {/* Row 2: Subcategory tabs */}
+      <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+        <button
+          onClick={() => { onCategoryChange("all"); onSubcategoryChange("all"); }}
+          className={`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-all border flex-shrink-0 ${
+            selectedCategory === "all" && selectedSubcategory === "all"
+              ? "bg-bg-elevated border-border-strong text-text-primary"
+              : "border-transparent text-text-muted hover:text-text-secondary hover:bg-bg-hover"
+          }`}
+        >
+          All
+        </button>
+        {allSubcategories.map((sub) => {
+          const isSelected = selectedSubcategory === sub.name;
+          const color = CAT_COLORS[sub.category];
+          return (
+            <button
+              key={`${sub.category}-${sub.name}`}
+              onClick={() => handleSubTabClick(sub)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-all border flex-shrink-0 ${
+                isSelected ? "" : "border-transparent text-text-muted hover:text-text-secondary hover:bg-bg-hover"
+              }`}
+              style={isSelected ? { backgroundColor: `${color}15`, color, borderColor: `${color}30` } : {}}
+            >
+              {sub.name}
+            </button>
+          );
+        })}
+        <Link
+          href="/settings"
+          className="px-2 py-1 rounded-md text-[11px] text-text-muted hover:text-accent hover:bg-bg-hover transition-all flex-shrink-0 flex items-center gap-1"
+          title="Manage subcategories"
+        >
+          <Settings size={11} />
+          Manage
+        </Link>
       </div>
     </div>
   );
