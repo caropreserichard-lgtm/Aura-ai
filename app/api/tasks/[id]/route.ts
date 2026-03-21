@@ -34,6 +34,7 @@ export async function PATCH(
       "recurring",
       "tags",
       "subtasks",
+      "sourceUrl",
     ];
 
     for (const field of allowedFields) {

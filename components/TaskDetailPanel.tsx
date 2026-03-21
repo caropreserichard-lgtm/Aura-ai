@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Play, Trash2, Plus, Check, Calendar, Clock } from "lucide-react";
+import { X, Play, Trash2, Plus, Check, Calendar, Clock, Link2, ExternalLink } from "lucide-react";
 import { Task, PRIORITY_CONFIG } from "@/lib/types";
 import { formatTime } from "@/lib/scoring";
 import SubcategoryPicker from "./SubcategoryPicker";
@@ -28,6 +28,8 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
   const [dueDate, setDueDate] = useState(task.dueDate || "");
   const [newSubtask, setNewSubtask] = useState("");
   const [subtasks, setSubtasks] = useState<{ text: string; done: boolean }[]>(task.subtasks || []);
+  const [sourceUrl, setSourceUrl] = useState(task.sourceUrl || "");
+  const [editingUrl, setEditingUrl] = useState(false);
 
   const color = CAT_COLORS[task.category] || "#666";
   const isDone = task.status === "done";
@@ -164,6 +166,53 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
             <span className="text-[11px] text-text-muted">ROI: {task.roi}/10</span>
             <span className="text-[11px] text-text-muted">Joy: {task.joy}/10</span>
             <span className="text-[11px] text-text-muted">Flow: {task.flowScore}</span>
+          </div>
+
+          {/* Link */}
+          <div>
+            <h3 className="text-[11px] text-text-muted uppercase tracking-wide mb-2">Link</h3>
+            {editingUrl || !sourceUrl ? (
+              <div className="flex items-center gap-2">
+                <Link2 size={13} className="text-text-muted flex-shrink-0" />
+                <input
+                  type="url"
+                  value={sourceUrl}
+                  onChange={(e) => setSourceUrl(e.target.value)}
+                  onBlur={() => {
+                    onUpdate({ sourceUrl: sourceUrl || null });
+                    setEditingUrl(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      onUpdate({ sourceUrl: sourceUrl || null });
+                      setEditingUrl(false);
+                    }
+                  }}
+                  placeholder="Add a link..."
+                  autoFocus={editingUrl}
+                  className="flex-1 bg-transparent text-[12px] text-text-primary placeholder:text-text-muted focus:outline-none border-b border-border focus:border-accent pb-0.5"
+                />
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 group">
+                <Link2 size={13} className="text-accent flex-shrink-0" />
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[12px] text-accent hover:underline truncate flex-1"
+                >
+                  {sourceUrl.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60)}
+                </a>
+                <ExternalLink size={11} className="text-accent flex-shrink-0" />
+                <button
+                  onClick={() => setEditingUrl(true)}
+                  className="opacity-0 group-hover:opacity-100 text-[10px] text-text-muted hover:text-text-secondary transition-all"
+                >
+                  Edit
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Notes */}
