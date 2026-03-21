@@ -29,6 +29,7 @@ export async function PATCH(
       "roi",
       "joy",
       "status",
+      "startDate",
       "dueDate",
       "recurring",
       "tags",

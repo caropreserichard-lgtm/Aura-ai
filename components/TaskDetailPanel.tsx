@@ -24,6 +24,7 @@ interface TaskDetailPanelProps {
 
 export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, onDelete, onStartTimer }: TaskDetailPanelProps) {
   const [description, setDescription] = useState(task.description || "");
+  const [startDate, setStartDate] = useState(task.startDate || task.createdAt?.split("T")[0] || "");
   const [dueDate, setDueDate] = useState(task.dueDate || "");
   const [newSubtask, setNewSubtask] = useState("");
   const [subtasks, setSubtasks] = useState<{ text: string; done: boolean }[]>(task.subtasks || []);
@@ -35,6 +36,11 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
     if (description !== (task.description || "")) {
       onUpdate({ description });
     }
+  };
+
+  const saveStartDate = (value: string) => {
+    setStartDate(value);
+    onUpdate({ startDate: value || null });
   };
 
   const saveDueDate = (value: string) => {
@@ -83,6 +89,16 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
             <div className="flex items-center gap-1 text-[11px] text-text-muted">
               <Calendar size={12} />
               <span>Start:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => saveStartDate(e.target.value)}
+                className="bg-transparent text-text-secondary text-[11px] focus:outline-none cursor-pointer"
+              />
+            </div>
+            <div className="flex items-center gap-1 text-[11px] text-text-muted">
+              <Calendar size={12} />
+              <span>Due:</span>
               <input
                 type="date"
                 value={dueDate}

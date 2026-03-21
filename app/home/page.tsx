@@ -6,6 +6,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import AddTaskModal from "@/components/AddTaskModal";
+import TaskDetailPanel from "@/components/TaskDetailPanel";
 import { Task, CATEGORIES } from "@/lib/types";
 
 const CAT_COLORS: Record<string, string> = {
@@ -48,6 +49,7 @@ export default function HomePage() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addModalDate, setAddModalDate] = useState<string | undefined>(undefined);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -138,6 +140,29 @@ export default function HomePage() {
       // destId is a date key like "2026-03-20"
       handleUpdateDueDate(taskId, destId);
     }
+  };
+
+  const handleTaskUpdate = async (taskId: string, updates: Record<string, unknown>) => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      const updated = await res.json();
+      setTasks((prev) => prev.map((t) => (t._id === taskId ? { ...t, ...updated } : t)));
+      if (selectedTask?._id === taskId) {
+        setSelectedTask((prev) => prev ? { ...prev, ...updated } : null);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
+      setTasks((prev) => prev.filter((t) => t._id !== taskId));
+      setSelectedTask(null);
+    } catch (e) { console.error(e); }
   };
 
   const openAddForDay = (dateKey: string) => {
@@ -244,9 +269,9 @@ export default function HomePage() {
                                     }`}
                                   >
                                     <div className="flex items-start gap-1.5">
-                                      <button onClick={() => handleComplete(task._id!)}
+                                      <button onClick={(e) => { e.stopPropagation(); handleComplete(task._id!); }}
                                         className="mt-0.5 w-3.5 h-3.5 rounded-full border border-text-muted hover:border-accent flex-shrink-0 transition-colors" />
-                                      <div className="min-w-0 flex-1">
+                                      <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setSelectedTask(task)}>
                                         <p className="text-[11px] text-text-primary leading-tight truncate">{task.title}</p>
                                         <span className="text-[9px] font-medium" style={{ color }}>
                                           # {task.subcategory}
@@ -300,9 +325,9 @@ export default function HomePage() {
                                       dragSnapshot.isDragging ? "bg-bg-elevated shadow-lg border border-accent/30" : "hover:bg-bg-hover"
                                     }`}
                                   >
-                                    <button onClick={() => handleComplete(task._id!)}
+                                    <button onClick={(e) => { e.stopPropagation(); handleComplete(task._id!); }}
                                       className="w-3 h-3 rounded-full border border-text-muted hover:border-accent flex-shrink-0 transition-colors" />
-                                    <p className="text-[11px] text-text-secondary truncate group-hover:text-text-primary transition-colors">{task.title}</p>
+                                    <p className="text-[11px] text-text-secondary truncate group-hover:text-text-primary transition-colors cursor-pointer" onClick={() => setSelectedTask(task)}>{task.title}</p>
                                   </div>
                                 )}
                               </Draggable>
@@ -328,6 +353,17 @@ export default function HomePage() {
           onSave={handleAddTask}
           initialDate={addModalDate}
         />
+
+        {selectedTask && (
+          <TaskDetailPanel
+            task={selectedTask}
+            onClose={() => setSelectedTask(null)}
+            onUpdate={(updates) => handleTaskUpdate(selectedTask._id!, updates)}
+            onComplete={() => { handleComplete(selectedTask._id!); setSelectedTask(null); }}
+            onDelete={() => handleDeleteTask(selectedTask._id!)}
+            onStartTimer={() => {}}
+          />
+        )}
       </main>
     </div>
   );

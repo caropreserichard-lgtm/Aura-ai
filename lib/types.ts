@@ -15,6 +15,7 @@ export interface Task {
   xp: number;
   status: TaskStatus;
   timeSpent: number;
+  startDate?: string;
   dueDate?: string;
   recurring?: {
     type: "daily" | "weekly" | "custom";
