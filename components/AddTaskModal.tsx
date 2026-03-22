@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, Link2 } from "lucide-react";
 import { CATEGORIES, Category, Priority, PRIORITY_CONFIG } from "@/lib/types";
 import { calculateFlowScore, calculateXP } from "@/lib/scoring";
 import { useSubcategories } from "@/lib/hooks/useSubcategories";
@@ -27,6 +27,7 @@ interface AddTaskModalProps {
     recurring: { type: "daily" | "weekly" | "custom"; days?: number[] } | null;
     tags: string[];
     dueDate?: string;
+    sourceUrl?: string;
   }) => void;
   editTask?: {
     _id?: string;
@@ -40,6 +41,7 @@ interface AddTaskModalProps {
     recurring?: { type: "daily" | "weekly" | "custom"; days?: number[] } | null;
     tags?: string[];
     dueDate?: string;
+    sourceUrl?: string;
   } | null;
   initialDate?: string;
 }
@@ -53,6 +55,7 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask, initia
   const [roi, setRoi] = useState(5);
   const [joy, setJoy] = useState(5);
   const [dueDate, setDueDate] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringType, setRecurringType] = useState<"daily" | "weekly" | "custom">("daily");
   const { subcategories: dynamicSubs } = useSubcategories();
@@ -67,6 +70,7 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask, initia
       setRoi(editTask.roi);
       setJoy(editTask.joy);
       setDueDate(editTask.dueDate || "");
+      setSourceUrl(editTask.sourceUrl || "");
       setIsRecurring(!!editTask.recurring);
       if (editTask.recurring) setRecurringType(editTask.recurring.type);
     } else {
@@ -78,6 +82,7 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask, initia
       setRoi(5);
       setJoy(5);
       setDueDate(initialDate || "");
+      setSourceUrl("");
       setIsRecurring(false);
     }
   }, [editTask, isOpen, dynamicSubs, initialDate]);
@@ -93,7 +98,7 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask, initia
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onSave({ title: title.trim(), description: description.trim(), category, subcategory, priority, roi, joy, recurring: isRecurring ? { type: recurringType } : null, tags: [], ...(dueDate ? { dueDate } : {}) });
+    onSave({ title: title.trim(), description: description.trim(), category, subcategory, priority, roi, joy, recurring: isRecurring ? { type: recurringType } : null, tags: [], ...(dueDate ? { dueDate } : {}), ...(sourceUrl.trim() ? { sourceUrl: sourceUrl.trim() } : {}) });
     onClose();
   };
 
@@ -114,6 +119,17 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask, initia
 
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" rows={2}
             className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-border text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent text-sm resize-none" />
+
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-tertiary border border-border">
+            <Link2 size={14} className="text-text-muted flex-shrink-0" />
+            <input type="url" value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} placeholder="Link (optional)"
+              className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none" />
+            {sourceUrl && (
+              <button type="button" onClick={() => setSourceUrl("")} className="text-text-muted hover:text-danger">
+                <X size={14} />
+              </button>
+            )}
+          </div>
 
           <div>
             <label className="block text-[11px] text-text-muted mb-1.5 uppercase tracking-wide">Due Date</label>
