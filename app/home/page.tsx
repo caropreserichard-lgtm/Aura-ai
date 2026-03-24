@@ -513,7 +513,7 @@ export default function HomePage() {
                                         ? "bg-bg-primary/30 border-border/30"
                                         : "bg-bg-secondary border-border hover:border-border/80 shadow-sm hover:shadow-md"
                                     }`}
-                                    style={{ opacity: isDone ? 0.45 : 1 }}>
+                                    style={{ opacity: isDone ? 0.6 : 1 }}>
                                     <div className="p-3">
                                       <div className="flex items-start gap-2.5">
                                         {/* Checkbox */}
