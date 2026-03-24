@@ -125,7 +125,10 @@ export interface Project {
   name: string;
   description?: string;
   color: string;
+  labels?: string[];
   tasks: ProjectTask[];
+  archived?: boolean;
+  order?: number;
   createdAt: string;
   updatedAt: string;
 }

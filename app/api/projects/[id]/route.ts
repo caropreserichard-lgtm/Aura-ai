@@ -181,8 +181,47 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ ok: true });
     }
 
-    // Generic update (name, description, color)
-    const allowed = ["name", "description", "color"];
+    if (action === "archive") {
+      await db.collection("projects").updateOne({ _id: new ObjectId(id) }, { $set: { archived: true, updatedAt: now } });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "unarchive") {
+      await db.collection("projects").updateOne({ _id: new ObjectId(id) }, { $set: { archived: false, updatedAt: now } });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "archive_all_cards") {
+      // Move all tasks to a special "archived" state — we clear them but store in archivedTasks
+      const project = await db.collection("projects").findOne({ _id: new ObjectId(id) });
+      if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      await db.collection("projects").updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { tasks: [], archivedTasks: [...(project.archivedTasks || []), ...(project.tasks || [])], updatedAt: now } }
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "copy_list") {
+      const project = await db.collection("projects").findOne({ _id: new ObjectId(id) });
+      if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const copy = {
+        name: `${project.name} (Copy)`,
+        description: project.description,
+        color: project.color,
+        labels: project.labels || [],
+        tasks: (project.tasks || []).map((t: { id: string }) => ({ ...t, id: new ObjectId().toString() })),
+        archived: false,
+        order: (project.order ?? 0) + 1,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const result = await db.collection("projects").insertOne(copy);
+      return NextResponse.json({ ...copy, _id: result.insertedId });
+    }
+
+    // Generic update (name, description, color, labels)
+    const allowed = ["name", "description", "color", "labels"];
     const updates: Record<string, unknown> = { updatedAt: now };
     for (const f of allowed) {
       if (body[f] !== undefined) updates[f] = body[f];
@@ -200,7 +239,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const db = await getDb();
     const { id } = await params;
     if (!ObjectId.isValid(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-    await db.collection("projects").deleteOne({ _id: new ObjectId(id) });
+    const now = new Date().toISOString();
+    // Soft delete — archive instead of permanent delete
+    await db.collection("projects").updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { archived: true, deletedAt: now, updatedAt: now } }
+    );
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("DELETE /api/projects/[id] error:", error);

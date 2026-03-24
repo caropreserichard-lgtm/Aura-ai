@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Plus, X, Check, Trash2, Link2, ExternalLink, MessageSquare,
-  FolderKanban, MoreHorizontal, ChevronDown, Calendar, Tags,
-  CheckSquare, AlignLeft, Clock, GripVertical,
+  FolderKanban, MoreHorizontal, ChevronDown, ChevronUp, Calendar, Tags,
+  CheckSquare, AlignLeft, Clock, GripVertical, Copy, ArrowRightLeft,
+  Eye, Archive, Zap, RotateCcw,
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import Sidebar from "@/components/Sidebar";
@@ -16,6 +17,7 @@ const LABEL_COLORS = [
   { name: "Red", color: "#EF4444" }, { name: "Orange", color: "#F97316" },
   { name: "Yellow", color: "#EAB308" }, { name: "Green", color: "#22C55E" },
   { name: "Blue", color: "#3B82F6" }, { name: "Purple", color: "#8B5CF6" },
+  { name: "Pink", color: "#EC4899" }, { name: "Teal", color: "#14B8A6" },
 ];
 
 // ─── Task Detail Modal ─────────────────────────────────────────
@@ -63,10 +65,8 @@ function TaskDetailModal({
     <div ref={overlayRef} className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center pt-12 overflow-y-auto pb-12"
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}>
       <div className="w-full max-w-[768px] bg-bg-secondary rounded-xl border border-border shadow-2xl animate-slide-in-right mx-4">
-        {/* Header */}
         <div className="px-5 pt-4 pb-3 flex items-start gap-3">
           <div className="flex-1 min-w-0">
-            {/* Project badge + Move */}
             <div className="relative mb-2">
               <button onClick={() => setShowMove(!showMove)}
                 className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium text-text-inverse"
@@ -98,15 +98,11 @@ function TaskDetailModal({
                       </select>
                     </div>
                     <button onClick={() => { onMoveTask(moveProject, movePosition); setShowMove(false); }}
-                      className="w-full py-1.5 rounded bg-accent text-text-inverse text-xs font-medium hover:bg-accent-hover transition-colors">
-                      Move
-                    </button>
+                      className="w-full py-1.5 rounded bg-accent text-text-inverse text-xs font-medium hover:bg-accent-hover transition-colors">Move</button>
                   </div>
                 </div>
               )}
             </div>
-
-            {/* Title */}
             {editingTitle ? (
               <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus
                 onBlur={() => { onUpdate({ title }); setEditingTitle(false); }}
@@ -126,8 +122,6 @@ function TaskDetailModal({
                 </h2>
               </div>
             )}
-
-            {/* Label dots */}
             {labels.length > 0 && (
               <div className="flex gap-1 mt-2 ml-8">
                 {labels.map((l) => <div key={l} className="w-8 h-2 rounded-full" style={{ backgroundColor: l }} />)}
@@ -138,25 +132,18 @@ function TaskDetailModal({
         </div>
 
         <div className="flex flex-col md:flex-row">
-          {/* Left - Content */}
           <div className="flex-1 px-5 pb-5 space-y-4 min-w-0">
-            {/* Action buttons */}
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => setShowLabels(!showLabels)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-bg-tertiary hover:bg-bg-hover text-text-secondary text-xs font-medium border border-border transition-colors">
+              <button onClick={() => setShowLabels(!showLabels)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-bg-tertiary hover:bg-bg-hover text-text-secondary text-xs font-medium border border-border transition-colors">
                 <Tags size={13} /> Labels
               </button>
-              <button onClick={() => setShowDates(!showDates)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-bg-tertiary hover:bg-bg-hover text-text-secondary text-xs font-medium border border-border transition-colors">
+              <button onClick={() => setShowDates(!showDates)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-bg-tertiary hover:bg-bg-hover text-text-secondary text-xs font-medium border border-border transition-colors">
                 <Calendar size={13} /> Dates
               </button>
-              <button onClick={() => document.getElementById("checklist-input")?.focus()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-bg-tertiary hover:bg-bg-hover text-text-secondary text-xs font-medium border border-border transition-colors">
+              <button onClick={() => document.getElementById("checklist-input")?.focus()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-bg-tertiary hover:bg-bg-hover text-text-secondary text-xs font-medium border border-border transition-colors">
                 <CheckSquare size={13} /> Checklist
               </button>
             </div>
-
-            {/* Labels dropdown */}
             {showLabels && (
               <div className="p-3 bg-bg-tertiary rounded-lg border border-border space-y-1.5">
                 <h4 className="text-[10px] text-text-muted uppercase tracking-wide">Labels</h4>
@@ -169,8 +156,6 @@ function TaskDetailModal({
                 ))}
               </div>
             )}
-
-            {/* Dates dropdown */}
             {showDates && (
               <div className="p-3 bg-bg-tertiary rounded-lg border border-border space-y-2">
                 <h4 className="text-[10px] text-text-muted uppercase tracking-wide">Due date</h4>
@@ -178,8 +163,6 @@ function TaskDetailModal({
                   className="w-full px-2 py-1.5 rounded bg-bg-secondary border border-border text-xs text-text-primary focus:outline-none focus:border-accent" />
               </div>
             )}
-
-            {/* Description */}
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <AlignLeft size={14} className="text-text-muted" />
@@ -199,57 +182,47 @@ function TaskDetailModal({
                 </div>
               ) : (
                 <button onClick={() => setEditingDesc(true)}
-                  className="w-full text-left px-3 py-3 rounded-lg bg-bg-tertiary text-sm text-text-muted hover:bg-bg-hover transition-colors min-h-[60px]">
+                  className="w-full text-left px-3 py-3 rounded-lg bg-bg-tertiary text-sm text-text-muted hover:bg-bg-hover transition-colors min-h-[60px] whitespace-pre-wrap">
                   {desc || "Add a more detailed description..."}
                 </button>
               )}
             </div>
-
-            {/* Checklist */}
-            {(checklist.length > 0 || true) && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckSquare size={14} className="text-text-muted" />
-                  <h3 className="text-sm font-semibold text-text-primary">Checklist</h3>
-                  {checklist.length > 0 && (
-                    <span className="text-[10px] text-text-muted">{checkDone}/{checklist.length}</span>
-                  )}
-                </div>
-                {checklist.length > 0 && (
-                  <div className="w-full h-1.5 rounded-full bg-bg-tertiary mb-2 overflow-hidden">
-                    <div className="h-full rounded-full bg-accent transition-all duration-300"
-                      style={{ width: `${checklist.length > 0 ? (checkDone / checklist.length) * 100 : 0}%` }} />
-                  </div>
-                )}
-                <div className="space-y-1 mb-2">
-                  {checklist.map((item) => (
-                    <div key={item.id} className="flex items-center gap-2 group px-1 py-0.5 rounded hover:bg-bg-hover">
-                      <button onClick={() => onToggleChecklist(item.id)}
-                        className={`w-4 h-4 rounded border-[1.5px] flex-shrink-0 flex items-center justify-center transition-colors ${
-                          item.done ? "bg-accent border-accent" : "border-text-muted hover:border-accent"
-                        }`}>
-                        {item.done && <Check size={8} className="text-text-inverse" />}
-                      </button>
-                      <span className={`flex-1 text-xs ${item.done ? "line-through text-text-muted" : "text-text-primary"}`}>{item.text}</span>
-                      <button onClick={() => onDeleteChecklist(item.id)}
-                        className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger transition-all"><X size={12} /></button>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2">
-                  <input id="checklist-input" type="text" value={checkText} onChange={(e) => setCheckText(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && checkText.trim()) { onAddChecklist(checkText.trim()); setCheckText(""); } }}
-                    placeholder="Add an item..."
-                    className="flex-1 px-2 py-1.5 rounded bg-bg-tertiary border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent" />
-                  {checkText && (
-                    <button onClick={() => { onAddChecklist(checkText.trim()); setCheckText(""); }}
-                      className="px-2 py-1.5 rounded bg-accent text-text-inverse text-xs font-medium">Add</button>
-                  )}
-                </div>
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <CheckSquare size={14} className="text-text-muted" />
+                <h3 className="text-sm font-semibold text-text-primary">Checklist</h3>
+                {checklist.length > 0 && <span className="text-[10px] text-text-muted">{checkDone}/{checklist.length}</span>}
               </div>
-            )}
-
-            {/* Links */}
+              {checklist.length > 0 && (
+                <div className="w-full h-1.5 rounded-full bg-bg-tertiary mb-2 overflow-hidden">
+                  <div className="h-full rounded-full bg-accent transition-all duration-300"
+                    style={{ width: `${(checkDone / checklist.length) * 100}%` }} />
+                </div>
+              )}
+              <div className="space-y-1 mb-2">
+                {checklist.map((item) => (
+                  <div key={item.id} className="flex items-center gap-2 group px-1 py-0.5 rounded hover:bg-bg-hover">
+                    <button onClick={() => onToggleChecklist(item.id)}
+                      className={`w-4 h-4 rounded border-[1.5px] flex-shrink-0 flex items-center justify-center transition-colors ${
+                        item.done ? "bg-accent border-accent" : "border-text-muted hover:border-accent"
+                      }`}>
+                      {item.done && <Check size={8} className="text-text-inverse" />}
+                    </button>
+                    <span className={`flex-1 text-xs ${item.done ? "line-through text-text-muted" : "text-text-primary"}`}>{item.text}</span>
+                    <button onClick={() => onDeleteChecklist(item.id)}
+                      className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger transition-all"><X size={12} /></button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <input id="checklist-input" type="text" value={checkText} onChange={(e) => setCheckText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && checkText.trim()) { onAddChecklist(checkText.trim()); setCheckText(""); } }}
+                  placeholder="Add an item..."
+                  className="flex-1 px-2 py-1.5 rounded bg-bg-tertiary border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent" />
+                {checkText && <button onClick={() => { onAddChecklist(checkText.trim()); setCheckText(""); }}
+                  className="px-2 py-1.5 rounded bg-accent text-text-inverse text-xs font-medium">Add</button>}
+              </div>
+            </div>
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Link2 size={14} className="text-text-muted" />
@@ -275,25 +248,17 @@ function TaskDetailModal({
               </div>
             </div>
           </div>
-
-          {/* Right - Comments & Activity */}
           <div className="w-full md:w-72 border-t md:border-t-0 md:border-l border-border px-4 pb-5 pt-3">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <MessageSquare size={14} className="text-text-muted" />
-                <h3 className="text-sm font-semibold text-text-primary">Comments and activity</h3>
-              </div>
+            <div className="flex items-center gap-2 mb-3">
+              <MessageSquare size={14} className="text-text-muted" />
+              <h3 className="text-sm font-semibold text-text-primary">Comments and activity</h3>
             </div>
-
-            {/* Add comment */}
             <div className="mb-3">
               <input type="text" value={comment} onChange={(e) => setComment(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && comment.trim()) { onAddComment(comment.trim()); setComment(""); } }}
                 placeholder="Write a comment..."
                 className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent" />
             </div>
-
-            {/* Activity log */}
             <div className="space-y-3">
               {(task.comments || []).slice().reverse().map((c) => (
                 <div key={c.id} className="flex gap-2">
@@ -308,38 +273,23 @@ function TaskDetailModal({
                   </div>
                 </div>
               ))}
-
-              {/* Created activity */}
               <div className="flex gap-2">
-                <div className="w-6 h-6 rounded-full bg-bg-tertiary flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Clock size={10} className="text-text-muted" />
-                </div>
+                <div className="w-6 h-6 rounded-full bg-bg-tertiary flex items-center justify-center flex-shrink-0 mt-0.5"><Clock size={10} className="text-text-muted" /></div>
                 <div>
-                  <p className="text-[11px] text-text-muted">
-                    Added this card to <span className="font-semibold text-text-secondary">{project.name}</span>
-                  </p>
-                  <p className="text-[10px] text-text-muted">
-                    {new Date(task.createdAt).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
-                  </p>
+                  <p className="text-[11px] text-text-muted">Added to <span className="font-semibold text-text-secondary">{project.name}</span></p>
+                  <p className="text-[10px] text-text-muted">{new Date(task.createdAt).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}</p>
                 </div>
               </div>
-
               {task.completedAt && (
                 <div className="flex gap-2">
-                  <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Check size={10} className="text-accent" />
-                  </div>
+                  <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5"><Check size={10} className="text-accent" /></div>
                   <div>
                     <p className="text-[11px] text-text-muted">Marked as <span className="font-semibold text-accent">complete</span></p>
-                    <p className="text-[10px] text-text-muted">
-                      {new Date(task.completedAt).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
-                    </p>
+                    <p className="text-[10px] text-text-muted">{new Date(task.completedAt).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}</p>
                   </div>
                 </div>
               )}
             </div>
-
-            {/* Delete */}
             <button onClick={onDelete}
               className="mt-6 flex items-center gap-1.5 text-[11px] text-danger hover:bg-danger-subtle px-3 py-1.5 rounded transition-colors w-full">
               <Trash2 size={12} /> Delete card
@@ -351,19 +301,23 @@ function TaskDetailModal({
   );
 }
 
-// ─── List Actions Menu ──────────────────────────────────────────
+// ─── List Actions Menu (Trello-style) ───────────────────────────
 function ListActionsMenu({
-  project, projects, onClose, onDelete, onAddCard, onChangeColor, onMoveAllCards, onSortBy,
+  project, projects, onClose, onArchive, onAddCard, onCopyList,
+  onChangeColor, onMoveAllCards, onSortBy, onArchiveAllCards,
 }: {
   project: Project; projects: Project[];
-  onClose: () => void; onDelete: () => void; onAddCard: () => void;
+  onClose: () => void; onArchive: () => void; onAddCard: () => void;
+  onCopyList: () => void;
   onChangeColor: (color: string) => void;
   onMoveAllCards: (toProjectId: string) => void;
   onSortBy: (sort: string) => void;
+  onArchiveAllCards: () => void;
 }) {
   const [showColors, setShowColors] = useState(false);
   const [showMoveAll, setShowMoveAll] = useState(false);
   const [showSort, setShowSort] = useState(false);
+  const [showAutomation, setShowAutomation] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -375,51 +329,92 @@ function ListActionsMenu({
   }, [onClose]);
 
   return (
-    <div ref={ref} className="absolute top-8 right-0 w-56 bg-bg-tertiary border border-border rounded-lg shadow-xl z-30 py-1">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+    <div ref={ref} className="absolute top-8 right-0 w-60 bg-bg-tertiary border border-border rounded-lg shadow-xl z-30 overflow-hidden"
+      onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
         <h4 className="text-xs font-semibold text-text-primary">List actions</h4>
         <button onClick={onClose} className="text-text-muted hover:text-text-primary"><X size={14} /></button>
       </div>
-      <button onClick={() => { onAddCard(); onClose(); }}
-        className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors">Add card</button>
-      <button onClick={() => setShowMoveAll(!showMoveAll)}
-        className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors">Move all cards in this list</button>
-      {showMoveAll && (
-        <div className="px-3 pb-2 space-y-1">
-          {projects.filter((p) => p._id !== project._id).map((p) => (
-            <button key={p._id} onClick={() => { onMoveAllCards(p._id!); onClose(); }}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-[11px] text-text-secondary hover:bg-bg-hover">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
-              {p.name}
-            </button>
-          ))}
-        </div>
-      )}
-      <button onClick={() => setShowSort(!showSort)}
-        className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors">Sort by...</button>
-      {showSort && (
-        <div className="px-3 pb-2 space-y-1">
-          <button onClick={() => { onSortBy("name"); onClose(); }} className="w-full text-left px-2 py-1 rounded text-[11px] text-text-secondary hover:bg-bg-hover">Name (A-Z)</button>
-          <button onClick={() => { onSortBy("created"); onClose(); }} className="w-full text-left px-2 py-1 rounded text-[11px] text-text-secondary hover:bg-bg-hover">Date created</button>
-          <button onClick={() => { onSortBy("done"); onClose(); }} className="w-full text-left px-2 py-1 rounded text-[11px] text-text-secondary hover:bg-bg-hover">Done status</button>
-        </div>
-      )}
-      <div className="border-t border-border mt-1 pt-1">
-        <button onClick={() => setShowColors(!showColors)}
-          className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors">Change list color</button>
-        {showColors && (
-          <div className="flex gap-1.5 px-3 pb-2">
-            {PROJECT_COLORS.map((c) => (
-              <button key={c} onClick={() => { onChangeColor(c); onClose(); }}
-                className={`w-6 h-6 rounded-full transition-all hover:scale-110 ${project.color === c ? "ring-2 ring-offset-1 ring-offset-bg-tertiary" : ""}`}
-                style={{ backgroundColor: c, ["--tw-ring-color" as string]: c }} />
+
+      <div className="py-1">
+        <button onClick={() => { onAddCard(); onClose(); }}
+          className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors">Add card</button>
+        <button onClick={() => { onCopyList(); onClose(); }}
+          className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors flex items-center gap-2">
+          <Copy size={12} className="text-text-muted" /> Copy list
+        </button>
+        <button onClick={() => setShowMoveAll(!showMoveAll)}
+          className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors flex items-center gap-2">
+          <ArrowRightLeft size={12} className="text-text-muted" /> Move all cards in this list
+        </button>
+        {showMoveAll && (
+          <div className="px-3 pb-2 space-y-1">
+            {projects.filter((p) => p._id !== project._id).map((p) => (
+              <button key={p._id} onClick={() => { onMoveAllCards(p._id!); onClose(); }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-[11px] text-text-secondary hover:bg-bg-hover">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+                {p.name}
+              </button>
             ))}
           </div>
         )}
+        <button onClick={() => setShowSort(!showSort)}
+          className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors">Sort by...</button>
+        {showSort && (
+          <div className="px-3 pb-2 space-y-1">
+            <button onClick={() => { onSortBy("name"); onClose(); }} className="w-full text-left px-2 py-1 rounded text-[11px] text-text-secondary hover:bg-bg-hover">Name (A-Z)</button>
+            <button onClick={() => { onSortBy("created"); onClose(); }} className="w-full text-left px-2 py-1 rounded text-[11px] text-text-secondary hover:bg-bg-hover">Date created</button>
+            <button onClick={() => { onSortBy("done"); onClose(); }} className="w-full text-left px-2 py-1 rounded text-[11px] text-text-secondary hover:bg-bg-hover">Done status</button>
+          </div>
+        )}
+        <button className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors flex items-center gap-2">
+          <Eye size={12} className="text-text-muted" /> Watch
+        </button>
       </div>
-      <div className="border-t border-border mt-1 pt-1">
-        <button onClick={() => { if (confirm(`Delete "${project.name}" and all its cards?`)) { onDelete(); onClose(); } }}
-          className="w-full text-left px-3 py-2 text-xs text-danger hover:bg-danger-subtle transition-colors">Delete list</button>
+
+      <div className="border-t border-border py-1">
+        <button onClick={() => setShowColors(!showColors)}
+          className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors flex items-center justify-between">
+          Change list color {showColors ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        </button>
+        {showColors && (
+          <div className="px-3 pb-2">
+            <div className="flex flex-wrap gap-1.5">
+              {PROJECT_COLORS.map((c) => (
+                <button key={c} onClick={() => { onChangeColor(c); onClose(); }}
+                  className={`w-7 h-7 rounded-full transition-all hover:scale-110 ${project.color === c ? "ring-2 ring-offset-1 ring-offset-bg-tertiary" : ""}`}
+                  style={{ backgroundColor: c, ["--tw-ring-color" as string]: c }} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-border py-1">
+        <button onClick={() => setShowAutomation(!showAutomation)}
+          className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors flex items-center justify-between">
+          <span className="flex items-center gap-2"><Zap size={12} className="text-text-muted" /> Automation</span>
+          {showAutomation ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        </button>
+        {showAutomation && (
+          <div className="px-3 pb-2 space-y-1">
+            <p className="text-[11px] text-text-secondary hover:bg-bg-hover px-2 py-1 rounded cursor-pointer">When a card is added to the list...</p>
+            <p className="text-[11px] text-text-secondary hover:bg-bg-hover px-2 py-1 rounded cursor-pointer">Every day, sort list by...</p>
+            <p className="text-[11px] text-text-secondary hover:bg-bg-hover px-2 py-1 rounded cursor-pointer">Every Monday, sort list by...</p>
+            <p className="text-[11px] text-text-secondary hover:bg-bg-hover px-2 py-1 rounded cursor-pointer">Create a rule</p>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-border py-1">
+        <button onClick={() => { onArchive(); onClose(); }}
+          className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors flex items-center gap-2">
+          <Archive size={12} className="text-text-muted" /> Archive this list
+        </button>
+        <button onClick={() => { onArchiveAllCards(); onClose(); }}
+          className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors flex items-center gap-2">
+          <Archive size={12} className="text-text-muted" /> Archive all cards in this list
+        </button>
       </div>
     </div>
   );
@@ -428,23 +423,30 @@ function ListActionsMenu({
 // ─── Main Page ──────────────────────────────────────────────────
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewProject, setShowNewProject] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newColor, setNewColor] = useState(PROJECT_COLORS[0]);
+  const [newLabels, setNewLabels] = useState<string[]>([]);
   const [selectedTask, setSelectedTask] = useState<{ task: ProjectTask; project: Project } | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState<Record<string, string>>({});
   const [hoverTask, setHoverTask] = useState<string | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [addingCardTo, setAddingCardTo] = useState<string | null>(null);
 
   const fetchProjects = useCallback(async () => {
     try {
-      const res = await fetch("/api/projects");
-      const data = await res.json();
-      setProjects(Array.isArray(data) ? data : []);
-    } catch { setProjects([]); }
+      const [activeRes, archivedRes] = await Promise.all([
+        fetch("/api/projects"),
+        fetch("/api/projects?archived=true"),
+      ]);
+      const activeData = await activeRes.json();
+      const allData = await archivedRes.json();
+      setProjects(Array.isArray(activeData) ? activeData : []);
+      setArchivedProjects(Array.isArray(allData) ? allData.filter((p: Project) => p.archived) : []);
+    } catch { setProjects([]); setArchivedProjects([]); }
     finally { setLoading(false); }
   }, []);
 
@@ -454,14 +456,47 @@ export default function ProjectsPage() {
     if (!newName.trim()) return;
     await fetch("/api/projects", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName.trim(), description: newDesc.trim(), color: newColor }),
+      body: JSON.stringify({ name: newName.trim(), description: newDesc.trim(), color: newColor, labels: newLabels }),
     });
-    setNewName(""); setNewDesc(""); setNewColor(PROJECT_COLORS[0]); setShowNewProject(false);
+    setNewName(""); setNewDesc(""); setNewColor(PROJECT_COLORS[0]); setNewLabels([]); setShowNewProject(false);
     fetchProjects();
   };
 
-  const deleteProject = async (id: string) => {
+  const archiveProject = async (id: string) => {
+    await fetch(`/api/projects/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "archive" }),
+    });
+    fetchProjects();
+  };
+
+  const unarchiveProject = async (id: string) => {
+    await fetch(`/api/projects/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "unarchive" }),
+    });
+    fetchProjects();
+  };
+
+  const permanentDelete = async (id: string) => {
+    // Only for truly deleting from archive
     await fetch(`/api/projects/${id}`, { method: "DELETE" });
+    fetchProjects();
+  };
+
+  const copyList = async (id: string) => {
+    await fetch(`/api/projects/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "copy_list" }),
+    });
+    fetchProjects();
+  };
+
+  const archiveAllCards = async (id: string) => {
+    await fetch(`/api/projects/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "archive_all_cards" }),
+    });
     fetchProjects();
   };
 
@@ -502,60 +537,32 @@ export default function ProjectsPage() {
   };
 
   const addComment = async (projectId: string, taskId: string, text: string) => {
-    await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "add_comment", taskId, text }),
-    });
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_comment", taskId, text }) });
     fetchProjects();
   };
-
   const addLink = async (projectId: string, taskId: string, link: string) => {
-    await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "add_link", taskId, link }),
-    });
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_link", taskId, link }) });
     fetchProjects();
   };
-
   const removeLink = async (projectId: string, taskId: string, idx: number) => {
-    await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "remove_link", taskId, linkIndex: idx }),
-    });
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "remove_link", taskId, linkIndex: idx }) });
     fetchProjects();
   };
-
   const addChecklist = async (projectId: string, taskId: string, text: string) => {
-    await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "add_checklist_item", taskId, text }),
-    });
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_checklist_item", taskId, text }) });
     fetchProjects();
   };
-
   const toggleChecklist = async (projectId: string, taskId: string, itemId: string) => {
-    await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "toggle_checklist_item", taskId, itemId }),
-    });
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "toggle_checklist_item", taskId, itemId }) });
     fetchProjects();
   };
-
   const deleteChecklist = async (projectId: string, taskId: string, itemId: string) => {
-    await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "delete_checklist_item", taskId, itemId }),
-    });
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete_checklist_item", taskId, itemId }) });
     fetchProjects();
   };
-
   const moveTask = async (fromProjectId: string, taskId: string, toProjectId: string, position: number) => {
-    await fetch(`/api/projects/${fromProjectId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "move_task", taskId, toProjectId, position }),
-    });
-    setSelectedTask(null);
-    fetchProjects();
+    await fetch(`/api/projects/${fromProjectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "move_task", taskId, toProjectId, position }) });
+    setSelectedTask(null); fetchProjects();
   };
 
   const reorderProjects = async (newOrder: Project[]) => {
@@ -567,10 +574,7 @@ export default function ProjectsPage() {
   };
 
   const changeProjectColor = async (projectId: string, color: string) => {
-    await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ color }),
-    });
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) });
     fetchProjects();
   };
 
@@ -578,10 +582,7 @@ export default function ProjectsPage() {
     const from = projects.find((p) => p._id === fromProjectId);
     if (!from || !from.tasks.length) return;
     for (const task of from.tasks) {
-      await fetch(`/api/projects/${fromProjectId}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "move_task", taskId: task.id, toProjectId, position: -1 }),
-      });
+      await fetch(`/api/projects/${fromProjectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "move_task", taskId: task.id, toProjectId, position: -1 }) });
     }
     fetchProjects();
   };
@@ -594,25 +595,19 @@ export default function ProjectsPage() {
     else if (sortBy === "created") sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     else if (sortBy === "done") sorted.sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1));
     setProjects((prev) => prev.map((p) => p._id === projectId ? { ...p, tasks: sorted } : p));
-    await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "reorder_tasks", tasks: sorted }),
-    });
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reorder_tasks", tasks: sorted }) });
   };
 
   const handleDragEnd = async (result: DropResult) => {
     const { source, destination, type } = result;
     if (!destination) return;
-
     if (type === "COLUMN") {
-      // Reorder projects
       const newProjects = [...projects];
       const [moved] = newProjects.splice(source.index, 1);
       newProjects.splice(destination.index, 0, moved);
       reorderProjects(newProjects);
       return;
     }
-
     if (type === "CARD") {
       const fromProjectId = source.droppableId;
       const toProjectId = destination.droppableId;
@@ -620,16 +615,12 @@ export default function ProjectsPage() {
       if (!fromProject) return;
       const task = fromProject.tasks[source.index];
       if (!task) return;
-
       if (fromProjectId === toProjectId) {
         const newTasks = [...fromProject.tasks];
         newTasks.splice(source.index, 1);
         newTasks.splice(destination.index, 0, task);
         setProjects((prev) => prev.map((p) => p._id === fromProjectId ? { ...p, tasks: newTasks } : p));
-        await fetch(`/api/projects/${fromProjectId}`, {
-          method: "PATCH", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "reorder_tasks", tasks: newTasks }),
-        });
+        await fetch(`/api/projects/${fromProjectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reorder_tasks", tasks: newTasks }) });
       } else {
         await moveTask(fromProjectId, task.id, toProjectId, destination.index);
       }
@@ -652,11 +643,46 @@ export default function ProjectsPage() {
               <FolderKanban size={20} className="text-accent" />
               <h1 className="font-heading font-semibold text-lg">Projects</h1>
             </div>
-            <button onClick={() => setShowNewProject(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse text-[12px] font-medium transition-colors">
-              <Plus size={14} /> New Project
-            </button>
+            <div className="flex items-center gap-2">
+              {archivedProjects.length > 0 && (
+                <button onClick={() => setShowArchive(!showArchive)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-secondary border border-border text-text-muted text-[12px] font-medium hover:text-text-secondary transition-colors">
+                  <Archive size={14} /> Archived ({archivedProjects.length})
+                </button>
+              )}
+              <button onClick={() => setShowNewProject(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse text-[12px] font-medium transition-colors">
+                <Plus size={14} /> New Project
+              </button>
+            </div>
           </div>
+
+          {/* Archived Projects */}
+          {showArchive && archivedProjects.length > 0 && (
+            <div className="mb-4 rounded-lg bg-bg-secondary border border-border p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2"><Archive size={14} /> Archived Projects</h3>
+                <button onClick={() => setShowArchive(false)} className="text-text-muted hover:text-text-secondary"><X size={14} /></button>
+              </div>
+              <div className="space-y-2">
+                {archivedProjects.map((p) => (
+                  <div key={p._id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-bg-tertiary border border-border">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+                    <span className="flex-1 text-sm text-text-primary">{p.name}</span>
+                    <span className="text-[10px] text-text-muted">{(p.tasks || []).length} cards</span>
+                    <button onClick={() => unarchiveProject(p._id!)}
+                      className="flex items-center gap-1 text-[11px] text-accent hover:bg-accent-subtle px-2 py-1 rounded transition-colors">
+                      <RotateCcw size={11} /> Restore
+                    </button>
+                    <button onClick={() => { if (confirm(`Permanently delete "${p.name}"? This cannot be undone.`)) permanentDelete(p._id!); }}
+                      className="flex items-center gap-1 text-[11px] text-danger hover:bg-danger-subtle px-2 py-1 rounded transition-colors">
+                      <Trash2 size={11} /> Delete forever
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* New Project Form */}
           {showNewProject && (
@@ -670,13 +696,26 @@ export default function ProjectsPage() {
                 className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-border text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent text-sm" />
               <input type="text" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Description (optional)"
                 className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-border text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent text-sm" />
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-text-muted">Color:</span>
-                {PROJECT_COLORS.map((c) => (
-                  <button key={c} onClick={() => setNewColor(c)}
-                    className={`w-6 h-6 rounded-full transition-all ${newColor === c ? "ring-2 ring-offset-2 ring-offset-bg-secondary" : "hover:scale-110"}`}
-                    style={{ backgroundColor: c, ["--tw-ring-color" as string]: c }} />
-                ))}
+              <div>
+                <span className="text-[11px] text-text-muted mb-1 block">Color:</span>
+                <div className="flex items-center gap-2">
+                  {PROJECT_COLORS.map((c) => (
+                    <button key={c} onClick={() => setNewColor(c)}
+                      className={`w-6 h-6 rounded-full transition-all ${newColor === c ? "ring-2 ring-offset-2 ring-offset-bg-secondary" : "hover:scale-110"}`}
+                      style={{ backgroundColor: c, ["--tw-ring-color" as string]: c }} />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="text-[11px] text-text-muted mb-1 block">Labels (multi-select):</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {LABEL_COLORS.map((l) => (
+                    <button key={l.color}
+                      onClick={() => setNewLabels((prev) => prev.includes(l.color) ? prev.filter((c) => c !== l.color) : [...prev, l.color])}
+                      className={`w-8 h-5 rounded transition-all ${newLabels.includes(l.color) ? "ring-2 ring-offset-1 ring-offset-bg-secondary" : "opacity-50 hover:opacity-80"}`}
+                      style={{ backgroundColor: l.color, ["--tw-ring-color" as string]: l.color }} />
+                  ))}
+                </div>
               </div>
               <button onClick={createProject} disabled={!newName.trim()}
                 className="px-4 py-2 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse text-sm font-medium disabled:opacity-40 transition-colors">
@@ -687,7 +726,7 @@ export default function ProjectsPage() {
 
           {/* Projects Board */}
           {loading ? (
-            <div className="flex gap-4">{[1, 2, 3].map((i) => <div key={i} className="w-72 h-48 rounded-lg bg-bg-secondary border border-border animate-pulse flex-shrink-0" />)}</div>
+            <div className="flex gap-4">{[1, 2, 3].map((i) => <div key={i} className="w-64 h-48 rounded-lg bg-bg-secondary border border-border animate-pulse flex-shrink-0" />)}</div>
           ) : projects.length === 0 && !showNewProject ? (
             <div className="text-center py-16 rounded-lg bg-bg-secondary border border-border">
               <FolderKanban size={40} className="mx-auto text-text-muted mb-3" />
@@ -700,144 +739,127 @@ export default function ProjectsPage() {
                 {(boardProvided) => (
                   <div ref={boardProvided.innerRef} {...boardProvided.droppableProps}
                     className="flex gap-3 overflow-x-auto pb-4 items-start" style={{ scrollbarWidth: "thin" }}>
-                {projects.map((project, projectIdx) => {
-                  const progress = getProgress(project.tasks || []);
-                  const totalTasks = (project.tasks || []).length;
-                  const doneTasks = (project.tasks || []).filter((t) => t.done).length;
+                    {projects.map((project, projectIdx) => {
+                      const progress = getProgress(project.tasks || []);
+                      const totalTasks = (project.tasks || []).length;
+                      const doneTasks = (project.tasks || []).filter((t) => t.done).length;
+                      const projectLabels = project.labels || [];
 
-                  return (
-                    <Draggable key={project._id} draggableId={`project-${project._id}`} index={projectIdx}>
-                      {(colProvided, colSnapshot) => (
-                    <div ref={colProvided.innerRef} {...colProvided.draggableProps}
-                      className={`w-64 flex-shrink-0 rounded-lg bg-bg-secondary border border-border overflow-hidden flex flex-col ${colSnapshot.isDragging ? "shadow-xl opacity-90" : ""}`}>
-                      {/* Project Header */}
-                      <div {...colProvided.dragHandleProps} className="px-3 py-2.5 border-b cursor-grab active:cursor-grabbing" style={{ borderBottomColor: `${project.color}30` }}>
-                        <div className="flex items-center gap-2 mb-1 relative">
-                          <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
-                          <h3 className="font-heading font-bold text-sm uppercase tracking-wide flex-1 truncate">{project.name}</h3>
-                          <span className="text-[11px] text-text-muted">{doneTasks}/{totalTasks}</span>
-                          <button onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === project._id ? null : project._id!); }}
-                            className="text-text-muted hover:text-text-primary transition-colors p-0.5">
-                            <MoreHorizontal size={14} />
-                          </button>
-                          {openMenu === project._id && (
-                            <ListActionsMenu
-                              project={project} projects={projects}
-                              onClose={() => setOpenMenu(null)}
-                              onDelete={() => deleteProject(project._id!)}
-                              onAddCard={() => setAddingCardTo(project._id!)}
-                              onChangeColor={(color) => changeProjectColor(project._id!, color)}
-                              onMoveAllCards={(toId) => moveAllCards(project._id!, toId)}
-                              onSortBy={(sort) => sortProjectTasks(project._id!, sort)}
-                            />
-                          )}
-                        </div>
-                        {project.description && <p className="text-[10px] text-text-muted truncate mb-1">{project.description}</p>}
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
-                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, backgroundColor: progress === 100 ? "#10B981" : project.color }} />
-                          </div>
-                          <span className="text-[10px] font-mono font-semibold" style={{ color: progress === 100 ? "#10B981" : project.color }}>{progress}%</span>
-                        </div>
-                      </div>
-
-                      {/* Tasks */}
-                      <Droppable droppableId={project._id!} type="CARD">
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className={`flex-1 p-2 space-y-1 min-h-[40px] overflow-y-auto max-h-[60vh] transition-colors ${
-                              snapshot.isDraggingOver ? "bg-bg-hover" : ""
-                            }`}
-                          >
-                            {(project.tasks || []).map((task, idx) => (
-                              <Draggable key={task.id} draggableId={task.id} index={idx}>
-                                {(provided, snapshot) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    onMouseEnter={() => setHoverTask(task.id)}
-                                    onMouseLeave={() => setHoverTask(null)}
-                                    className={`rounded-md border border-border bg-bg-primary hover:bg-bg-hover transition-all cursor-pointer ${
-                                      snapshot.isDragging ? "shadow-lg border-accent/30" : ""
-                                    }`}
-                                  >
-                                    {/* Label dots */}
-                                    {(task.labels || []).length > 0 && (
-                                      <div className="flex gap-1 px-2.5 pt-2">
-                                        {task.labels!.map((l) => <div key={l} className="w-8 h-1.5 rounded-full" style={{ backgroundColor: l }} />)}
-                                      </div>
-                                    )}
-
-                                    <div className="flex items-center gap-2 px-2.5 py-2">
-                                      <span {...provided.dragHandleProps} className="text-text-muted/30 hover:text-text-muted cursor-grab active:cursor-grabbing flex-shrink-0">
-                                        <GripVertical size={12} />
-                                      </span>
-
-                                      {/* Checkbox on hover or if done */}
-                                      {(hoverTask === task.id || task.done) ? (
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); toggleTask(project._id!, task.id); }}
-                                          className={`w-4 h-4 rounded-full border-[1.5px] flex-shrink-0 flex items-center justify-center transition-colors ${
-                                            task.done ? "bg-accent border-accent" : "border-text-muted hover:border-accent"
-                                          }`}>
-                                          {task.done && <Check size={8} className="text-text-inverse" />}
-                                        </button>
-                                      ) : <div className="w-4 flex-shrink-0" />}
-
-                                      <button
-                                        onClick={() => setSelectedTask({ task, project })}
-                                        className={`flex-1 text-left text-[12px] ${task.done ? "line-through text-text-muted" : "text-text-primary"}`}>
-                                        {task.title}
-                                      </button>
-
-                                      {/* Indicators */}
-                                      <div className="flex items-center gap-1 flex-shrink-0">
-                                        {(task.links || []).length > 0 && <Link2 size={10} className="text-accent" />}
-                                        {(task.comments || []).length > 0 && (
-                                          <span className="flex items-center gap-0.5 text-text-muted text-[9px]">
-                                            <MessageSquare size={9} /> {task.comments.length}
-                                          </span>
-                                        )}
-                                        {(task.checklist || []).length > 0 && (
-                                          <span className={`flex items-center gap-0.5 text-[9px] ${
-                                            (task.checklist || []).every((c) => c.done) ? "text-accent" : "text-text-muted"
-                                          }`}>
-                                            <CheckSquare size={9} /> {(task.checklist || []).filter((c) => c.done).length}/{(task.checklist || []).length}
-                                          </span>
-                                        )}
-                                      </div>
+                      return (
+                        <Draggable key={project._id} draggableId={`project-${project._id}`} index={projectIdx}>
+                          {(colProvided, colSnapshot) => (
+                            <div ref={colProvided.innerRef} {...colProvided.draggableProps}
+                              className={`w-64 flex-shrink-0 rounded-lg bg-bg-secondary border border-border overflow-visible flex flex-col transition-shadow ${colSnapshot.isDragging ? "shadow-2xl opacity-95 rotate-1" : ""}`}>
+                              {/* Project Header — drag handle */}
+                              <div {...colProvided.dragHandleProps} className="px-3 py-2.5 border-b cursor-grab active:cursor-grabbing" style={{ borderBottomColor: `${project.color}30` }}>
+                                <div className="flex items-center gap-2 mb-1 relative">
+                                  {/* Multi-color labels or single dot */}
+                                  {projectLabels.length > 0 ? (
+                                    <div className="flex gap-0.5 flex-shrink-0">
+                                      {projectLabels.map((l) => <div key={l} className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: l }} />)}
                                     </div>
+                                  ) : (
+                                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
+                                  )}
+                                  <h3 className="font-heading font-bold text-sm uppercase tracking-wide flex-1 truncate">{project.name}</h3>
+                                  <span className="text-[11px] text-text-muted">{doneTasks}/{totalTasks}</span>
+                                  <button onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === project._id ? null : project._id!); }}
+                                    className="text-text-muted hover:text-text-primary transition-colors p-0.5">
+                                    <MoreHorizontal size={14} />
+                                  </button>
+                                  {openMenu === project._id && (
+                                    <ListActionsMenu
+                                      project={project} projects={projects}
+                                      onClose={() => setOpenMenu(null)}
+                                      onArchive={() => archiveProject(project._id!)}
+                                      onAddCard={() => document.querySelector<HTMLInputElement>(`input[data-project="${project._id}"]`)?.focus()}
+                                      onCopyList={() => copyList(project._id!)}
+                                      onChangeColor={(color) => changeProjectColor(project._id!, color)}
+                                      onMoveAllCards={(toId) => moveAllCards(project._id!, toId)}
+                                      onSortBy={(sort) => sortProjectTasks(project._id!, sort)}
+                                      onArchiveAllCards={() => archiveAllCards(project._id!)}
+                                    />
+                                  )}
+                                </div>
+                                {project.description && <p className="text-[10px] text-text-muted truncate mb-1">{project.description}</p>}
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
+                                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, backgroundColor: progress === 100 ? "#10B981" : project.color }} />
+                                  </div>
+                                  <span className="text-[10px] font-mono font-semibold" style={{ color: progress === 100 ? "#10B981" : project.color }}>{progress}%</span>
+                                </div>
+                              </div>
+
+                              {/* Tasks */}
+                              <Droppable droppableId={project._id!} type="CARD">
+                                {(provided, snapshot) => (
+                                  <div ref={provided.innerRef} {...provided.droppableProps}
+                                    className={`flex-1 p-2 space-y-1 min-h-[40px] overflow-y-auto max-h-[60vh] transition-colors ${snapshot.isDraggingOver ? "bg-bg-hover" : ""}`}>
+                                    {(project.tasks || []).map((task, idx) => (
+                                      <Draggable key={task.id} draggableId={task.id} index={idx}>
+                                        {(provided, snapshot) => (
+                                          <div ref={provided.innerRef} {...provided.draggableProps}
+                                            onMouseEnter={() => setHoverTask(task.id)}
+                                            onMouseLeave={() => setHoverTask(null)}
+                                            className={`rounded-md border border-border bg-bg-primary hover:bg-bg-hover transition-all cursor-pointer ${snapshot.isDragging ? "shadow-lg border-accent/30" : ""}`}>
+                                            {(task.labels || []).length > 0 && (
+                                              <div className="flex gap-1 px-2.5 pt-2">
+                                                {task.labels!.map((l) => <div key={l} className="w-8 h-1.5 rounded-full" style={{ backgroundColor: l }} />)}
+                                              </div>
+                                            )}
+                                            <div className="flex items-center gap-2 px-2.5 py-2">
+                                              <span {...provided.dragHandleProps} className="text-text-muted/30 hover:text-text-muted cursor-grab active:cursor-grabbing flex-shrink-0">
+                                                <GripVertical size={12} />
+                                              </span>
+                                              {(hoverTask === task.id || task.done) ? (
+                                                <button onClick={(e) => { e.stopPropagation(); toggleTask(project._id!, task.id); }}
+                                                  className={`w-4 h-4 rounded-full border-[1.5px] flex-shrink-0 flex items-center justify-center transition-colors ${task.done ? "bg-accent border-accent" : "border-text-muted hover:border-accent"}`}>
+                                                  {task.done && <Check size={8} className="text-text-inverse" />}
+                                                </button>
+                                              ) : <div className="w-4 flex-shrink-0" />}
+                                              <button onClick={() => setSelectedTask({ task, project })}
+                                                className={`flex-1 text-left text-[12px] ${task.done ? "line-through text-text-muted" : "text-text-primary"}`}>
+                                                {task.title}
+                                              </button>
+                                              <div className="flex items-center gap-1 flex-shrink-0">
+                                                {(task.links || []).length > 0 && <Link2 size={10} className="text-accent" />}
+                                                {(task.comments || []).length > 0 && (
+                                                  <span className="flex items-center gap-0.5 text-text-muted text-[9px]"><MessageSquare size={9} /> {task.comments.length}</span>
+                                                )}
+                                                {(task.checklist || []).length > 0 && (
+                                                  <span className={`flex items-center gap-0.5 text-[9px] ${(task.checklist || []).every((c) => c.done) ? "text-accent" : "text-text-muted"}`}>
+                                                    <CheckSquare size={9} /> {(task.checklist || []).filter((c) => c.done).length}/{(task.checklist || []).length}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </Draggable>
+                                    ))}
+                                    {provided.placeholder}
                                   </div>
                                 )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
+                              </Droppable>
 
-                      {/* Add card */}
-                      <div className="px-2 pb-2 pt-1 border-t border-border">
-                        <div className="flex items-center gap-2">
-                          <Plus size={14} className="text-text-muted flex-shrink-0" />
-                          <input
-                            type="text"
-                            value={newTaskTitle[project._id!] || ""}
-                            onChange={(e) => setNewTaskTitle((p) => ({ ...p, [project._id!]: e.target.value }))}
-                            onKeyDown={(e) => e.key === "Enter" && addTask(project._id!)}
-                            placeholder="Add a card"
-                            className="flex-1 bg-transparent text-[12px] text-text-primary placeholder:text-text-muted focus:outline-none py-1.5"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                      )}
-                    </Draggable>
-                  );
-                })}
-                {boardProvided.placeholder}
+                              {/* Add card */}
+                              <div className="px-2 pb-2 pt-1 border-t border-border">
+                                <div className="flex items-center gap-2">
+                                  <Plus size={14} className="text-text-muted flex-shrink-0" />
+                                  <input type="text" data-project={project._id}
+                                    value={newTaskTitle[project._id!] || ""}
+                                    onChange={(e) => setNewTaskTitle((p) => ({ ...p, [project._id!]: e.target.value }))}
+                                    onKeyDown={(e) => e.key === "Enter" && addTask(project._id!)}
+                                    placeholder="Add a card"
+                                    className="flex-1 bg-transparent text-[12px] text-text-primary placeholder:text-text-muted focus:outline-none py-1.5" />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      );
+                    })}
+                    {boardProvided.placeholder}
                   </div>
                 )}
               </Droppable>

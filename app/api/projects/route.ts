@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const db = await getDb();
-    const projects = await db.collection("projects").find().sort({ order: 1, createdAt: 1 }).toArray();
+    const { searchParams } = new URL(req.url);
+    const includeArchived = searchParams.get("archived") === "true";
+    const filter = includeArchived ? {} : { $or: [{ archived: { $ne: true } }, { archived: { $exists: false } }] };
+    const projects = await db.collection("projects").find(filter).sort({ order: 1, createdAt: 1 }).toArray();
     return NextResponse.json(projects);
   } catch (error) {
     console.error("GET /api/projects error:", error);
