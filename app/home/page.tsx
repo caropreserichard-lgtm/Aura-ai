@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Check } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
@@ -80,22 +80,32 @@ export default function HomePage() {
     subcategoryGroups[key].push(t);
   });
 
-  // Tasks with due dates mapped to days
+  // Tasks with due dates mapped to days (include completed — pending first, done last)
   const tasksByDay: Record<string, Task[]> = {};
   weekDates.forEach((d) => {
     const key = toDateKey(d);
-    tasksByDay[key] = tasks.filter((t) => t.dueDate && t.dueDate.startsWith(key) && t.status !== "done");
+    const dayTasks = tasks.filter((t) => t.dueDate && t.dueDate.startsWith(key));
+    dayTasks.sort((a, b) => {
+      if (a.status === "done" && b.status !== "done") return 1;
+      if (a.status !== "done" && b.status === "done") return -1;
+      return 0;
+    });
+    tasksByDay[key] = dayTasks;
   });
 
   const handleComplete = async (id: string) => {
+    const task = tasks.find((t) => t._id === id);
+    const newStatus = task?.status === "done" ? "pending" : "done";
+    // Optimistic UI update
+    setTasks((prev) => prev.map((t) => t._id === id ? { ...t, status: newStatus, completedAt: newStatus === "done" ? new Date().toISOString() : undefined } : t));
     try {
       await fetch(`/api/tasks/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "done" }),
+        body: JSON.stringify({ status: newStatus }),
       });
       fetchTasks();
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); fetchTasks(); }
   };
 
   const handleAddTask = async (taskData: Record<string, unknown>) => {
@@ -244,17 +254,25 @@ export default function HomePage() {
                               </button>
                             </div>
                           </div>
-                          {dayTasks.length > 0 && (
-                            <div className="mt-1">
-                              <span className="text-[10px] text-text-muted">{dayTasks.length} task{dayTasks.length > 1 ? "s" : ""}</span>
-                            </div>
-                          )}
+                          {dayTasks.length > 0 && (() => {
+                            const doneCount = dayTasks.filter((t) => t.status === "done").length;
+                            const totalCount = dayTasks.length;
+                            return (
+                              <div className="mt-1 flex items-center gap-1.5">
+                                <div className="flex-1 h-1 rounded-full bg-bg-tertiary overflow-hidden">
+                                  <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%` }} />
+                                </div>
+                                <span className="text-[10px] text-text-muted font-mono">{doneCount}/{totalCount}</span>
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Day tasks */}
                         <div className="p-1.5 space-y-1">
                           {dayTasks.map((task, index) => {
                             const color = CAT_COLORS[task.category] || "#666";
+                            const isDone = task.status === "done";
                             return (
                               <Draggable key={task._id} draggableId={task._id!} index={index}>
                                 {(dragProvided, dragSnapshot) => (
@@ -265,15 +283,26 @@ export default function HomePage() {
                                     className={`group p-1.5 rounded-md border transition-all cursor-grab active:cursor-grabbing ${
                                       dragSnapshot.isDragging
                                         ? "bg-bg-elevated border-accent/30 shadow-lg"
+                                        : isDone
+                                        ? "bg-bg-primary/20 border-transparent"
                                         : "bg-bg-primary/50 hover:bg-bg-hover border-transparent hover:border-border"
                                     }`}
+                                    style={{ opacity: isDone ? 0.45 : 1 }}
                                   >
                                     <div className="flex items-start gap-1.5">
                                       <button onClick={(e) => { e.stopPropagation(); handleComplete(task._id!); }}
-                                        className="mt-0.5 w-3.5 h-3.5 rounded-full border border-text-muted hover:border-accent flex-shrink-0 transition-colors" />
+                                        className={`mt-0.5 w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center transition-colors ${
+                                          isDone
+                                            ? "bg-emerald-500 border border-emerald-500"
+                                            : "border border-text-muted hover:border-accent"
+                                        }`}>
+                                        {isDone && <Check size={8} className="text-white" strokeWidth={3} />}
+                                      </button>
                                       <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setSelectedTask(task)}>
-                                        <p className="text-[11px] text-text-primary leading-tight truncate">{task.title}</p>
-                                        <span className="text-[9px] font-medium" style={{ color }}>
+                                        <p className={`text-[11px] leading-tight truncate transition-all ${
+                                          isDone ? "line-through text-text-muted" : "text-text-primary"
+                                        }`}>{task.title}</p>
+                                        <span className="text-[9px] font-medium" style={{ color: isDone ? `${color}80` : color }}>
                                           # {task.subcategory}
                                         </span>
                                       </div>
