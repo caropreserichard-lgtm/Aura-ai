@@ -304,7 +304,7 @@ function TaskDetailModal({
 // ─── List Actions Menu (Trello-style) ───────────────────────────
 function ListActionsMenu({
   project, projects, onClose, onArchive, onAddCard, onCopyList,
-  onChangeColor, onMoveAllCards, onSortBy, onArchiveAllCards,
+  onChangeColor, onMoveAllCards, onSortBy, onArchiveAllCards, anchorRect,
 }: {
   project: Project; projects: Project[];
   onClose: () => void; onArchive: () => void; onAddCard: () => void;
@@ -313,6 +313,7 @@ function ListActionsMenu({
   onMoveAllCards: (toProjectId: string) => void;
   onSortBy: (sort: string) => void;
   onArchiveAllCards: () => void;
+  anchorRect?: { top: number; left: number; width: number };
 }) {
   const [showColors, setShowColors] = useState(false);
   const [showMoveAll, setShowMoveAll] = useState(false);
@@ -328,8 +329,31 @@ function ListActionsMenu({
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
 
+  // Position the menu near the anchor button
+  useEffect(() => {
+    if (ref.current && anchorRect) {
+      const menu = ref.current;
+      const menuRect = menu.getBoundingClientRect();
+      let top = anchorRect.top;
+      let left = anchorRect.left + anchorRect.width + 8;
+      // If overflows right, put it to the left of the anchor
+      if (left + menuRect.width > window.innerWidth - 16) {
+        left = anchorRect.left - menuRect.width - 8;
+      }
+      // If overflows bottom, shift up
+      if (top + menuRect.height > window.innerHeight - 16) {
+        top = window.innerHeight - menuRect.height - 16;
+      }
+      if (top < 8) top = 8;
+      if (left < 8) left = 8;
+      menu.style.top = `${top}px`;
+      menu.style.left = `${left}px`;
+    }
+  }, [anchorRect]);
+
   return (
-    <div ref={ref} className="absolute top-8 right-0 w-60 bg-bg-tertiary border border-border rounded-lg shadow-xl z-30 overflow-hidden"
+    <div ref={ref} className="fixed w-72 bg-bg-tertiary border border-border rounded-lg shadow-2xl z-50 max-h-[80vh] overflow-y-auto"
+      style={{ top: "auto", right: "auto" }}
       onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
         <h4 className="text-xs font-semibold text-text-primary">List actions</h4>
@@ -435,6 +459,7 @@ export default function ProjectsPage() {
   const [newTaskTitle, setNewTaskTitle] = useState<Record<string, string>>({});
   const [hoverTask, setHoverTask] = useState<string | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; left: number; width: number } | undefined>(undefined);
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -636,13 +661,8 @@ export default function ProjectsPage() {
     <div className="flex min-h-screen">
       <Sidebar />
       <main className="flex-1 md:ml-60">
-        <TopBar onAddTask={() => setShowNewProject(true)} />
-        <div className="p-4 md:p-6 pb-24 md:pb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <FolderKanban size={20} className="text-accent" />
-              <h1 className="font-heading font-semibold text-lg">Projects</h1>
-            </div>
+        <TopBar hideAdd
+          leftContent={
             <div className="flex items-center gap-2">
               {archivedProjects.length > 0 && (
                 <button onClick={() => setShowArchive(!showArchive)}
@@ -655,6 +675,12 @@ export default function ProjectsPage() {
                 <Plus size={14} /> New Project
               </button>
             </div>
+          }
+        />
+        <div className="p-4 md:p-6 pb-24 md:pb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <FolderKanban size={20} className="text-accent" />
+            <h1 className="font-heading font-semibold text-lg">Projects</h1>
           </div>
 
           {/* Archived Projects */}
@@ -763,23 +789,18 @@ export default function ProjectsPage() {
                                   )}
                                   <h3 className="font-heading font-bold text-sm uppercase tracking-wide flex-1 truncate">{project.name}</h3>
                                   <span className="text-[11px] text-text-muted">{doneTasks}/{totalTasks}</span>
-                                  <button onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === project._id ? null : project._id!); }}
+                                  <button onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (openMenu === project._id) { setOpenMenu(null); setMenuAnchor(undefined); }
+                                      else {
+                                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                        setMenuAnchor({ top: rect.top, left: rect.left, width: rect.width });
+                                        setOpenMenu(project._id!);
+                                      }
+                                    }}
                                     className="text-text-muted hover:text-text-primary transition-colors p-0.5">
                                     <MoreHorizontal size={14} />
                                   </button>
-                                  {openMenu === project._id && (
-                                    <ListActionsMenu
-                                      project={project} projects={projects}
-                                      onClose={() => setOpenMenu(null)}
-                                      onArchive={() => archiveProject(project._id!)}
-                                      onAddCard={() => document.querySelector<HTMLInputElement>(`input[data-project="${project._id}"]`)?.focus()}
-                                      onCopyList={() => copyList(project._id!)}
-                                      onChangeColor={(color) => changeProjectColor(project._id!, color)}
-                                      onMoveAllCards={(toId) => moveAllCards(project._id!, toId)}
-                                      onSortBy={(sort) => sortProjectTasks(project._id!, sort)}
-                                      onArchiveAllCards={() => archiveAllCards(project._id!)}
-                                    />
-                                  )}
                                 </div>
                                 {project.description && <p className="text-[10px] text-text-muted truncate mb-1">{project.description}</p>}
                                 <div className="flex items-center gap-2">
@@ -867,6 +888,26 @@ export default function ProjectsPage() {
           )}
         </div>
       </main>
+
+      {/* List Actions Menu (rendered outside board for proper positioning) */}
+      {openMenu && (() => {
+        const menuProject = projects.find((p) => p._id === openMenu);
+        if (!menuProject) return null;
+        return (
+          <ListActionsMenu
+            project={menuProject} projects={projects}
+            anchorRect={menuAnchor}
+            onClose={() => { setOpenMenu(null); setMenuAnchor(undefined); }}
+            onArchive={() => archiveProject(menuProject._id!)}
+            onAddCard={() => document.querySelector<HTMLInputElement>(`input[data-project="${menuProject._id}"]`)?.focus()}
+            onCopyList={() => copyList(menuProject._id!)}
+            onChangeColor={(color) => changeProjectColor(menuProject._id!, color)}
+            onMoveAllCards={(toId) => moveAllCards(menuProject._id!, toId)}
+            onSortBy={(sort) => sortProjectTasks(menuProject._id!, sort)}
+            onArchiveAllCards={() => archiveAllCards(menuProject._id!)}
+          />
+        );
+      })()}
 
       {/* Task Detail Modal */}
       {selectedTask && (() => {
