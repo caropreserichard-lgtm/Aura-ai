@@ -135,11 +135,10 @@ function CalendarPopover({ current, onSelect, onClose }: {
   );
 }
 
-// ─── Inline Add Task ──────────────────────────────────────────
-function InlineAddTask({ dateKey, onAdd, categories }: {
-  dateKey: string; onAdd: (data: Record<string, unknown>) => void; categories: typeof CATEGORIES;
+// ─── Add Task Popup (centered modal) ──────────────────────────
+function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
+  dateKey: string; onAdd: (data: Record<string, unknown>) => void; onClose: () => void; categories: typeof CATEGORIES;
 }) {
-  const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [showTime, setShowTime] = useState(false);
   const [showChannel, setShowChannel] = useState(false);
@@ -147,6 +146,7 @@ function InlineAddTask({ dateKey, onAdd, categories }: {
   const [category, setCategory] = useState<string>("trabajo");
   const [subcategory, setSubcategory] = useState("");
   const [timeInput, setTimeInput] = useState("");
+  const overlayRef = useRef<HTMLDivElement>(null);
   const timeRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<HTMLDivElement>(null);
 
@@ -167,86 +167,92 @@ function InlineAddTask({ dateKey, onAdd, categories }: {
       priority: 3, roi: 5, joy: 5, dueDate: dateKey,
       ...(estimatedTime > 0 ? { estimatedTime } : {}),
     });
-    setTitle(""); setEstimatedTime(0); setCategory("trabajo"); setSubcategory(""); setOpen(false);
+    setTitle(""); setEstimatedTime(0); setCategory("trabajo"); setSubcategory(""); onClose();
   };
 
-  if (!open) {
-    return (
-      <button onClick={() => setOpen(true)}
-        className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-bg-secondary/60 hover:bg-bg-secondary border border-border/50 hover:border-border text-text-muted hover:text-text-secondary transition-all text-xs">
-        <Plus size={14} /> Add task
-      </button>
-    );
-  }
+  const dateLabel = (() => {
+    const d = new Date(dateKey + "T00:00:00");
+    const today = new Date();
+    const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+    if (d.toDateString() === today.toDateString()) return "Today";
+    if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  })();
 
   return (
-    <div className="rounded-xl bg-bg-secondary border border-border p-3 space-y-2.5 shadow-lg">
-      <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus
-        onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") setOpen(false); }}
-        placeholder="Task description..."
-        className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none" />
-      <div className="flex items-center gap-1 flex-wrap">
-        <span className="flex items-center gap-1 px-2 py-1 rounded-md bg-purple-500/20 text-purple-400 text-[10px] font-semibold">
-          TIP <span className="text-text-muted font-normal">Paste a URL</span>
-        </span>
-        <button className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-tertiary hover:bg-bg-hover text-[10px] text-text-muted transition-colors">
-          <Calendar size={11} /> {new Date(dateKey).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-        </button>
-        <div className="relative" ref={timeRef}>
-          <button onClick={() => setShowTime(!showTime)}
-            className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-tertiary hover:bg-bg-hover text-[10px] text-text-muted transition-colors">
-            <Clock size={11} /> {estimatedTime > 0 ? formatMins(estimatedTime) : "--:--"}
-          </button>
-          {showTime && (
-            <div className="absolute bottom-full left-0 mb-2 w-48 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 p-2 animate-slide-in-right">
-              <input type="text" value={timeInput} onChange={(e) => setTimeInput(e.target.value)} placeholder="e.g. 25 or 1:30"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && timeInput.trim()) {
-                    const parts = timeInput.split(":");
-                    const mins = parts.length === 2 ? parseInt(parts[0]) * 60 + parseInt(parts[1]) : parseInt(timeInput);
-                    if (!isNaN(mins) && mins > 0) { setEstimatedTime(mins); setShowTime(false); setTimeInput(""); }
-                  }
-                }}
-                className="w-full px-2 py-1.5 rounded-lg bg-bg-secondary border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent mb-2" />
-              <div className="grid grid-cols-4 gap-1">
-                {TIME_PRESETS.map((p) => (
-                  <button key={p.label} onClick={() => { setEstimatedTime(p.mins); setShowTime(false); }}
-                    className={`px-1.5 py-1 rounded-md text-[10px] font-medium transition-colors ${estimatedTime === p.mins ? "bg-accent text-text-inverse" : "bg-bg-secondary text-text-secondary hover:bg-bg-hover"}`}>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+    <div ref={overlayRef} className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]"
+      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="relative w-full max-w-xl bg-bg-secondary rounded-2xl border border-border shadow-2xl mx-4 overflow-visible">
+        <div className="p-4">
+          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus
+            onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") onClose(); }}
+            placeholder="Task description..."
+            className="w-full bg-transparent text-base text-text-primary placeholder:text-text-muted focus:outline-none" />
         </div>
-        <div className="relative" ref={channelRef}>
-          <button onClick={() => setShowChannel(!showChannel)}
-            className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-tertiary hover:bg-bg-hover text-[10px] text-text-muted transition-colors">
-            <Hash size={11} /> {subcategory || "channel"}
+        <div className="px-4 pb-4 flex items-center gap-2 flex-wrap">
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-400 text-[11px] font-semibold">
+            TIP <span className="text-text-muted font-normal">Paste a URL</span>
+          </span>
+          <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg-tertiary hover:bg-bg-hover text-[11px] text-text-muted transition-colors">
+            <Calendar size={12} /> {dateLabel}
           </button>
-          {showChannel && (
-            <div className="absolute bottom-full left-0 mb-2 w-56 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 p-2 max-h-48 overflow-y-auto animate-slide-in-right">
-              {Object.entries(categories).map(([cat, conf]) => (
-                <div key={cat} className="mb-1">
-                  <p className="text-[9px] font-semibold uppercase tracking-wide px-2 py-1" style={{ color: conf.color }}>{conf.label}</p>
-                  {conf.subcategories.map((sub) => (
-                    <button key={sub} onClick={() => { setCategory(cat); setSubcategory(sub); setShowChannel(false); }}
-                      className={`w-full text-left px-2 py-1 rounded-md text-[11px] transition-colors ${subcategory === sub ? "bg-bg-hover text-text-primary" : "text-text-secondary hover:bg-bg-hover"}`}>
-                      # {sub}
+          <div className="relative" ref={timeRef}>
+            <button onClick={() => setShowTime(!showTime)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg-tertiary hover:bg-bg-hover text-[11px] text-text-muted transition-colors">
+              <Clock size={12} /> {estimatedTime > 0 ? formatMins(estimatedTime) : "--:--"}
+            </button>
+            {showTime && (
+              <div className="absolute top-full left-0 mt-2 w-52 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 p-2.5 animate-slide-in-right">
+                <input type="text" value={timeInput} onChange={(e) => setTimeInput(e.target.value)} placeholder="e.g. 25 or 1:30"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && timeInput.trim()) {
+                      const parts = timeInput.split(":");
+                      const mins = parts.length === 2 ? parseInt(parts[0]) * 60 + parseInt(parts[1]) : parseInt(timeInput);
+                      if (!isNaN(mins) && mins > 0) { setEstimatedTime(mins); setShowTime(false); setTimeInput(""); }
+                    }
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent mb-2" />
+                <div className="grid grid-cols-4 gap-1.5">
+                  {TIME_PRESETS.map((p) => (
+                    <button key={p.label} onClick={() => { setEstimatedTime(p.mins); setShowTime(false); }}
+                      className={`px-2 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${estimatedTime === p.mins ? "bg-accent text-text-inverse" : "bg-bg-secondary text-text-secondary hover:bg-bg-hover"}`}>
+                      {p.label}
                     </button>
                   ))}
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
+          <div className="relative" ref={channelRef}>
+            <button onClick={() => setShowChannel(!showChannel)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg-tertiary hover:bg-bg-hover text-[11px] text-text-muted transition-colors">
+              <Hash size={12} /> {subcategory || "channel"}
+            </button>
+            {showChannel && (
+              <div className="absolute top-full left-0 mt-2 w-60 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 p-2 max-h-56 overflow-y-auto animate-slide-in-right">
+                {Object.entries(categories).map(([cat, conf]) => (
+                  <div key={cat} className="mb-1">
+                    <p className="text-[9px] font-semibold uppercase tracking-wide px-2 py-1" style={{ color: conf.color }}>{conf.label}</p>
+                    {conf.subcategories.map((sub) => (
+                      <button key={sub} onClick={() => { setCategory(cat); setSubcategory(sub); setShowChannel(false); }}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] transition-colors ${subcategory === sub ? "bg-bg-hover text-text-primary" : "text-text-secondary hover:bg-bg-hover"}`}>
+                        # {sub}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <button className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-tertiary hover:bg-bg-hover text-[11px] text-text-muted transition-colors">
+            <Target size={12} />
+          </button>
+          <button onClick={submit} disabled={!title.trim()}
+            className="ml-auto p-2 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse transition-colors disabled:opacity-30">
+            <ArrowUp size={14} />
+          </button>
         </div>
-        <button className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-tertiary hover:bg-bg-hover text-[10px] text-text-muted transition-colors">
-          <Target size={11} />
-        </button>
-        <button onClick={submit} disabled={!title.trim()}
-          className="ml-auto p-1.5 rounded-md bg-accent hover:bg-accent-hover text-text-inverse transition-colors disabled:opacity-30">
-          <ArrowUp size={13} />
-        </button>
       </div>
     </div>
   );
@@ -294,6 +300,7 @@ export default function HomePage() {
   const [showFilter, setShowFilter] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [sortMenuDay, setSortMenuDay] = useState<string | null>(null);
+  const [addTaskDay, setAddTaskDay] = useState<string | null>(null);
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -480,11 +487,12 @@ export default function HomePage() {
                           </div>
                         </div>
 
-                        {/* Inline Add + Sort */}
+                        {/* Add task button + Sort */}
                         <div className="mb-2 flex items-center gap-1">
-                          <div className="flex-1">
-                            <InlineAddTask dateKey={key} onAdd={handleInlineAdd} categories={CATEGORIES} />
-                          </div>
+                          <button onClick={() => setAddTaskDay(key)}
+                            className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-bg-secondary/60 hover:bg-bg-secondary border border-border/50 hover:border-border text-text-muted hover:text-text-secondary transition-all text-xs">
+                            <Plus size={14} /> Add task
+                          </button>
                           <div className="relative">
                             <button onClick={() => setSortMenuDay(sortMenuDay === key ? null : key)}
                               className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors" title="Reorder">
@@ -513,10 +521,10 @@ export default function HomePage() {
                                         ? "bg-bg-primary/30 border-border/30"
                                         : "bg-bg-secondary border-border hover:border-border/80 shadow-sm hover:shadow-md"
                                     }`}
-                                    style={{ opacity: isDone ? 0.6 : 1 }}>
+                                    style={{ opacity: isDone ? 0.4 : 1 }}>
                                     <div className="p-3">
-                                      <div className="flex items-start gap-2.5">
-                                        {/* Checkbox */}
+                                      {/* Title row */}
+                                      <div className="flex items-start gap-2">
                                         <button onClick={(e) => { e.stopPropagation(); handleComplete(task._id!); }}
                                           className={`mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center transition-all ${
                                             isDone
@@ -525,33 +533,40 @@ export default function HomePage() {
                                           }`}>
                                           {isDone && <Check size={11} className="text-white" strokeWidth={3} />}
                                         </button>
-
-                                        {/* Content */}
                                         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedTask(task)}>
-                                          <div className="flex items-start justify-between gap-2">
-                                            <div className="min-w-0">
-                                              <p className={`text-[13px] font-semibold leading-snug ${isDone ? "line-through text-text-muted" : "text-text-primary"}`}>
-                                                {task.title}
-                                              </p>
-                                              {task.description && (
-                                                <p className="text-[10px] text-text-muted mt-0.5 truncate">{task.description}</p>
-                                              )}
-                                            </div>
-                                            {/* Time estimate */}
+                                          <div className="flex items-start justify-between gap-1">
+                                            <p className={`text-[12px] font-semibold leading-snug break-words ${isDone ? "line-through text-text-muted" : "text-text-primary"}`}>
+                                              {task.title}
+                                            </p>
                                             {(est || spent > 0) && (
-                                              <span className="text-[10px] font-mono text-text-muted bg-bg-tertiary px-1.5 py-0.5 rounded flex-shrink-0">
+                                              <span className="text-[9px] font-mono text-text-muted bg-bg-tertiary px-1 py-0.5 rounded flex-shrink-0 ml-1">
                                                 {formatMins(spent)}{est ? ` / ${formatMins(est)}` : ""}
                                               </span>
                                             )}
                                           </div>
-                                          {/* Footer: channel tag */}
-                                          <div className="flex items-center justify-between mt-1.5">
-                                            <span className="text-[10px] font-medium" style={{ color: isDone ? `${color}60` : color }}>
-                                              # {task.subcategory}
-                                            </span>
-                                            {task.sourceUrl && <Link2 size={10} className="text-accent" />}
-                                          </div>
                                         </div>
+                                      </div>
+                                      {/* Subtasks preview */}
+                                      {(task.subtasks || []).length > 0 && (
+                                        <div className="mt-1.5 ml-7 space-y-0.5">
+                                          {task.subtasks!.map((sub, si) => (
+                                            <div key={si} className="flex items-center gap-1.5">
+                                              <div className={`w-3 h-3 rounded-full border flex-shrink-0 flex items-center justify-center ${
+                                                sub.done ? "bg-emerald-500 border-emerald-500" : "border-text-muted/40"
+                                              }`}>
+                                                {sub.done && <Check size={6} className="text-white" strokeWidth={3} />}
+                                              </div>
+                                              <span className={`text-[10px] truncate ${sub.done ? "line-through text-text-muted" : "text-text-secondary"}`}>{sub.text}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {/* Footer */}
+                                      <div className="flex items-center justify-between mt-1.5 ml-7">
+                                        <span className="text-[9px] font-medium" style={{ color: isDone ? `${color}60` : color }}>
+                                          # {task.subcategory}
+                                        </span>
+                                        {task.sourceUrl && <Link2 size={9} className="text-accent" />}
                                       </div>
                                     </div>
                                   </div>
@@ -616,6 +631,15 @@ export default function HomePage() {
             </div>
           </DragDropContext>
         </div>
+
+        {addTaskDay && (
+          <AddTaskPopup
+            dateKey={addTaskDay}
+            onAdd={handleInlineAdd}
+            onClose={() => setAddTaskDay(null)}
+            categories={CATEGORIES}
+          />
+        )}
 
         <AddTaskModal
           isOpen={showAddModal}
