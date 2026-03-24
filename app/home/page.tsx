@@ -522,51 +522,46 @@ export default function HomePage() {
                                         : "bg-bg-secondary border-border hover:border-border/80 shadow-sm hover:shadow-md"
                                     }`}
                                     style={{ opacity: isDone ? 0.4 : 1 }}>
-                                    <div className="p-3">
-                                      {/* Title row */}
-                                      <div className="flex items-start gap-2">
-                                        <button onClick={(e) => { e.stopPropagation(); handleComplete(task._id!); }}
-                                          className={`mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center transition-all ${
-                                            isDone
-                                              ? "bg-emerald-500 border-2 border-emerald-500"
-                                              : "border-2 border-text-muted/40 hover:border-accent"
-                                          }`}>
-                                          {isDone && <Check size={11} className="text-white" strokeWidth={3} />}
-                                        </button>
-                                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedTask(task)}>
-                                          <div className="flex items-start justify-between gap-1">
-                                            <p className={`text-[12px] font-semibold leading-snug break-words ${isDone ? "line-through text-text-muted" : "text-text-primary"}`}>
-                                              {task.title}
-                                            </p>
-                                            {(est || spent > 0) && (
-                                              <span className="text-[9px] font-mono text-text-muted bg-bg-tertiary px-1 py-0.5 rounded flex-shrink-0 ml-1">
-                                                {formatMins(spent)}{est ? ` / ${formatMins(est)}` : ""}
-                                              </span>
-                                            )}
-                                          </div>
-                                        </div>
+                                    <div className="px-3 pt-2.5 pb-2 cursor-pointer" onClick={() => setSelectedTask(task)}>
+                                      {/* Title + time */}
+                                      <div className="flex items-start justify-between gap-1.5 mb-1">
+                                        <p className={`text-[11px] font-bold leading-tight ${isDone ? "line-through text-text-muted" : "text-text-primary"}`}>
+                                          {task.title}
+                                        </p>
+                                        {(est || spent > 0) && (
+                                          <span className="text-[9px] font-mono text-text-muted bg-bg-tertiary px-1 py-0.5 rounded flex-shrink-0">
+                                            {formatMins(spent)}{est ? ` / ${formatMins(est)}` : ""}
+                                          </span>
+                                        )}
                                       </div>
-                                      {/* Subtasks preview */}
+                                      {/* Subtasks */}
                                       {(task.subtasks || []).length > 0 && (
-                                        <div className="mt-1.5 ml-7 space-y-0.5">
+                                        <div className="space-y-0.5 mb-1.5">
                                           {task.subtasks!.map((sub, si) => (
                                             <div key={si} className="flex items-center gap-1.5">
-                                              <div className={`w-3 h-3 rounded-full border flex-shrink-0 flex items-center justify-center ${
-                                                sub.done ? "bg-emerald-500 border-emerald-500" : "border-text-muted/40"
+                                              <div className={`w-3.5 h-3.5 rounded-full border-[1.5px] flex-shrink-0 flex items-center justify-center ${
+                                                sub.done ? "bg-emerald-500 border-emerald-500" : "border-text-muted/30"
                                               }`}>
-                                                {sub.done && <Check size={6} className="text-white" strokeWidth={3} />}
+                                                {sub.done && <Check size={7} className="text-white" strokeWidth={3} />}
                                               </div>
-                                              <span className={`text-[10px] truncate ${sub.done ? "line-through text-text-muted" : "text-text-secondary"}`}>{sub.text}</span>
+                                              <span className={`text-[10px] ${sub.done ? "line-through text-text-muted" : "text-text-secondary"}`}>{sub.text}</span>
                                             </div>
                                           ))}
                                         </div>
                                       )}
-                                      {/* Footer */}
-                                      <div className="flex items-center justify-between mt-1.5 ml-7">
-                                        <span className="text-[9px] font-medium" style={{ color: isDone ? `${color}60` : color }}>
-                                          # {task.subcategory}
+                                      {/* Footer: complete checkbox + channel */}
+                                      <div className="flex items-center justify-between mt-1">
+                                        <button onClick={(e) => { e.stopPropagation(); handleComplete(task._id!); }}
+                                          className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center transition-all ${
+                                            isDone
+                                              ? "bg-emerald-500 border-[1.5px] border-emerald-500"
+                                              : "border-[1.5px] border-text-muted/30 hover:border-accent"
+                                          }`}>
+                                          {isDone && <Check size={8} className="text-white" strokeWidth={3} />}
+                                        </button>
+                                        <span className="text-[9px] font-medium truncate max-w-[70%] text-right" style={{ color: isDone ? `${color}60` : color }}>
+                                          # {task.subcategory.length > 12 ? task.subcategory.slice(0, 12) + "..." : task.subcategory}
                                         </span>
-                                        {task.sourceUrl && <Link2 size={9} className="text-accent" />}
                                       </div>
                                     </div>
                                   </div>
