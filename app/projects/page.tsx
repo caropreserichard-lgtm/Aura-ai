@@ -351,6 +351,80 @@ function TaskDetailModal({
   );
 }
 
+// ─── List Actions Menu ──────────────────────────────────────────
+function ListActionsMenu({
+  project, projects, onClose, onDelete, onAddCard, onChangeColor, onMoveAllCards, onSortBy,
+}: {
+  project: Project; projects: Project[];
+  onClose: () => void; onDelete: () => void; onAddCard: () => void;
+  onChangeColor: (color: string) => void;
+  onMoveAllCards: (toProjectId: string) => void;
+  onSortBy: (sort: string) => void;
+}) {
+  const [showColors, setShowColors] = useState(false);
+  const [showMoveAll, setShowMoveAll] = useState(false);
+  const [showSort, setShowSort] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  return (
+    <div ref={ref} className="absolute top-8 right-0 w-56 bg-bg-tertiary border border-border rounded-lg shadow-xl z-30 py-1">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+        <h4 className="text-xs font-semibold text-text-primary">List actions</h4>
+        <button onClick={onClose} className="text-text-muted hover:text-text-primary"><X size={14} /></button>
+      </div>
+      <button onClick={() => { onAddCard(); onClose(); }}
+        className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors">Add card</button>
+      <button onClick={() => setShowMoveAll(!showMoveAll)}
+        className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors">Move all cards in this list</button>
+      {showMoveAll && (
+        <div className="px-3 pb-2 space-y-1">
+          {projects.filter((p) => p._id !== project._id).map((p) => (
+            <button key={p._id} onClick={() => { onMoveAllCards(p._id!); onClose(); }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-[11px] text-text-secondary hover:bg-bg-hover">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
+      <button onClick={() => setShowSort(!showSort)}
+        className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors">Sort by...</button>
+      {showSort && (
+        <div className="px-3 pb-2 space-y-1">
+          <button onClick={() => { onSortBy("name"); onClose(); }} className="w-full text-left px-2 py-1 rounded text-[11px] text-text-secondary hover:bg-bg-hover">Name (A-Z)</button>
+          <button onClick={() => { onSortBy("created"); onClose(); }} className="w-full text-left px-2 py-1 rounded text-[11px] text-text-secondary hover:bg-bg-hover">Date created</button>
+          <button onClick={() => { onSortBy("done"); onClose(); }} className="w-full text-left px-2 py-1 rounded text-[11px] text-text-secondary hover:bg-bg-hover">Done status</button>
+        </div>
+      )}
+      <div className="border-t border-border mt-1 pt-1">
+        <button onClick={() => setShowColors(!showColors)}
+          className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors">Change list color</button>
+        {showColors && (
+          <div className="flex gap-1.5 px-3 pb-2">
+            {PROJECT_COLORS.map((c) => (
+              <button key={c} onClick={() => { onChangeColor(c); onClose(); }}
+                className={`w-6 h-6 rounded-full transition-all hover:scale-110 ${project.color === c ? "ring-2 ring-offset-1 ring-offset-bg-tertiary" : ""}`}
+                style={{ backgroundColor: c, ["--tw-ring-color" as string]: c }} />
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="border-t border-border mt-1 pt-1">
+        <button onClick={() => { if (confirm(`Delete "${project.name}" and all its cards?`)) { onDelete(); onClose(); } }}
+          className="w-full text-left px-3 py-2 text-xs text-danger hover:bg-danger-subtle transition-colors">Delete list</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ──────────────────────────────────────────────────
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -362,6 +436,8 @@ export default function ProjectsPage() {
   const [selectedTask, setSelectedTask] = useState<{ task: ProjectTask; project: Project } | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState<Record<string, string>>({});
   const [hoverTask, setHoverTask] = useState<string | null>(null);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [addingCardTo, setAddingCardTo] = useState<string | null>(null);
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -482,9 +558,60 @@ export default function ProjectsPage() {
     fetchProjects();
   };
 
+  const reorderProjects = async (newOrder: Project[]) => {
+    setProjects(newOrder);
+    await fetch("/api/projects", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reorder", projectIds: newOrder.map((p) => p._id) }),
+    });
+  };
+
+  const changeProjectColor = async (projectId: string, color: string) => {
+    await fetch(`/api/projects/${projectId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ color }),
+    });
+    fetchProjects();
+  };
+
+  const moveAllCards = async (fromProjectId: string, toProjectId: string) => {
+    const from = projects.find((p) => p._id === fromProjectId);
+    if (!from || !from.tasks.length) return;
+    for (const task of from.tasks) {
+      await fetch(`/api/projects/${fromProjectId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "move_task", taskId: task.id, toProjectId, position: -1 }),
+      });
+    }
+    fetchProjects();
+  };
+
+  const sortProjectTasks = async (projectId: string, sortBy: string) => {
+    const project = projects.find((p) => p._id === projectId);
+    if (!project) return;
+    const sorted = [...project.tasks];
+    if (sortBy === "name") sorted.sort((a, b) => a.title.localeCompare(b.title));
+    else if (sortBy === "created") sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    else if (sortBy === "done") sorted.sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1));
+    setProjects((prev) => prev.map((p) => p._id === projectId ? { ...p, tasks: sorted } : p));
+    await fetch(`/api/projects/${projectId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reorder_tasks", tasks: sorted }),
+    });
+  };
+
   const handleDragEnd = async (result: DropResult) => {
     const { source, destination, type } = result;
     if (!destination) return;
+
+    if (type === "COLUMN") {
+      // Reorder projects
+      const newProjects = [...projects];
+      const [moved] = newProjects.splice(source.index, 1);
+      newProjects.splice(destination.index, 0, moved);
+      reorderProjects(newProjects);
+      return;
+    }
 
     if (type === "CARD") {
       const fromProjectId = source.droppableId;
@@ -495,18 +622,15 @@ export default function ProjectsPage() {
       if (!task) return;
 
       if (fromProjectId === toProjectId) {
-        // Reorder within same project
         const newTasks = [...fromProject.tasks];
         newTasks.splice(source.index, 1);
         newTasks.splice(destination.index, 0, task);
-        // Optimistic
         setProjects((prev) => prev.map((p) => p._id === fromProjectId ? { ...p, tasks: newTasks } : p));
         await fetch(`/api/projects/${fromProjectId}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "reorder_tasks", tasks: newTasks }),
         });
       } else {
-        // Move between projects
         await moveTask(fromProjectId, task.id, toProjectId, destination.index);
       }
     }
@@ -572,24 +696,41 @@ export default function ProjectsPage() {
             </div>
           ) : (
             <DragDropContext onDragEnd={handleDragEnd}>
-              <div className="flex gap-3 overflow-x-auto pb-4 items-start" style={{ scrollbarWidth: "thin" }}>
-                {projects.map((project) => {
+              <Droppable droppableId="board" type="COLUMN" direction="horizontal">
+                {(boardProvided) => (
+                  <div ref={boardProvided.innerRef} {...boardProvided.droppableProps}
+                    className="flex gap-3 overflow-x-auto pb-4 items-start" style={{ scrollbarWidth: "thin" }}>
+                {projects.map((project, projectIdx) => {
                   const progress = getProgress(project.tasks || []);
                   const totalTasks = (project.tasks || []).length;
                   const doneTasks = (project.tasks || []).filter((t) => t.done).length;
 
                   return (
-                    <div key={project._id} className="w-64 flex-shrink-0 rounded-lg bg-bg-secondary border border-border overflow-hidden flex flex-col">
+                    <Draggable key={project._id} draggableId={`project-${project._id}`} index={projectIdx}>
+                      {(colProvided, colSnapshot) => (
+                    <div ref={colProvided.innerRef} {...colProvided.draggableProps}
+                      className={`w-64 flex-shrink-0 rounded-lg bg-bg-secondary border border-border overflow-hidden flex flex-col ${colSnapshot.isDragging ? "shadow-xl opacity-90" : ""}`}>
                       {/* Project Header */}
-                      <div className="px-3 py-2.5 border-b" style={{ borderBottomColor: `${project.color}30` }}>
-                        <div className="flex items-center gap-2 mb-1">
+                      <div {...colProvided.dragHandleProps} className="px-3 py-2.5 border-b cursor-grab active:cursor-grabbing" style={{ borderBottomColor: `${project.color}30` }}>
+                        <div className="flex items-center gap-2 mb-1 relative">
                           <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
                           <h3 className="font-heading font-bold text-sm uppercase tracking-wide flex-1 truncate">{project.name}</h3>
                           <span className="text-[11px] text-text-muted">{doneTasks}/{totalTasks}</span>
-                          <button onClick={() => deleteProject(project._id!)}
-                            className="text-text-muted hover:text-danger transition-colors p-0.5">
+                          <button onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === project._id ? null : project._id!); }}
+                            className="text-text-muted hover:text-text-primary transition-colors p-0.5">
                             <MoreHorizontal size={14} />
                           </button>
+                          {openMenu === project._id && (
+                            <ListActionsMenu
+                              project={project} projects={projects}
+                              onClose={() => setOpenMenu(null)}
+                              onDelete={() => deleteProject(project._id!)}
+                              onAddCard={() => setAddingCardTo(project._id!)}
+                              onChangeColor={(color) => changeProjectColor(project._id!, color)}
+                              onMoveAllCards={(toId) => moveAllCards(project._id!, toId)}
+                              onSortBy={(sort) => sortProjectTasks(project._id!, sort)}
+                            />
+                          )}
                         </div>
                         {project.description && <p className="text-[10px] text-text-muted truncate mb-1">{project.description}</p>}
                         <div className="flex items-center gap-2">
@@ -692,9 +833,14 @@ export default function ProjectsPage() {
                         </div>
                       </div>
                     </div>
+                      )}
+                    </Draggable>
                   );
                 })}
-              </div>
+                {boardProvided.placeholder}
+                  </div>
+                )}
+              </Droppable>
             </DragDropContext>
           )}
         </div>
