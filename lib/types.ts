@@ -24,6 +24,9 @@ export interface Task {
   subtasks?: { text: string; done: boolean }[];
   tags: string[];
   sourceUrl?: string;
+  estimatedTime?: number;
+  attachments?: { name: string; url: string; size: number; type: string; uploadedAt: string }[];
+  comments?: { id: string; text: string; createdAt: string }[];
   calendarEventId?: string;
   createdAt: string;
   completedAt?: string;

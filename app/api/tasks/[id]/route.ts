@@ -35,6 +35,9 @@ export async function PATCH(
       "tags",
       "subtasks",
       "sourceUrl",
+      "estimatedTime",
+      "attachments",
+      "comments",
     ];
 
     for (const field of allowedFields) {

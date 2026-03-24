@@ -514,53 +514,70 @@ export default function HomePage() {
                               <Draggable key={task._id} draggableId={task._id!} index={index}>
                                 {(dragProvided, dragSnapshot) => (
                                   <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps}
-                                    className={`rounded-xl border transition-all cursor-grab active:cursor-grabbing ${
+                                    className={`rounded-xl border transition-all cursor-grab active:cursor-grabbing overflow-hidden ${
                                       dragSnapshot.isDragging
                                         ? "bg-bg-elevated border-accent/40 shadow-xl scale-[1.02]"
                                         : isDone
                                         ? "bg-bg-primary/30 border-border/30"
                                         : "bg-bg-secondary border-border hover:border-border/80 shadow-sm hover:shadow-md"
                                     }`}
-                                    style={{ opacity: isDone ? 0.4 : 1 }}>
-                                    <div className="px-3 pt-2.5 pb-2 cursor-pointer" onClick={() => setSelectedTask(task)}>
-                                      {/* Title + time */}
-                                      <div className="flex items-start justify-between gap-1.5 mb-1">
-                                        <p className={`text-[11px] font-bold leading-tight ${isDone ? "line-through text-text-muted" : "text-text-primary"}`}>
-                                          {task.title}
-                                        </p>
-                                        {(est || spent > 0) && (
-                                          <span className="text-[9px] font-mono text-text-muted bg-bg-tertiary px-1 py-0.5 rounded flex-shrink-0">
-                                            {formatMins(spent)}{est ? ` / ${formatMins(est)}` : ""}
-                                          </span>
-                                        )}
-                                      </div>
+                                    style={{ opacity: isDone ? 0.5 : 1 }}>
+                                    <div className="px-2.5 pt-2 pb-1.5 cursor-pointer" onClick={() => setSelectedTask(task)}>
+                                      {/* Start time + estimated time */}
+                                      {(task.startDate || est) && (
+                                        <div className="flex items-center justify-between mb-0.5">
+                                          {task.startDate && (
+                                            <span className="text-[9px] text-text-muted">
+                                              {new Date(task.startDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase()}
+                                            </span>
+                                          )}
+                                          {(est || spent > 0) && (
+                                            <span className="text-[8px] font-mono text-text-muted bg-bg-tertiary px-1 py-0.5 rounded ml-auto">
+                                              {formatMins(spent)}{est ? ` / ${formatMins(est)}` : ""}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                      {/* Title — smaller text, clamped */}
+                                      <p className={`text-[11px] font-semibold leading-snug mb-1 ${isDone ? "line-through text-text-muted" : "text-text-primary"}`}
+                                        style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                                        {task.title}
+                                      </p>
                                       {/* Subtasks */}
                                       {(task.subtasks || []).length > 0 && (
-                                        <div className="space-y-0.5 mb-1.5">
+                                        <div className="space-y-0.5 mb-1">
                                           {task.subtasks!.map((sub, si) => (
-                                            <div key={si} className="flex items-center gap-1.5">
-                                              <div className={`w-3.5 h-3.5 rounded-full border-[1.5px] flex-shrink-0 flex items-center justify-center ${
+                                            <div key={si} className="flex items-center gap-1">
+                                              <div className={`w-3 h-3 rounded-full border-[1.5px] flex-shrink-0 flex items-center justify-center ${
                                                 sub.done ? "bg-emerald-500 border-emerald-500" : "border-text-muted/30"
                                               }`}>
-                                                {sub.done && <Check size={7} className="text-white" strokeWidth={3} />}
+                                                {sub.done && <Check size={6} className="text-white" strokeWidth={3} />}
                                               </div>
-                                              <span className={`text-[10px] ${sub.done ? "line-through text-text-muted" : "text-text-secondary"}`}>{sub.text}</span>
+                                              <span className={`text-[9px] truncate ${sub.done ? "line-through text-text-muted" : "text-text-secondary"}`}>{sub.text}</span>
                                             </div>
                                           ))}
                                         </div>
                                       )}
-                                      {/* Footer: complete checkbox + channel */}
+                                      {/* Footer: complete checkbox + icons + channel */}
                                       <div className="flex items-center justify-between mt-1">
-                                        <button onClick={(e) => { e.stopPropagation(); handleComplete(task._id!); }}
-                                          className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center transition-all ${
-                                            isDone
-                                              ? "bg-emerald-500 border-[1.5px] border-emerald-500"
-                                              : "border-[1.5px] border-text-muted/30 hover:border-accent"
-                                          }`}>
-                                          {isDone && <Check size={8} className="text-white" strokeWidth={3} />}
-                                        </button>
-                                        <span className="text-[9px] font-medium truncate max-w-[70%] text-right" style={{ color: isDone ? `${color}60` : color }}>
-                                          # {task.subcategory.length > 12 ? task.subcategory.slice(0, 12) + "..." : task.subcategory}
+                                        <div className="flex items-center gap-1.5">
+                                          <button onClick={(e) => { e.stopPropagation(); handleComplete(task._id!); }}
+                                            className={`w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center transition-all ${
+                                              isDone
+                                                ? "bg-emerald-500 border-[1.5px] border-emerald-500"
+                                                : "border-[1.5px] border-text-muted/30 hover:border-accent"
+                                            }`}>
+                                            {isDone && <Check size={7} className="text-white" strokeWidth={3} />}
+                                          </button>
+                                          {task.dueDate && !task.startDate && (
+                                            <Calendar size={8} className="text-text-muted/40" />
+                                          )}
+                                          {est && !task.startDate && (
+                                            <Clock size={8} className="text-text-muted/40" />
+                                          )}
+                                        </div>
+                                        <span className="text-[8px] font-medium truncate max-w-[60%] text-right" style={{ color: isDone ? `${color}50` : color }}>
+                                          # {task.subcategory.length > 14 ? task.subcategory.slice(0, 14) + "..." : task.subcategory}
                                         </span>
                                       </div>
                                     </div>
