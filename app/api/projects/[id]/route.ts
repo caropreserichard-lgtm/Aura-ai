@@ -27,10 +27,95 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     if (action === "add_task") {
       const taskId = new ObjectId().toString();
-      const task = { id: taskId, title: body.title, done: false, comments: [], links: body.links || [], createdAt: now };
+      const task = { id: taskId, title: body.title, description: "", done: false, labels: [], checklist: [], comments: [], links: body.links || [], createdAt: now };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await db.collection("projects").updateOne({ _id: new ObjectId(id) }, { $push: { tasks: task } as any, $set: { updatedAt: now } });
       return NextResponse.json(task);
+    }
+
+    if (action === "update_task") {
+      const project = await db.collection("projects").findOne({ _id: new ObjectId(id) });
+      if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const allowed = ["title", "description", "labels", "dueDate", "done"];
+      const tasks = (project.tasks || []).map((t: { id: string }) => {
+        if (t.id === body.taskId) {
+          const updated = { ...t };
+          for (const f of allowed) {
+            if (body[f] !== undefined) (updated as Record<string, unknown>)[f] = body[f];
+          }
+          return updated;
+        }
+        return t;
+      });
+      await db.collection("projects").updateOne({ _id: new ObjectId(id) }, { $set: { tasks, updatedAt: now } });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "move_task") {
+      const { taskId, toProjectId, position } = body;
+      const fromProject = await db.collection("projects").findOne({ _id: new ObjectId(id) });
+      if (!fromProject) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const task = (fromProject.tasks || []).find((t: { id: string }) => t.id === taskId);
+      if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+      // Remove from source
+      await db.collection("projects").updateOne(
+        { _id: new ObjectId(id) },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { $pull: { tasks: { id: taskId } } as any, $set: { updatedAt: now } }
+      );
+      // Add to destination
+      const toProject = await db.collection("projects").findOne({ _id: new ObjectId(toProjectId) });
+      if (!toProject) return NextResponse.json({ error: "Dest not found" }, { status: 404 });
+      const destTasks = [...(toProject.tasks || [])];
+      const pos = position !== undefined ? position : destTasks.length;
+      destTasks.splice(pos, 0, task);
+      await db.collection("projects").updateOne({ _id: new ObjectId(toProjectId) }, { $set: { tasks: destTasks, updatedAt: now } });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "add_checklist_item") {
+      const project = await db.collection("projects").findOne({ _id: new ObjectId(id) });
+      if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const itemId = new ObjectId().toString();
+      const tasks = (project.tasks || []).map((t: { id: string; checklist?: unknown[] }) => {
+        if (t.id === body.taskId) {
+          return { ...t, checklist: [...(t.checklist || []), { id: itemId, text: body.text, done: false }] };
+        }
+        return t;
+      });
+      await db.collection("projects").updateOne({ _id: new ObjectId(id) }, { $set: { tasks, updatedAt: now } });
+      return NextResponse.json({ id: itemId });
+    }
+
+    if (action === "toggle_checklist_item") {
+      const project = await db.collection("projects").findOne({ _id: new ObjectId(id) });
+      if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const tasks = (project.tasks || []).map((t: { id: string; checklist?: { id: string; done: boolean }[] }) => {
+        if (t.id === body.taskId) {
+          return { ...t, checklist: (t.checklist || []).map((c) => c.id === body.itemId ? { ...c, done: !c.done } : c) };
+        }
+        return t;
+      });
+      await db.collection("projects").updateOne({ _id: new ObjectId(id) }, { $set: { tasks, updatedAt: now } });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "delete_checklist_item") {
+      const project = await db.collection("projects").findOne({ _id: new ObjectId(id) });
+      if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const tasks = (project.tasks || []).map((t: { id: string; checklist?: { id: string }[] }) => {
+        if (t.id === body.taskId) {
+          return { ...t, checklist: (t.checklist || []).filter((c) => c.id !== body.itemId) };
+        }
+        return t;
+      });
+      await db.collection("projects").updateOne({ _id: new ObjectId(id) }, { $set: { tasks, updatedAt: now } });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "reorder_tasks") {
+      await db.collection("projects").updateOne({ _id: new ObjectId(id) }, { $set: { tasks: body.tasks, updatedAt: now } });
+      return NextResponse.json({ ok: true });
     }
 
     if (action === "toggle_task") {

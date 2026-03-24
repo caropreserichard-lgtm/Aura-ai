@@ -133,7 +133,11 @@ export interface Project {
 export interface ProjectTask {
   id: string;
   title: string;
+  description?: string;
   done: boolean;
+  labels?: string[];
+  dueDate?: string;
+  checklist?: { id: string; text: string; done: boolean }[];
   comments: ProjectComment[];
   links: string[];
   createdAt: string;
