@@ -125,9 +125,16 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask, initia
             <input type="url" value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} placeholder="Link (optional)"
               className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none" />
             {sourceUrl && (
-              <button type="button" onClick={() => setSourceUrl("")} className="text-text-muted hover:text-danger">
-                <X size={14} />
-              </button>
+              <>
+                <a href={sourceUrl} target="_blank" rel="noopener noreferrer"
+                  className="text-accent hover:text-accent-hover text-[11px] font-medium flex-shrink-0"
+                  onClick={(e) => e.stopPropagation()}>
+                  Open
+                </a>
+                <button type="button" onClick={() => setSourceUrl("")} className="text-text-muted hover:text-danger">
+                  <X size={14} />
+                </button>
+              </>
             )}
           </div>
 

@@ -120,6 +120,32 @@ export const CATEGORIES: Record<Category, CategoryConfig> = {
   },
 };
 
+export interface Project {
+  _id?: string;
+  name: string;
+  description?: string;
+  color: string;
+  tasks: ProjectTask[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectTask {
+  id: string;
+  title: string;
+  done: boolean;
+  comments: ProjectComment[];
+  links: string[];
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface ProjectComment {
+  id: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface CalendarToken {
   _id?: string;
   userId: string;
