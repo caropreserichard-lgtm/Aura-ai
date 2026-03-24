@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Plus, Check } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  ChevronLeft, ChevronRight, Plus, Check, Calendar, SlidersHorizontal,
+  ArrowUpDown, Hash, Clock, Target, ArrowUp, Link2, X, Search,
+} from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import AddTaskModal from "@/components/AddTaskModal";
 import TaskDetailPanel from "@/components/TaskDetailPanel";
-import { Task, CATEGORIES } from "@/lib/types";
+import { Task, CATEGORIES, Category } from "@/lib/types";
 
 const CAT_COLORS: Record<string, string> = {
   trabajo: "#d4a04e",
@@ -16,14 +19,20 @@ const CAT_COLORS: Record<string, string> = {
   proyectos: "#6b8aaf",
 };
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_NAMES_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+const TIME_PRESETS = [
+  { label: "5m", mins: 5 }, { label: "10m", mins: 10 }, { label: "15m", mins: 15 },
+  { label: "20m", mins: 20 }, { label: "25m", mins: 25 }, { label: "30m", mins: 30 },
+  { label: "35m", mins: 35 }, { label: "40m", mins: 40 }, { label: "45m", mins: 45 },
+  { label: "1h", mins: 60 }, { label: "2h", mins: 120 },
+];
 
 function getWeekDates(offset: number) {
   const now = new Date();
   const day = now.getDay();
   const monday = new Date(now);
   monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
-
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
@@ -34,15 +43,246 @@ function getWeekDates(offset: number) {
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
+function isToday(d: Date) { return isSameDay(d, new Date()); }
+function toDateKey(d: Date) { return d.toISOString().split("T")[0]; }
+function formatMins(m: number) { return m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}` : `0:${String(m).padStart(2, "0")}`; }
 
-function isToday(d: Date) {
-  return isSameDay(d, new Date());
+// ─── Filter Popover ─────────────────────────────────────────────
+function FilterPopover({ selected, onSelect, onClose }: {
+  selected: string; onSelect: (cat: string) => void; onClose: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
+  }, [onClose]);
+
+  const cats = [
+    { key: "all", label: "all", color: "#888" },
+    ...Object.entries(CATEGORIES).map(([k, v]) => ({ key: k, label: v.label.toLowerCase(), color: v.color })),
+  ].filter((c) => c.label.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div ref={ref} className="absolute top-full left-0 mt-2 w-64 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-slide-in-right">
+      <div className="px-3 pt-3 pb-2">
+        <p className="text-[11px] text-text-muted mb-2">Filter tasks by channel:</p>
+        <div className="relative">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..."
+            className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-bg-secondary border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent" />
+        </div>
+      </div>
+      <div className="px-1 pb-1 max-h-52 overflow-y-auto">
+        {cats.map((c) => (
+          <button key={c.key} onClick={() => { onSelect(c.key); onClose(); }}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-sm transition-colors ${selected === c.key ? "bg-bg-hover" : "hover:bg-bg-hover/60"}`}>
+            <Hash size={14} style={{ color: c.color }} />
+            <span className="flex-1 text-text-primary">{c.label}</span>
+            {selected === c.key && <Check size={14} className="text-accent" />}
+          </button>
+        ))}
+      </div>
+      <div className="border-t border-border px-3 py-2">
+        <a href="/settings" className="text-xs text-accent hover:underline">Manage channels</a>
+      </div>
+    </div>
+  );
 }
 
-function toDateKey(d: Date) {
-  return d.toISOString().split("T")[0];
+// ─── Calendar Popover ─────────────────────────────────────────
+function CalendarPopover({ current, onSelect, onClose }: {
+  current: Date; onSelect: (d: Date) => void; onClose: () => void;
+}) {
+  const [viewMonth, setViewMonth] = useState(new Date(current.getFullYear(), current.getMonth(), 1));
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
+  }, [onClose]);
+
+  const year = viewMonth.getFullYear();
+  const month = viewMonth.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const offset = firstDay === 0 ? 6 : firstDay - 1; // Monday start
+
+  return (
+    <div ref={ref} className="absolute top-full left-0 mt-2 w-64 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 p-3 animate-slide-in-right">
+      <div className="flex items-center justify-between mb-3">
+        <button onClick={() => setViewMonth(new Date(year, month - 1, 1))} className="p-1 rounded hover:bg-bg-hover text-text-muted"><ChevronLeft size={14} /></button>
+        <span className="text-xs font-semibold text-text-primary">{viewMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
+        <button onClick={() => setViewMonth(new Date(year, month + 1, 1))} className="p-1 rounded hover:bg-bg-hover text-text-muted"><ChevronRight size={14} /></button>
+      </div>
+      <div className="grid grid-cols-7 gap-0.5 text-center">
+        {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
+          <span key={d} className="text-[9px] font-semibold text-text-muted py-1">{d}</span>
+        ))}
+        {Array.from({ length: offset }, (_, i) => <div key={`e-${i}`} />)}
+        {Array.from({ length: daysInMonth }, (_, i) => {
+          const d = new Date(year, month, i + 1);
+          const today = isToday(d);
+          const sel = isSameDay(d, current);
+          return (
+            <button key={i} onClick={() => { onSelect(d); onClose(); }}
+              className={`w-7 h-7 rounded-full text-[11px] transition-colors ${sel ? "bg-accent text-text-inverse font-bold" : today ? "ring-1 ring-accent text-accent font-semibold" : "text-text-secondary hover:bg-bg-hover"}`}>
+              {i + 1}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
+// ─── Inline Add Task ──────────────────────────────────────────
+function InlineAddTask({ dateKey, onAdd, categories }: {
+  dateKey: string; onAdd: (data: Record<string, unknown>) => void; categories: typeof CATEGORIES;
+}) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [showTime, setShowTime] = useState(false);
+  const [showChannel, setShowChannel] = useState(false);
+  const [estimatedTime, setEstimatedTime] = useState(0);
+  const [category, setCategory] = useState<string>("trabajo");
+  const [subcategory, setSubcategory] = useState("");
+  const [timeInput, setTimeInput] = useState("");
+  const timeRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (timeRef.current && !timeRef.current.contains(e.target as Node)) setShowTime(false);
+      if (channelRef.current && !channelRef.current.contains(e.target as Node)) setShowChannel(false);
+    };
+    document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const submit = () => {
+    if (!title.trim()) return;
+    const cat = category as Category;
+    const sub = subcategory || categories[cat]?.subcategories[0] || "";
+    onAdd({
+      title: title.trim(), category: cat, subcategory: sub,
+      priority: 3, roi: 5, joy: 5, dueDate: dateKey,
+      ...(estimatedTime > 0 ? { estimatedTime } : {}),
+    });
+    setTitle(""); setEstimatedTime(0); setCategory("trabajo"); setSubcategory(""); setOpen(false);
+  };
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)}
+        className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-bg-secondary/60 hover:bg-bg-secondary border border-border/50 hover:border-border text-text-muted hover:text-text-secondary transition-all text-xs">
+        <Plus size={14} /> Add task
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-xl bg-bg-secondary border border-border p-3 space-y-2.5 shadow-lg">
+      <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus
+        onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") setOpen(false); }}
+        placeholder="Task description..."
+        className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none" />
+      <div className="flex items-center gap-1 flex-wrap">
+        <span className="flex items-center gap-1 px-2 py-1 rounded-md bg-purple-500/20 text-purple-400 text-[10px] font-semibold">
+          TIP <span className="text-text-muted font-normal">Paste a URL</span>
+        </span>
+        <button className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-tertiary hover:bg-bg-hover text-[10px] text-text-muted transition-colors">
+          <Calendar size={11} /> {new Date(dateKey).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+        </button>
+        <div className="relative" ref={timeRef}>
+          <button onClick={() => setShowTime(!showTime)}
+            className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-tertiary hover:bg-bg-hover text-[10px] text-text-muted transition-colors">
+            <Clock size={11} /> {estimatedTime > 0 ? formatMins(estimatedTime) : "--:--"}
+          </button>
+          {showTime && (
+            <div className="absolute bottom-full left-0 mb-2 w-48 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 p-2 animate-slide-in-right">
+              <input type="text" value={timeInput} onChange={(e) => setTimeInput(e.target.value)} placeholder="e.g. 25 or 1:30"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && timeInput.trim()) {
+                    const parts = timeInput.split(":");
+                    const mins = parts.length === 2 ? parseInt(parts[0]) * 60 + parseInt(parts[1]) : parseInt(timeInput);
+                    if (!isNaN(mins) && mins > 0) { setEstimatedTime(mins); setShowTime(false); setTimeInput(""); }
+                  }
+                }}
+                className="w-full px-2 py-1.5 rounded-lg bg-bg-secondary border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent mb-2" />
+              <div className="grid grid-cols-4 gap-1">
+                {TIME_PRESETS.map((p) => (
+                  <button key={p.label} onClick={() => { setEstimatedTime(p.mins); setShowTime(false); }}
+                    className={`px-1.5 py-1 rounded-md text-[10px] font-medium transition-colors ${estimatedTime === p.mins ? "bg-accent text-text-inverse" : "bg-bg-secondary text-text-secondary hover:bg-bg-hover"}`}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="relative" ref={channelRef}>
+          <button onClick={() => setShowChannel(!showChannel)}
+            className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-tertiary hover:bg-bg-hover text-[10px] text-text-muted transition-colors">
+            <Hash size={11} /> {subcategory || "channel"}
+          </button>
+          {showChannel && (
+            <div className="absolute bottom-full left-0 mb-2 w-56 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 p-2 max-h-48 overflow-y-auto animate-slide-in-right">
+              {Object.entries(categories).map(([cat, conf]) => (
+                <div key={cat} className="mb-1">
+                  <p className="text-[9px] font-semibold uppercase tracking-wide px-2 py-1" style={{ color: conf.color }}>{conf.label}</p>
+                  {conf.subcategories.map((sub) => (
+                    <button key={sub} onClick={() => { setCategory(cat); setSubcategory(sub); setShowChannel(false); }}
+                      className={`w-full text-left px-2 py-1 rounded-md text-[11px] transition-colors ${subcategory === sub ? "bg-bg-hover text-text-primary" : "text-text-secondary hover:bg-bg-hover"}`}>
+                      # {sub}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <button className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-tertiary hover:bg-bg-hover text-[10px] text-text-muted transition-colors">
+          <Target size={11} />
+        </button>
+        <button onClick={submit} disabled={!title.trim()}
+          className="ml-auto p-1.5 rounded-md bg-accent hover:bg-accent-hover text-text-inverse transition-colors disabled:opacity-30">
+          <ArrowUp size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sort Menu ────────────────────────────────────────────────
+function SortMenu({ onSort, onClose }: { onSort: (by: string) => void; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
+  }, [onClose]);
+
+  return (
+    <div ref={ref} className="absolute top-full right-0 mt-2 w-56 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-slide-in-right">
+      <div className="px-3 py-2.5 border-b border-border">
+        <p className="text-[11px] text-text-muted">Reorder unscheduled tasks by:</p>
+      </div>
+      <div className="py-1">
+        {[
+          { key: "name", label: "Name A-Z", icon: "A-Z" },
+          { key: "created", label: "Date created", icon: "📅" },
+          { key: "done", label: "Done status", icon: "✓" },
+        ].map((opt) => (
+          <button key={opt.key} onClick={() => { onSort(opt.key); onClose(); }}
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-text-primary hover:bg-bg-hover transition-colors">
+            <span className="w-5 text-center text-text-muted text-xs">{opt.icon}</span>
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────
 export default function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,17 +290,18 @@ export default function HomePage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [addModalDate, setAddModalDate] = useState<string | undefined>(undefined);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [filterCat, setFilterCat] = useState("all");
+  const [showFilter, setShowFilter] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [sortMenuDay, setSortMenuDay] = useState<string | null>(null);
 
   const fetchTasks = useCallback(async () => {
     try {
       const res = await fetch("/api/tasks");
       const data = await res.json();
       if (Array.isArray(data)) setTasks(data);
-    } catch (error) {
-      console.error("Error:", error);
-    } finally {
-      setLoading(false);
-    }
+    } catch (error) { console.error("Error:", error); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
@@ -68,11 +309,9 @@ export default function HomePage() {
   const weekDates = getWeekDates(weekOffset);
   const pendingTasks = tasks.filter((t) => t.status !== "done");
 
-  // Backlog = pending tasks with NO dueDate (or dueDate outside this week)
+  // Backlog
   const weekKeys = new Set(weekDates.map(toDateKey));
   const backlogTasks = pendingTasks.filter((t) => !t.dueDate || !weekKeys.has(t.dueDate.split("T")[0]));
-
-  // Group backlog by subcategory
   const subcategoryGroups: Record<string, Task[]> = {};
   backlogTasks.forEach((t) => {
     const key = t.subcategory || "Other";
@@ -80,11 +319,12 @@ export default function HomePage() {
     subcategoryGroups[key].push(t);
   });
 
-  // Tasks with due dates mapped to days (include completed — pending first, done last)
+  // Tasks by day (with filter)
   const tasksByDay: Record<string, Task[]> = {};
   weekDates.forEach((d) => {
     const key = toDateKey(d);
-    const dayTasks = tasks.filter((t) => t.dueDate && t.dueDate.startsWith(key));
+    let dayTasks = tasks.filter((t) => t.dueDate && t.dueDate.startsWith(key));
+    if (filterCat !== "all") dayTasks = dayTasks.filter((t) => t.category === filterCat);
     dayTasks.sort((a, b) => {
       if (a.status === "done" && b.status !== "done") return 1;
       if (a.status !== "done" && b.status === "done") return -1;
@@ -96,74 +336,48 @@ export default function HomePage() {
   const handleComplete = async (id: string) => {
     const task = tasks.find((t) => t._id === id);
     const newStatus = task?.status === "done" ? "pending" : "done";
-    // Optimistic UI update
     setTasks((prev) => prev.map((t) => t._id === id ? { ...t, status: newStatus, completedAt: newStatus === "done" ? new Date().toISOString() : undefined } : t));
     try {
-      await fetch(`/api/tasks/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
+      await fetch(`/api/tasks/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: newStatus }) });
       fetchTasks();
     } catch (e) { console.error(e); fetchTasks(); }
   };
 
   const handleAddTask = async (taskData: Record<string, unknown>) => {
     try {
-      await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(taskData),
-      });
+      await fetch("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(taskData) });
+      fetchTasks();
+    } catch (e) { console.error(e); }
+  };
+
+  const handleInlineAdd = async (data: Record<string, unknown>) => {
+    try {
+      await fetch("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
       fetchTasks();
     } catch (e) { console.error(e); }
   };
 
   const handleUpdateDueDate = async (taskId: string, newDueDate: string | null) => {
-    // Optimistic update
-    setTasks((prev) =>
-      prev.map((t) => (t._id === taskId ? { ...t, dueDate: newDueDate || undefined } : t))
-    );
+    setTasks((prev) => prev.map((t) => (t._id === taskId ? { ...t, dueDate: newDueDate || undefined } : t)));
     try {
-      await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dueDate: newDueDate }),
-      });
-    } catch (e) {
-      console.error(e);
-      fetchTasks(); // Revert on error
-    }
+      await fetch(`/api/tasks/${taskId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dueDate: newDueDate }) });
+    } catch (e) { console.error(e); fetchTasks(); }
   };
 
   const handleDragEnd = (result: DropResult) => {
     const { draggableId, source, destination } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-
-    const taskId = draggableId;
-    const destId = destination.droppableId;
-
-    if (destId === "backlog") {
-      handleUpdateDueDate(taskId, null);
-    } else {
-      // destId is a date key like "2026-03-20"
-      handleUpdateDueDate(taskId, destId);
-    }
+    if (destination.droppableId === "backlog") handleUpdateDueDate(draggableId, null);
+    else handleUpdateDueDate(draggableId, destination.droppableId);
   };
 
   const handleTaskUpdate = async (taskId: string, updates: Record<string, unknown>) => {
     try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      });
+      const res = await fetch(`/api/tasks/${taskId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updates) });
       const updated = await res.json();
       setTasks((prev) => prev.map((t) => (t._id === taskId ? { ...t, ...updated } : t)));
-      if (selectedTask?._id === taskId) {
-        setSelectedTask((prev) => prev ? { ...prev, ...updated } : null);
-      }
+      if (selectedTask?._id === taskId) setSelectedTask((prev) => prev ? { ...prev, ...updated } : null);
     } catch (e) { console.error(e); }
   };
 
@@ -175,17 +389,32 @@ export default function HomePage() {
     } catch (e) { console.error(e); }
   };
 
-  const openAddForDay = (dateKey: string) => {
-    setAddModalDate(dateKey);
-    setShowAddModal(true);
+  const handleSort = (dateKey: string, by: string) => {
+    setTasks((prev) => {
+      const copy = [...prev];
+      const dayTaskIds = new Set(copy.filter((t) => t.dueDate?.startsWith(dateKey)).map((t) => t._id));
+      const dayTasks = copy.filter((t) => dayTaskIds.has(t._id));
+      if (by === "name") dayTasks.sort((a, b) => a.title.localeCompare(b.title));
+      else if (by === "created") dayTasks.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      else if (by === "done") dayTasks.sort((a, b) => (a.status === "done" ? 1 : 0) - (b.status === "done" ? 1 : 0));
+      const rest = copy.filter((t) => !dayTaskIds.has(t._id));
+      return [...rest, ...dayTasks];
+    });
   };
 
-  const openAddGeneral = () => {
-    setAddModalDate(undefined);
-    setShowAddModal(true);
+  const navigateToDate = (d: Date) => {
+    const now = new Date();
+    const nowDay = now.getDay();
+    const nowMonday = new Date(now);
+    nowMonday.setDate(now.getDate() - (nowDay === 0 ? 6 : nowDay - 1));
+    const targetDay = d.getDay();
+    const targetMonday = new Date(d);
+    targetMonday.setDate(d.getDate() - (targetDay === 0 ? 6 : targetDay - 1));
+    const diffWeeks = Math.round((targetMonday.getTime() - nowMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    setWeekOffset(diffWeeks);
   };
 
-  const monthLabel = weekDates[0].toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const openAddGeneral = () => { setAddModalDate(undefined); setShowAddModal(true); };
 
   return (
     <div className="flex min-h-screen">
@@ -194,117 +423,135 @@ export default function HomePage() {
         <TopBar onAddTask={openAddGeneral} />
 
         <div className="p-4 md:p-6 pb-24 md:pb-6">
-          {/* Week navigation */}
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h1 className="font-heading font-semibold text-lg">{monthLabel}</h1>
-              <p className="text-[11px] text-text-muted mt-0.5">
-                {pendingTasks.length} pending tasks across {Object.keys(subcategoryGroups).length} projects
-              </p>
+          {/* ── Global Header: Today + Filter + Nav ─────── */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <button onClick={() => { setShowCalendar(!showCalendar); setShowFilter(false); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-secondary border border-border text-text-secondary text-xs font-medium hover:bg-bg-hover transition-colors">
+                  <Calendar size={13} /> Today
+                </button>
+                {showCalendar && <CalendarPopover current={weekDates[0]} onSelect={navigateToDate} onClose={() => setShowCalendar(false)} />}
+              </div>
+              <div className="relative">
+                <button onClick={() => { setShowFilter(!showFilter); setShowCalendar(false); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-secondary border border-border text-text-secondary text-xs font-medium hover:bg-bg-hover transition-colors">
+                  <SlidersHorizontal size={13} /> Filter
+                </button>
+                {showFilter && <FilterPopover selected={filterCat} onSelect={setFilterCat} onClose={() => setShowFilter(false)} />}
+              </div>
             </div>
             <div className="flex items-center gap-1">
-              <button onClick={() => setWeekOffset((w) => w - 1)} className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors">
-                <ChevronLeft size={18} />
-              </button>
-              <button onClick={() => setWeekOffset(0)} className="px-3 py-1 rounded-lg text-[12px] font-medium hover:bg-bg-hover text-text-secondary transition-colors">
-                Today
-              </button>
-              <button onClick={() => setWeekOffset((w) => w + 1)} className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors">
-                <ChevronRight size={18} />
-              </button>
+              <button onClick={() => setWeekOffset((w) => w - 1)} className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors"><ChevronLeft size={18} /></button>
+              <button onClick={() => setWeekOffset(0)} className="px-3 py-1 rounded-lg text-[12px] font-medium hover:bg-bg-hover text-text-secondary transition-colors">Today</button>
+              <button onClick={() => setWeekOffset((w) => w + 1)} className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors"><ChevronRight size={18} /></button>
             </div>
           </div>
 
+          {/* ── Weekly Columns ─────────────────────────── */}
           <DragDropContext onDragEnd={handleDragEnd}>
-            {/* Weekly columns */}
-            <div className="grid grid-cols-7 gap-2 mb-6">
-              {weekDates.map((date, i) => {
+            <div className="grid grid-cols-7 gap-4 mb-8">
+              {weekDates.map((date) => {
                 const key = toDateKey(date);
                 const dayTasks = tasksByDay[key] || [];
                 const today = isToday(date);
+                const doneCount = dayTasks.filter((t) => t.status === "done").length;
+                const totalCount = dayTasks.length;
+                const progress = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
 
                 return (
                   <Droppable key={key} droppableId={key}>
                     {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={`min-h-[300px] rounded-lg border transition-colors ${
-                          snapshot.isDraggingOver
-                            ? "border-accent bg-accent-subtle/60"
-                            : today
-                            ? "border-accent/40 bg-accent-subtle"
-                            : "border-border bg-bg-secondary"
-                        }`}
-                      >
-                        {/* Day header */}
-                        <div className={`px-2.5 py-2 border-b ${today ? "border-accent/20" : "border-border"}`}>
-                          <div className="flex items-center justify-between">
-                            <span className={`text-[11px] font-semibold ${today ? "text-accent-text" : "text-text-secondary"}`}>{DAYS[i]}</span>
-                            <div className="flex items-center gap-1">
-                              <span className={`text-[11px] ${today ? "text-accent-text font-bold" : "text-text-muted"}`}>
-                                {date.getDate()}
-                              </span>
-                              <button
-                                onClick={() => openAddForDay(key)}
-                                className="w-4 h-4 rounded flex items-center justify-center hover:bg-bg-hover text-text-muted hover:text-accent transition-colors"
-                                title="Add task"
-                              >
-                                <Plus size={12} />
-                              </button>
-                            </div>
+                      <div ref={provided.innerRef} {...provided.droppableProps}
+                        className={`min-h-[350px] transition-colors rounded-lg ${snapshot.isDraggingOver ? "bg-accent-subtle/30" : ""}`}>
+
+                        {/* Day Header — Sunsama style */}
+                        <div className="mb-3">
+                          <h3 className={`text-base font-bold ${today ? "text-accent" : "text-text-primary"}`}>
+                            {DAY_NAMES_FULL[date.getDay()]}
+                          </h3>
+                          <p className="text-[11px] text-text-muted">
+                            {date.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
+                          </p>
+                          {/* Progress bar */}
+                          <div className="mt-2 h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-700 ease-out"
+                              style={{ width: `${progress}%`, backgroundColor: progress === 100 ? "#10B981" : "#22C55E" }} />
                           </div>
-                          {dayTasks.length > 0 && (() => {
-                            const doneCount = dayTasks.filter((t) => t.status === "done").length;
-                            const totalCount = dayTasks.length;
-                            return (
-                              <div className="mt-1 flex items-center gap-1.5">
-                                <div className="flex-1 h-1 rounded-full bg-bg-tertiary overflow-hidden">
-                                  <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%` }} />
-                                </div>
-                                <span className="text-[10px] text-text-muted font-mono">{doneCount}/{totalCount}</span>
-                              </div>
-                            );
-                          })()}
                         </div>
 
-                        {/* Day tasks */}
-                        <div className="p-1.5 space-y-1">
+                        {/* Inline Add + Sort */}
+                        <div className="mb-2 flex items-center gap-1">
+                          <div className="flex-1">
+                            <InlineAddTask dateKey={key} onAdd={handleInlineAdd} categories={CATEGORIES} />
+                          </div>
+                          <div className="relative">
+                            <button onClick={() => setSortMenuDay(sortMenuDay === key ? null : key)}
+                              className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors" title="Reorder">
+                              <ArrowUpDown size={13} />
+                            </button>
+                            {sortMenuDay === key && <SortMenu onSort={(by) => handleSort(key, by)} onClose={() => setSortMenuDay(null)} />}
+                          </div>
+                        </div>
+
+                        {/* Task Cards */}
+                        <div className="space-y-2">
                           {dayTasks.map((task, index) => {
                             const color = CAT_COLORS[task.category] || "#666";
                             const isDone = task.status === "done";
+                            const est = (task as unknown as Record<string, unknown>).estimatedTime as number | undefined;
+                            const spent = task.timeSpent || 0;
+
                             return (
                               <Draggable key={task._id} draggableId={task._id!} index={index}>
                                 {(dragProvided, dragSnapshot) => (
-                                  <div
-                                    ref={dragProvided.innerRef}
-                                    {...dragProvided.draggableProps}
-                                    {...dragProvided.dragHandleProps}
-                                    className={`group p-1.5 rounded-md border transition-all cursor-grab active:cursor-grabbing ${
+                                  <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps}
+                                    className={`rounded-xl border transition-all cursor-grab active:cursor-grabbing ${
                                       dragSnapshot.isDragging
-                                        ? "bg-bg-elevated border-accent/30 shadow-lg"
+                                        ? "bg-bg-elevated border-accent/40 shadow-xl scale-[1.02]"
                                         : isDone
-                                        ? "bg-bg-primary/20 border-transparent"
-                                        : "bg-bg-primary/50 hover:bg-bg-hover border-transparent hover:border-border"
+                                        ? "bg-bg-primary/30 border-border/30"
+                                        : "bg-bg-secondary border-border hover:border-border/80 shadow-sm hover:shadow-md"
                                     }`}
-                                    style={{ opacity: isDone ? 0.45 : 1 }}
-                                  >
-                                    <div className="flex items-start gap-1.5">
-                                      <button onClick={(e) => { e.stopPropagation(); handleComplete(task._id!); }}
-                                        className={`mt-0.5 w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center transition-colors ${
-                                          isDone
-                                            ? "bg-emerald-500 border border-emerald-500"
-                                            : "border border-text-muted hover:border-accent"
-                                        }`}>
-                                        {isDone && <Check size={8} className="text-white" strokeWidth={3} />}
-                                      </button>
-                                      <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setSelectedTask(task)}>
-                                        <p className={`text-[11px] leading-tight truncate transition-all ${
-                                          isDone ? "line-through text-text-muted" : "text-text-primary"
-                                        }`}>{task.title}</p>
-                                        <span className="text-[9px] font-medium" style={{ color: isDone ? `${color}80` : color }}>
-                                          # {task.subcategory}
-                                        </span>
+                                    style={{ opacity: isDone ? 0.45 : 1 }}>
+                                    <div className="p-3">
+                                      <div className="flex items-start gap-2.5">
+                                        {/* Checkbox */}
+                                        <button onClick={(e) => { e.stopPropagation(); handleComplete(task._id!); }}
+                                          className={`mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center transition-all ${
+                                            isDone
+                                              ? "bg-emerald-500 border-2 border-emerald-500"
+                                              : "border-2 border-text-muted/40 hover:border-accent"
+                                          }`}>
+                                          {isDone && <Check size={11} className="text-white" strokeWidth={3} />}
+                                        </button>
+
+                                        {/* Content */}
+                                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedTask(task)}>
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                              <p className={`text-[13px] font-semibold leading-snug ${isDone ? "line-through text-text-muted" : "text-text-primary"}`}>
+                                                {task.title}
+                                              </p>
+                                              {task.description && (
+                                                <p className="text-[10px] text-text-muted mt-0.5 truncate">{task.description}</p>
+                                              )}
+                                            </div>
+                                            {/* Time estimate */}
+                                            {(est || spent > 0) && (
+                                              <span className="text-[10px] font-mono text-text-muted bg-bg-tertiary px-1.5 py-0.5 rounded flex-shrink-0">
+                                                {formatMins(spent)}{est ? ` / ${formatMins(est)}` : ""}
+                                              </span>
+                                            )}
+                                          </div>
+                                          {/* Footer: channel tag */}
+                                          <div className="flex items-center justify-between mt-1.5">
+                                            <span className="text-[10px] font-medium" style={{ color: isDone ? `${color}60` : color }}>
+                                              # {task.subcategory}
+                                            </span>
+                                            {task.sourceUrl && <Link2 size={10} className="text-accent" />}
+                                          </div>
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
@@ -321,23 +568,20 @@ export default function HomePage() {
               })}
             </div>
 
-            {/* Backlog by subcategory — droppable */}
+            {/* ── Backlog ─────────────────────────────── */}
             <div>
               <h2 className="font-heading font-semibold text-sm text-text-secondary mb-3">Backlog</h2>
               <Droppable droppableId="backlog">
                 {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
+                  <div ref={provided.innerRef} {...provided.droppableProps}
                     className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 min-h-[80px] rounded-lg p-1 transition-colors ${
                       snapshot.isDraggingOver ? "bg-accent-subtle/40 ring-1 ring-accent/30" : ""
-                    }`}
-                  >
+                    }`}>
                     {Object.entries(subcategoryGroups).sort((a, b) => b[1].length - a[1].length).slice(0, 9).map(([sub, subTasks]) => {
                       const cat = subTasks[0]?.category || "trabajo";
                       const color = CAT_COLORS[cat] || "#666";
                       return (
-                        <div key={sub} className="rounded-lg border border-border bg-bg-secondary p-3">
+                        <div key={sub} className="rounded-xl border border-border bg-bg-secondary p-3">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-[12px] font-semibold" style={{ color }}># {sub}</span>
                             <span className="text-[10px] text-text-muted font-mono">{subTasks.length}</span>
@@ -346,17 +590,14 @@ export default function HomePage() {
                             {subTasks.slice(0, 4).map((task, index) => (
                               <Draggable key={task._id} draggableId={task._id!} index={index}>
                                 {(dragProvided, dragSnapshot) => (
-                                  <div
-                                    ref={dragProvided.innerRef}
-                                    {...dragProvided.draggableProps}
-                                    {...dragProvided.dragHandleProps}
-                                    className={`flex items-center gap-2 group p-1 rounded-md transition-all cursor-grab active:cursor-grabbing ${
+                                  <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps}
+                                    className={`flex items-center gap-2 group p-1.5 rounded-md transition-all cursor-grab active:cursor-grabbing ${
                                       dragSnapshot.isDragging ? "bg-bg-elevated shadow-lg border border-accent/30" : "hover:bg-bg-hover"
-                                    }`}
-                                  >
+                                    }`}>
                                     <button onClick={(e) => { e.stopPropagation(); handleComplete(task._id!); }}
-                                      className="w-3 h-3 rounded-full border border-text-muted hover:border-accent flex-shrink-0 transition-colors" />
-                                    <p className="text-[11px] text-text-secondary truncate group-hover:text-text-primary transition-colors cursor-pointer" onClick={() => setSelectedTask(task)}>{task.title}</p>
+                                      className="w-3.5 h-3.5 rounded-full border-[1.5px] border-text-muted hover:border-accent flex-shrink-0 transition-colors" />
+                                    <p className="text-[11px] text-text-secondary truncate group-hover:text-text-primary transition-colors cursor-pointer"
+                                      onClick={() => setSelectedTask(task)}>{task.title}</p>
                                   </div>
                                 )}
                               </Draggable>
