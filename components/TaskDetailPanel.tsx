@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
-  X, Play, Trash2, Plus, Check, Calendar, Link2, ExternalLink,
+  X, Play, Pause, Trash2, Plus, Check, Calendar, Link2, ExternalLink,
   Maximize2, MoreHorizontal, Paperclip, Download, FileText, Image as ImageIcon,
 } from "lucide-react";
 import { Task, PRIORITY_CONFIG } from "@/lib/types";
@@ -17,10 +17,9 @@ const CAT_COLORS: Record<string, string> = {
 };
 
 const TIME_PRESETS = [
-  { label: "5m", mins: 5 }, { label: "10m", mins: 10 }, { label: "15m", mins: 15 },
-  { label: "20m", mins: 20 }, { label: "25m", mins: 25 }, { label: "30m", mins: 30 },
-  { label: "35m", mins: 35 }, { label: "40m", mins: 40 }, { label: "45m", mins: 45 },
-  { label: "1h", mins: 60 }, { label: "2h", mins: 120 },
+  { label: "5 min", mins: 5 }, { label: "10 min", mins: 10 }, { label: "15 min", mins: 15 },
+  { label: "20 min", mins: 20 }, { label: "25 min", mins: 25 }, { label: "30 min", mins: 30 },
+  { label: "45 min", mins: 45 }, { label: "1 hr", mins: 60 },
 ];
 
 interface TaskDetailPanelProps {
@@ -34,7 +33,8 @@ interface TaskDetailPanelProps {
 
 export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, onDelete, onStartTimer }: TaskDetailPanelProps) {
   const [description, setDescription] = useState(task.description || "");
-  const [startDate] = useState(task.startDate || task.dueDate || "");
+  const [startDate, setStartDate] = useState(task.startDate || task.dueDate || "");
+  const [showStartPicker, setShowStartPicker] = useState(false);
   const [dueDate, setDueDate] = useState(task.dueDate || "");
   const [newSubtask, setNewSubtask] = useState("");
   const [subtasks, setSubtasks] = useState<{ text: string; done: boolean }[]>(task.subtasks || []);
@@ -50,11 +50,54 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
   const [uploading, setUploading] = useState(false);
   const [estimatedTime, setEstimatedTime] = useState<number>(task.estimatedTime || 0);
   const [timeInput, setTimeInput] = useState("");
+  // Timer state
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(task.timeSpent * 60); // convert mins to seconds
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const subtaskInputRef = useRef<HTMLInputElement>(null);
 
   const isDone = task.status === "done";
+
+  // Timer effect
+  useEffect(() => {
+    if (timerRunning) {
+      timerRef.current = setInterval(() => {
+        setTimerSeconds((s) => s + 1);
+      }, 1000);
+    } else if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [timerRunning]);
+
+  // Save time when stopping
+  const toggleTimer = useCallback(() => {
+    if (timerRunning) {
+      // Stopping — save accumulated time
+      const totalMins = Math.floor(timerSeconds / 60);
+      onUpdate({ addTime: totalMins - task.timeSpent });
+      setTimerRunning(false);
+    } else {
+      setTimerRunning(true);
+    }
+  }, [timerRunning, timerSeconds, task.timeSpent, onUpdate]);
+
+  const formatTimerDisplay = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
+
+  // Ensure links are absolute
+  const ensureAbsoluteUrl = (url: string) => {
+    if (!url) return url;
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    return "https://" + url;
+  };
 
   const saveDescription = () => {
     if (description !== (task.description || "")) onUpdate({ description });
@@ -116,6 +159,12 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
     onUpdate({ attachments: updated });
   };
 
+  const handleStartDate = (val: string) => {
+    setStartDate(val);
+    onUpdate({ startDate: val || null, dueDate: val || dueDate || null });
+    setShowStartPicker(false);
+  };
+
   const handleDueDate = (val: string) => {
     setDueDate(val);
     onUpdate({ dueDate: val || null });
@@ -163,11 +212,23 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
                 onSelect={handleSubcategoryChange}
               />
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 relative">
               <span className="text-[10px] text-text-muted uppercase tracking-wide">Start</span>
-              <span className="text-xs font-semibold text-text-primary">
+              <button onClick={() => { setShowStartPicker(!showStartPicker); setShowDuePicker(false); setShowTimePicker(false); setShowMoreMenu(false); }}
+                className="text-xs font-semibold text-text-primary hover:text-accent transition-colors">
                 {startDate ? formatDateShort(startDate) : "—"}
-              </span>
+              </button>
+              {showStartPicker && (
+                <div className="absolute top-full left-0 mt-1 w-56 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 p-3">
+                  <p className="text-[10px] text-text-muted mb-2 uppercase tracking-wide">Start date</p>
+                  <input type="date" value={startDate} onChange={(e) => handleStartDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border text-xs text-text-primary focus:outline-none focus:border-accent" />
+                  {startDate && (
+                    <button onClick={() => handleStartDate("")}
+                      className="mt-2 text-[10px] text-danger hover:underline">Remove start date</button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -252,43 +313,56 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
             <h2 className={`flex-1 font-heading font-bold text-lg leading-tight ${isDone ? "line-through text-text-muted" : "text-text-primary"}`}>
               {task.title}
             </h2>
-            <button onClick={() => { onStartTimer(); onClose(); }}
-              className="p-2 rounded-lg hover:bg-bg-hover text-text-muted transition-colors" title="Start timer">
-              <Play size={16} />
+            <button onClick={toggleTimer}
+              className={`p-2 rounded-lg transition-colors ${timerRunning ? "bg-accent/20 text-accent" : "hover:bg-bg-hover text-text-muted"}`}
+              title={timerRunning ? "Pause timer" : "Start timer"}>
+              {timerRunning ? <Pause size={16} /> : <Play size={16} />}
             </button>
             <div className="text-right flex-shrink-0">
               <div className="flex items-center gap-4 text-[10px] text-text-muted uppercase tracking-wide">
                 <span>Actual</span>
                 <span>Planned</span>
               </div>
-              <div className="flex items-center gap-4 font-mono text-sm font-semibold text-text-primary">
-                <span>{task.timeSpent > 0 ? formatTime(task.timeSpent) : "--:--"}</span>
+              <div className="flex items-center gap-4 font-mono text-sm font-semibold">
+                <span style={{ color: timerRunning ? "#22c55e" : undefined }} className={timerRunning ? "" : "text-text-primary"}>
+                  {timerSeconds > 0 ? formatTimerDisplay(timerSeconds) : "--:--"}
+                </span>
                 <div className="relative">
                   <button onClick={() => { setShowTimePicker(!showTimePicker); setShowDuePicker(false); setShowMoreMenu(false); }}
                     className="hover:text-accent transition-colors">
                     {estimatedTime > 0 ? formatTime(estimatedTime) : "--:--"}
                   </button>
                   {showTimePicker && (
-                    <div className="absolute top-full right-0 mt-1 w-52 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 p-2.5">
-                      <input type="text" value={timeInput} onChange={(e) => setTimeInput(e.target.value)} placeholder="e.g. 25 or 1:30"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && timeInput.trim()) {
-                            const parts = timeInput.split(":");
-                            const mins = parts.length === 2 ? parseInt(parts[0]) * 60 + parseInt(parts[1]) : parseInt(timeInput);
-                            if (!isNaN(mins) && mins > 0) { handleEstimatedTime(mins); setTimeInput(""); }
-                          }
-                        }}
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent mb-2" />
-                      <div className="grid grid-cols-4 gap-1.5">
+                    <div className="absolute top-full right-0 mt-1 w-48 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 overflow-hidden">
+                      <div className="px-3 pt-3 pb-2 border-b border-border">
+                        <p className="text-[10px] text-text-muted mb-1.5">Set planned time{dueDate ? ` · ${formatDateShort(dueDate)}` : ""}:</p>
+                        <input type="text" value={timeInput} onChange={(e) => setTimeInput(e.target.value)} placeholder={estimatedTime > 0 ? formatTime(estimatedTime) : "0:00"}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && timeInput.trim()) {
+                              const parts = timeInput.split(":");
+                              const mins = parts.length === 2 ? parseInt(parts[0]) * 60 + parseInt(parts[1]) : parseInt(timeInput);
+                              if (!isNaN(mins) && mins > 0) { handleEstimatedTime(mins); setTimeInput(""); }
+                            }
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border text-sm font-mono text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent" />
+                      </div>
+                      <div className="py-1 max-h-64 overflow-y-auto">
                         {TIME_PRESETS.map((p) => (
                           <button key={p.label} onClick={() => { handleEstimatedTime(p.mins); setTimeInput(""); }}
-                            className={`px-2 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
-                              estimatedTime === p.mins ? "bg-accent text-text-inverse" : "bg-bg-secondary text-text-secondary hover:bg-bg-hover"
-                            }`}>
-                            {p.label}
+                            className="w-full flex items-center justify-between px-3 py-2 text-sm text-text-primary hover:bg-bg-hover transition-colors">
+                            <span>{p.label}</span>
+                            {estimatedTime === p.mins && <Check size={14} className="text-accent" />}
                           </button>
                         ))}
                       </div>
+                      {estimatedTime > 0 && (
+                        <div className="border-t border-border py-1">
+                          <button onClick={() => { handleEstimatedTime(0); setTimeInput(""); }}
+                            className="w-full px-3 py-2 text-sm text-blue-400 hover:bg-bg-hover transition-colors text-left">
+                            Clear planned
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -371,7 +445,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
               ) : (
                 <div className="flex items-center gap-2 group">
                   <Link2 size={13} className="text-accent flex-shrink-0" />
-                  <a href={sourceUrl} target="_blank" rel="noopener noreferrer"
+                  <a href={ensureAbsoluteUrl(sourceUrl)} target="_blank" rel="noopener noreferrer"
                     className="text-[12px] text-accent hover:underline truncate flex-1">
                     {sourceUrl.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60)}
                   </a>
