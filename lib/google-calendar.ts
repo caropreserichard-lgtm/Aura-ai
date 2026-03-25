@@ -1,11 +1,16 @@
-import { google } from "googleapis";
 import { getDb } from "./mongodb";
 import type { CalendarToken, Task } from "./types";
 
 const SCOPES = ["https://www.googleapis.com/auth/calendar.events"];
 const USER_ID = "default"; // Single-user MVP
 
-function getOAuth2Client() {
+async function getGoogle() {
+  const { google } = await import("googleapis");
+  return google;
+}
+
+async function getOAuth2Client() {
+  const google = await getGoogle();
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
@@ -13,8 +18,8 @@ function getOAuth2Client() {
   );
 }
 
-export function getAuthUrl(): string {
-  const oauth2Client = getOAuth2Client();
+export async function getAuthUrl(): Promise<string> {
+  const oauth2Client = await getOAuth2Client();
   return oauth2Client.generateAuthUrl({
     access_type: "offline",
     scope: SCOPES,
@@ -23,7 +28,7 @@ export function getAuthUrl(): string {
 }
 
 export async function getTokensFromCode(code: string) {
-  const oauth2Client = getOAuth2Client();
+  const oauth2Client = await getOAuth2Client();
   const { tokens } = await oauth2Client.getToken(code);
   return tokens;
 }
@@ -68,7 +73,7 @@ export async function getAuthenticatedClient() {
   const tokens = await getStoredTokens();
   if (!tokens) return null;
 
-  const oauth2Client = getOAuth2Client();
+  const oauth2Client = await getOAuth2Client();
   oauth2Client.setCredentials({
     access_token: tokens.accessToken,
     refresh_token: tokens.refreshToken,
@@ -94,6 +99,7 @@ export async function listUpcomingEvents(maxResults = 10) {
   const auth = await getAuthenticatedClient();
   if (!auth) return [];
 
+  const google = await getGoogle();
   const calendar = google.calendar({ version: "v3", auth });
   const now = new Date();
   const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -114,6 +120,7 @@ export async function createCalendarEvent(task: Task) {
   const auth = await getAuthenticatedClient();
   if (!auth || !task.dueDate) return null;
 
+  const google = await getGoogle();
   const calendar = google.calendar({ version: "v3", auth });
 
   const event = await calendar.events.insert({
@@ -142,6 +149,7 @@ export async function deleteCalendarEvent(eventId: string) {
   const auth = await getAuthenticatedClient();
   if (!auth) return;
 
+  const google = await getGoogle();
   const calendar = google.calendar({ version: "v3", auth });
   try {
     await calendar.events.delete({
@@ -157,6 +165,7 @@ export async function getUserEmail() {
   const auth = await getAuthenticatedClient();
   if (!auth) return null;
 
+  const google = await getGoogle();
   const oauth2 = google.oauth2({ version: "v2", auth });
   const res = await oauth2.userinfo.get();
   return res.data.email;

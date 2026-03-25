@@ -10,7 +10,7 @@ export async function GET() {
       );
     }
 
-    const url = getAuthUrl();
+    const url = await getAuthUrl();
     return NextResponse.redirect(url);
   } catch (error) {
     console.error("Calendar auth error:", error);
