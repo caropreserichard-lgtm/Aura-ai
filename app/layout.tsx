@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import ThemeProvider from "@/components/ThemeProvider";
 import PWARegister from "@/components/PWARegister";
+import GlobalTimerProvider from "@/components/GlobalTimerProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -57,7 +58,9 @@ export default function RootLayout({
       <body className="min-h-full bg-bg-primary text-text-primary font-sans">
         <ThemeProvider>
           <PWARegister />
-          {children}
+          <GlobalTimerProvider>
+            {children}
+          </GlobalTimerProvider>
         </ThemeProvider>
       </body>
     </html>

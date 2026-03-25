@@ -11,6 +11,7 @@ import TopBar from "@/components/TopBar";
 import AddTaskModal from "@/components/AddTaskModal";
 import TaskDetailPanel from "@/components/TaskDetailPanel";
 import { Task, CATEGORIES, Category } from "@/lib/types";
+import { useTimerStore } from "@/lib/timerStore";
 
 const CAT_COLORS: Record<string, string> = {
   trabajo: "#d4a04e",
@@ -364,7 +365,21 @@ export default function HomePage() {
     const { draggableId, source, destination } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-    handleUpdateDueDate(draggableId, destination.droppableId);
+
+    // Update local state immediately for instant feedback
+    setTasks((prev) => {
+      const updated = prev.map((t) =>
+        t._id === draggableId ? { ...t, dueDate: destination.droppableId } : t
+      );
+      return updated;
+    });
+
+    // Persist to DB
+    fetch(`/api/tasks/${draggableId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dueDate: destination.droppableId }),
+    }).catch(() => fetchTasks());
   };
 
   const handleTaskUpdate = async (taskId: string, updates: Record<string, unknown>) => {

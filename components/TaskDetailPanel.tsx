@@ -9,6 +9,7 @@ import {
 import { Task, PRIORITY_CONFIG } from "@/lib/types";
 import { formatTime } from "@/lib/scoring";
 import SubcategoryPicker from "./SubcategoryPicker";
+import { useTimerStore } from "@/lib/timerStore";
 
 const CAT_COLORS: Record<string, string> = {
   trabajo: "#d4a04e",
@@ -62,8 +63,18 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
   const dueDateRef = useRef<HTMLInputElement>(null);
 
   const isDone = task.status === "done";
+  const timerStore = useTimerStore();
 
-  // Timer effect
+  // ESC key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  // Timer effect (local count-up for actual time tracking)
   useEffect(() => {
     if (timerRunning) {
       timerRef.current = setInterval(() => {
@@ -85,8 +96,12 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
       setTimerRunning(false);
     } else {
       setTimerRunning(true);
+      // If there's a planned time, launch the floating countdown widget
+      if (estimatedTime > 0) {
+        timerStore.startTimer(task._id || "", task.title, estimatedTime);
+      }
     }
-  }, [timerRunning, timerSeconds, task.timeSpent, onUpdate]);
+  }, [timerRunning, timerSeconds, task.timeSpent, task._id, task.title, estimatedTime, onUpdate, timerStore]);
 
   const formatTimerDisplay = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
