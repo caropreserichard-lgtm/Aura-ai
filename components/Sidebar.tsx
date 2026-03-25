@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Home, CalendarDays, Inbox, ListTodo, BarChart3, Timer, Focus, Settings, ClipboardCheck, FolderKanban, Wrench } from "lucide-react";
+import { Home, CalendarDays, Inbox, ListTodo, BarChart3, Timer, Focus, Settings, ClipboardCheck, FolderKanban, Wrench, Archive } from "lucide-react";
 
 const MAIN_NAV = [
   { href: "/home", label: "Home", icon: Home },
@@ -15,6 +15,7 @@ const MAIN_NAV = [
   { href: "/stats", label: "Stats", icon: BarChart3 },
   { href: "/weekly-review", label: "Weekly Review", icon: ClipboardCheck },
   { href: "/timer", label: "Timer", icon: Timer },
+  { href: "/backlog", label: "Backlog", icon: Archive },
 ];
 
 export default function Sidebar() {

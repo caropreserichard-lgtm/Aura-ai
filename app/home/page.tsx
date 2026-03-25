@@ -314,17 +314,6 @@ export default function HomePage() {
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
   const weekDates = getWeekDates(weekOffset);
-  const pendingTasks = tasks.filter((t) => t.status !== "done");
-
-  // Backlog
-  const weekKeys = new Set(weekDates.map(toDateKey));
-  const backlogTasks = pendingTasks.filter((t) => !t.dueDate || !weekKeys.has(t.dueDate.split("T")[0]));
-  const subcategoryGroups: Record<string, Task[]> = {};
-  backlogTasks.forEach((t) => {
-    const key = t.subcategory || "Other";
-    if (!subcategoryGroups[key]) subcategoryGroups[key] = [];
-    subcategoryGroups[key].push(t);
-  });
 
   // Tasks by day (with filter)
   const tasksByDay: Record<string, Task[]> = {};
@@ -375,8 +364,7 @@ export default function HomePage() {
     const { draggableId, source, destination } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-    if (destination.droppableId === "backlog") handleUpdateDueDate(draggableId, null);
-    else handleUpdateDueDate(draggableId, destination.droppableId);
+    handleUpdateDueDate(draggableId, destination.droppableId);
   };
 
   const handleTaskUpdate = async (taskId: string, updates: Record<string, unknown>) => {
@@ -450,7 +438,18 @@ export default function HomePage() {
             </div>
             <div className="flex items-center gap-1">
               <button onClick={() => setWeekOffset((w) => w - 1)} className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors"><ChevronLeft size={18} /></button>
-              <button onClick={() => setWeekOffset(0)} className="px-3 py-1 rounded-lg text-[12px] font-medium hover:bg-bg-hover text-text-secondary transition-colors">Today</button>
+              <button onClick={() => setWeekOffset(0)} className="px-3 py-1 rounded-lg text-[12px] font-medium hover:bg-bg-hover text-text-secondary transition-colors whitespace-nowrap">
+                {(() => {
+                  const wdStart = weekDates[0];
+                  const wdEnd = weekDates[6];
+                  const fmtDay = (d: Date) => {
+                    const day = d.getDate();
+                    const suffix = day === 1 || day === 21 || day === 31 ? "st" : day === 2 || day === 22 ? "nd" : day === 3 || day === 23 ? "rd" : "th";
+                    return `${day}${suffix} ${d.toLocaleDateString("en-US", { month: "long" })}`;
+                  };
+                  return `${fmtDay(wdStart)} - ${fmtDay(wdEnd)}`;
+                })()}
+              </button>
               <button onClick={() => setWeekOffset((w) => w + 1)} className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors"><ChevronRight size={18} /></button>
             </div>
           </div>
@@ -467,43 +466,42 @@ export default function HomePage() {
                 const progress = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
 
                 return (
-                  <Droppable key={key} droppableId={key}>
-                    {(provided, snapshot) => (
-                      <div ref={provided.innerRef} {...provided.droppableProps}
-                        className={`min-h-[350px] transition-colors rounded-lg ${snapshot.isDraggingOver ? "bg-accent-subtle/30" : ""}`}>
+                  <div key={key}>
+                    {/* Day Header — Sunsama style */}
+                    <div className="mb-3">
+                      <h3 className={`text-base font-bold ${today ? "text-accent" : "text-text-primary"}`}>
+                        {DAY_NAMES_FULL[date.getDay()]}
+                      </h3>
+                      <p className="text-[11px] text-text-muted">
+                        {date.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
+                      </p>
+                      {/* Progress bar */}
+                      <div className="mt-2 h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-700 ease-out"
+                          style={{ width: `${progress}%`, backgroundColor: progress === 100 ? "#10B981" : "#22C55E" }} />
+                      </div>
+                    </div>
 
-                        {/* Day Header — Sunsama style */}
-                        <div className="mb-3">
-                          <h3 className={`text-base font-bold ${today ? "text-accent" : "text-text-primary"}`}>
-                            {DAY_NAMES_FULL[date.getDay()]}
-                          </h3>
-                          <p className="text-[11px] text-text-muted">
-                            {date.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
-                          </p>
-                          {/* Progress bar */}
-                          <div className="mt-2 h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
-                            <div className="h-full rounded-full transition-all duration-700 ease-out"
-                              style={{ width: `${progress}%`, backgroundColor: progress === 100 ? "#10B981" : "#22C55E" }} />
-                          </div>
-                        </div>
+                    {/* Add task button + Sort */}
+                    <div className="mb-2 flex items-center gap-1">
+                      <button onClick={() => setAddTaskDay(key)}
+                        className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-bg-secondary/60 hover:bg-bg-secondary border border-border/50 hover:border-border text-text-muted hover:text-text-secondary transition-all text-xs">
+                        <Plus size={14} /> Add task
+                      </button>
+                      <div className="relative">
+                        <button onClick={() => setSortMenuDay(sortMenuDay === key ? null : key)}
+                          className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors" title="Reorder">
+                          <ArrowUpDown size={13} />
+                        </button>
+                        {sortMenuDay === key && <SortMenu onSort={(by) => handleSort(key, by)} onClose={() => setSortMenuDay(null)} />}
+                      </div>
+                    </div>
 
-                        {/* Add task button + Sort */}
-                        <div className="mb-2 flex items-center gap-1">
-                          <button onClick={() => setAddTaskDay(key)}
-                            className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-bg-secondary/60 hover:bg-bg-secondary border border-border/50 hover:border-border text-text-muted hover:text-text-secondary transition-all text-xs">
-                            <Plus size={14} /> Add task
-                          </button>
-                          <div className="relative">
-                            <button onClick={() => setSortMenuDay(sortMenuDay === key ? null : key)}
-                              className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors" title="Reorder">
-                              <ArrowUpDown size={13} />
-                            </button>
-                            {sortMenuDay === key && <SortMenu onSort={(by) => handleSort(key, by)} onClose={() => setSortMenuDay(null)} />}
-                          </div>
-                        </div>
-
-                        {/* Task Cards */}
-                        <div className="space-y-2">
+                    {/* Droppable Task Cards */}
+                    <Droppable droppableId={key}>
+                      {(provided, snapshot) => (
+                        <div ref={provided.innerRef} {...provided.droppableProps}
+                          className={`min-h-[120px] space-y-2 transition-colors rounded-lg p-1 ${snapshot.isDraggingOver ? "bg-accent-subtle/30 ring-1 ring-accent/20" : ""}`}>
                           {dayTasks.map((task, index) => {
                             const color = CAT_COLORS[task.category] || "#666";
                             const isDone = task.status === "done";
@@ -524,7 +522,7 @@ export default function HomePage() {
                                     style={{ opacity: isDone ? 0.5 : 1 }}>
                                     <div className="px-2.5 pt-2 pb-1.5 cursor-pointer" onClick={() => setSelectedTask(task)}>
                                       {/* Start time + estimated time */}
-                                      {(task.startDate || est) && (
+                                      {!!(task.startDate || est) && (
                                         <div className="flex items-center justify-between mb-0.5">
                                           {task.startDate && (
                                             <span className="text-[9px] text-text-muted">
@@ -588,59 +586,14 @@ export default function HomePage() {
                           })}
                           {provided.placeholder}
                         </div>
-                      </div>
-                    )}
-                  </Droppable>
+                      )}
+                    </Droppable>
+                  </div>
                 );
               })}
             </div>
 
-            {/* ── Backlog ─────────────────────────────── */}
-            <div>
-              <h2 className="font-heading font-semibold text-sm text-text-secondary mb-3">Backlog</h2>
-              <Droppable droppableId="backlog">
-                {(provided, snapshot) => (
-                  <div ref={provided.innerRef} {...provided.droppableProps}
-                    className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 min-h-[80px] rounded-lg p-1 transition-colors ${
-                      snapshot.isDraggingOver ? "bg-accent-subtle/40 ring-1 ring-accent/30" : ""
-                    }`}>
-                    {Object.entries(subcategoryGroups).sort((a, b) => b[1].length - a[1].length).slice(0, 9).map(([sub, subTasks]) => {
-                      const cat = subTasks[0]?.category || "trabajo";
-                      const color = CAT_COLORS[cat] || "#666";
-                      return (
-                        <div key={sub} className="rounded-xl border border-border bg-bg-secondary p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-[12px] font-semibold" style={{ color }}># {sub}</span>
-                            <span className="text-[10px] text-text-muted font-mono">{subTasks.length}</span>
-                          </div>
-                          <div className="space-y-1">
-                            {subTasks.slice(0, 4).map((task, index) => (
-                              <Draggable key={task._id} draggableId={task._id!} index={index}>
-                                {(dragProvided, dragSnapshot) => (
-                                  <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps}
-                                    className={`flex items-center gap-2 group p-1.5 rounded-md transition-all cursor-grab active:cursor-grabbing ${
-                                      dragSnapshot.isDragging ? "bg-bg-elevated shadow-lg border border-accent/30" : "hover:bg-bg-hover"
-                                    }`}>
-                                    <button onClick={(e) => { e.stopPropagation(); handleComplete(task._id!); }}
-                                      className="w-3.5 h-3.5 rounded-full border-[1.5px] border-text-muted hover:border-accent flex-shrink-0 transition-colors" />
-                                    <p className="text-[11px] text-text-secondary truncate group-hover:text-text-primary transition-colors cursor-pointer"
-                                      onClick={() => setSelectedTask(task)}>{task.title}</p>
-                                  </div>
-                                )}
-                              </Draggable>
-                            ))}
-                            {subTasks.length > 4 && (
-                              <p className="text-[10px] text-text-muted pl-5">+{subTasks.length - 4} more</p>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </div>
+            {/* Backlog moved to /backlog page */}
           </DragDropContext>
         </div>
 

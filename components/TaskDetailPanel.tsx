@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   X, Play, Pause, Trash2, Plus, Check, Calendar, Link2, ExternalLink,
   Maximize2, MoreHorizontal, Paperclip, Download, FileText, Image as ImageIcon,
+  Pencil, Save,
 } from "lucide-react";
 import { Task, PRIORITY_CONFIG } from "@/lib/types";
 import { formatTime } from "@/lib/scoring";
@@ -34,7 +35,6 @@ interface TaskDetailPanelProps {
 export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, onDelete, onStartTimer }: TaskDetailPanelProps) {
   const [description, setDescription] = useState(task.description || "");
   const [startDate, setStartDate] = useState(task.startDate || task.dueDate || "");
-  const [showStartPicker, setShowStartPicker] = useState(false);
   const [dueDate, setDueDate] = useState(task.dueDate || "");
   const [newSubtask, setNewSubtask] = useState("");
   const [subtasks, setSubtasks] = useState<{ text: string; done: boolean }[]>(task.subtasks || []);
@@ -43,7 +43,6 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
   const [comment, setComment] = useState("");
   const [comments, setComments] = useState<{ id: string; text: string; createdAt: string }[]>(task.comments || []);
   const [attachments, setAttachments] = useState<{ name: string; url: string; size: number; type: string; uploadedAt: string }[]>(task.attachments || []);
-  const [showDuePicker, setShowDuePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -54,9 +53,13 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(task.timeSpent * 60); // convert mins to seconds
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [editingSubtaskIndex, setEditingSubtaskIndex] = useState<number | null>(null);
+  const [editingSubtaskText, setEditingSubtaskText] = useState("");
   const overlayRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const subtaskInputRef = useRef<HTMLInputElement>(null);
+  const startDateRef = useRef<HTMLInputElement>(null);
+  const dueDateRef = useRef<HTMLInputElement>(null);
 
   const isDone = task.status === "done";
 
@@ -123,6 +126,33 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
     onUpdate({ subtasks: updated });
   };
 
+  const startEditSubtask = (index: number) => {
+    setEditingSubtaskIndex(index);
+    setEditingSubtaskText(subtasks[index].text);
+  };
+
+  const saveEditSubtask = () => {
+    if (editingSubtaskIndex === null) return;
+    if (!editingSubtaskText.trim()) { deleteSubtask(editingSubtaskIndex); setEditingSubtaskIndex(null); return; }
+    const updated = subtasks.map((s, i) => i === editingSubtaskIndex ? { ...s, text: editingSubtaskText.trim() } : s);
+    setSubtasks(updated);
+    onUpdate({ subtasks: updated });
+    setEditingSubtaskIndex(null);
+    setEditingSubtaskText("");
+  };
+
+  const handleSaveAndClose = () => {
+    // Save any pending description
+    if (description !== (task.description || "")) onUpdate({ description });
+    // Stop timer if running
+    if (timerRunning) {
+      const totalMins = Math.floor(timerSeconds / 60);
+      onUpdate({ addTime: totalMins - task.timeSpent });
+      setTimerRunning(false);
+    }
+    onClose();
+  };
+
   const handleSubcategoryChange = (category: string, subcategory: string) => {
     onUpdate({ category, subcategory });
   };
@@ -162,13 +192,11 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
   const handleStartDate = (val: string) => {
     setStartDate(val);
     onUpdate({ startDate: val || null, dueDate: val || dueDate || null });
-    setShowStartPicker(false);
   };
 
   const handleDueDate = (val: string) => {
     setDueDate(val);
     onUpdate({ dueDate: val || null });
-    setShowDuePicker(false);
   };
 
   const handleEstimatedTime = (mins: number) => {
@@ -214,41 +242,25 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
             </div>
             <div className="flex items-center gap-1.5 relative">
               <span className="text-[10px] text-text-muted uppercase tracking-wide">Start</span>
-              <button onClick={() => { setShowStartPicker(!showStartPicker); setShowDuePicker(false); setShowTimePicker(false); setShowMoreMenu(false); }}
+              <button onClick={() => { startDateRef.current?.showPicker(); }}
                 className="text-xs font-semibold text-text-primary hover:text-accent transition-colors">
                 {startDate ? formatDateShort(startDate) : "—"}
               </button>
-              {showStartPicker && (
-                <div className="absolute top-full left-0 mt-1 w-56 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 p-3">
-                  <p className="text-[10px] text-text-muted mb-2 uppercase tracking-wide">Start date</p>
-                  <input type="date" value={startDate} onChange={(e) => handleStartDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border text-xs text-text-primary focus:outline-none focus:border-accent" />
-                  {startDate && (
-                    <button onClick={() => handleStartDate("")}
-                      className="mt-2 text-[10px] text-danger hover:underline">Remove start date</button>
-                  )}
-                </div>
-              )}
+              <input ref={startDateRef} type="date" value={startDate}
+                onChange={(e) => handleStartDate(e.target.value)}
+                className="absolute opacity-0 w-0 h-0 pointer-events-none" />
             </div>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
             {/* Due date button */}
             <div className="relative">
-              <button onClick={() => { setShowDuePicker(!showDuePicker); setShowTimePicker(false); setShowMoreMenu(false); }}
+              <button onClick={() => { dueDateRef.current?.showPicker(); }}
                 className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-bg-hover text-text-muted text-[11px] transition-colors">
                 <Calendar size={12} /> {dueDate ? formatDateShort(dueDate) : "Due"}
               </button>
-              {showDuePicker && (
-                <div className="absolute top-full right-0 mt-1 w-56 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 p-3">
-                  <p className="text-[10px] text-text-muted mb-2 uppercase tracking-wide">Due date</p>
-                  <input type="date" value={dueDate} onChange={(e) => handleDueDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border text-xs text-text-primary focus:outline-none focus:border-accent" />
-                  {dueDate && (
-                    <button onClick={() => handleDueDate("")}
-                      className="mt-2 text-[10px] text-danger hover:underline">Remove due date</button>
-                  )}
-                </div>
-              )}
+              <input ref={dueDateRef} type="date" value={dueDate}
+                onChange={(e) => handleDueDate(e.target.value)}
+                className="absolute opacity-0 w-0 h-0 pointer-events-none" />
             </div>
             {/* + Subtasks button */}
             <button onClick={() => { subtaskInputRef.current?.focus(); subtaskInputRef.current?.scrollIntoView({ behavior: "smooth" }); }}
@@ -257,7 +269,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
             </button>
             {/* More menu */}
             <div className="relative">
-              <button onClick={() => { setShowMoreMenu(!showMoreMenu); setShowDuePicker(false); setShowTimePicker(false); }}
+              <button onClick={() => { setShowMoreMenu(!showMoreMenu); setShowTimePicker(false); }}
                 className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted transition-colors">
                 <MoreHorizontal size={14} />
               </button>
@@ -328,7 +340,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
                   {timerSeconds > 0 ? formatTimerDisplay(timerSeconds) : "--:--"}
                 </span>
                 <div className="relative">
-                  <button onClick={() => { setShowTimePicker(!showTimePicker); setShowDuePicker(false); setShowMoreMenu(false); }}
+                  <button onClick={() => { setShowTimePicker(!showTimePicker); setShowMoreMenu(false); }}
                     className="hover:text-accent transition-colors">
                     {estimatedTime > 0 ? formatTime(estimatedTime) : "--:--"}
                   </button>
@@ -381,17 +393,27 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
                     }`}>
                     {sub.done && <Check size={10} className="text-text-inverse" />}
                   </button>
-                  <span className={`flex-1 text-sm font-medium ${sub.done ? "line-through text-text-muted" : "text-text-primary"}`}>
-                    {sub.text}
-                  </span>
-                  <div className="flex items-center gap-3 text-[11px] text-text-muted font-mono opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span>--:--</span>
-                    <span>--:--</span>
+                  {editingSubtaskIndex === i ? (
+                    <input type="text" value={editingSubtaskText} onChange={(e) => setEditingSubtaskText(e.target.value)}
+                      onBlur={saveEditSubtask}
+                      onKeyDown={(e) => { if (e.key === "Enter") saveEditSubtask(); if (e.key === "Escape") setEditingSubtaskIndex(null); }}
+                      autoFocus
+                      className="flex-1 text-sm font-medium text-text-primary bg-bg-secondary border border-accent rounded-md px-2 py-0.5 focus:outline-none" />
+                  ) : (
+                    <span className={`flex-1 text-sm font-medium ${sub.done ? "line-through text-text-muted" : "text-text-primary"}`}>
+                      {sub.text}
+                    </span>
+                  )}
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => startEditSubtask(i)}
+                      className="text-text-muted hover:text-accent transition-all p-0.5" title="Edit subtask">
+                      <Pencil size={11} />
+                    </button>
+                    <button onClick={() => deleteSubtask(i)}
+                      className="text-text-muted hover:text-danger transition-all p-0.5" title="Delete subtask">
+                      <Trash2 size={11} />
+                    </button>
                   </div>
-                  <button onClick={() => deleteSubtask(i)}
-                    className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger transition-all p-0.5">
-                    <Trash2 size={11} />
-                  </button>
                 </div>
               ))}
             </div>
@@ -535,11 +557,15 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
           </div>
         </div>
 
-        {/* ── Delete Footer ────────────────────────── */}
-        <div className="border-t border-border px-5 py-3">
+        {/* ── Footer: Delete + Save ────────────────── */}
+        <div className="border-t border-border px-5 py-3 flex items-center justify-between">
           <button onClick={onDelete}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-danger text-[12px] hover:bg-danger-subtle transition-colors">
             <Trash2 size={13} /> Delete task
+          </button>
+          <button onClick={handleSaveAndClose}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse text-[13px] font-semibold transition-colors">
+            <Save size={14} /> Save
           </button>
         </div>
       </div>
