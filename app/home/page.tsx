@@ -50,7 +50,12 @@ function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 function isToday(d: Date) { return isSameDay(d, new Date()); }
-function toDateKey(d: Date) { return d.toISOString().split("T")[0]; }
+function toDateKey(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 function formatMins(m: number) { return m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}` : `0:${String(m).padStart(2, "0")}`; }
 
 // ─── Filter Popover ─────────────────────────────────────────────
@@ -331,7 +336,7 @@ function TaskCard({ task, onSelect, onComplete, isDragging }: {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.3 : isDone ? 0.5 : 1,
+    opacity: isDragging ? 0.3 : 1,
   };
 
   return (
