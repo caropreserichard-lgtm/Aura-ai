@@ -206,7 +206,7 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
       {/* Invisible click-catcher */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
       {/* Wide rectangular popup — absolutely positioned below Add task row */}
-      <div ref={overlayRef} className="absolute left-0 right-0 top-[105px] z-50 bg-[#2a2a2e] rounded-2xl border border-border/40 shadow-2xl overflow-visible">
+      <div ref={overlayRef} className="absolute left-[8%] right-[8%] top-[105px] z-50 bg-[#2a2a2e] rounded-2xl border border-border/40 shadow-2xl overflow-visible">
         {/* Input area */}
         <div className="px-5 pt-4 pb-2">
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus
