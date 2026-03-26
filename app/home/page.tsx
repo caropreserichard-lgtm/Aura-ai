@@ -206,23 +206,23 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
       {/* Invisible click-catcher */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
       {/* Wide rectangular popup — absolutely positioned below Add task row */}
-      <div ref={overlayRef} className="absolute left-[8%] right-[8%] top-[105px] z-50 bg-[#2a2a2e] rounded-2xl border border-border/40 shadow-2xl overflow-visible">
+      <div ref={overlayRef} className="absolute left-1/2 -translate-x-1/2 w-[50%] top-[105px] z-50 bg-[#2a2a2e] rounded-xl border border-border/40 shadow-2xl overflow-visible">
         {/* Input area */}
-        <div className="px-5 pt-4 pb-2">
+        <div className="px-3.5 pt-3 pb-1.5">
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus
             onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") onClose(); }}
             placeholder="Task description..."
-            className="w-full bg-transparent text-base text-text-primary placeholder:text-text-muted/50 focus:outline-none" />
+            className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none" />
         </div>
         {/* Bottom bar — horizontal row */}
-        <div className="px-5 pb-4 flex items-center gap-2">
-          <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-500/20 text-purple-400 text-xs font-medium">
-            <span className="text-[10px] font-bold">TIP</span> Paste a URL
+        <div className="px-3.5 pb-3 flex items-center gap-1.5">
+          <span className="flex items-center gap-1 px-2 py-1 rounded-md bg-purple-500/20 text-purple-400 text-[10px] font-medium whitespace-nowrap">
+            <span className="text-[9px] font-bold">TIP</span> Paste a URL
           </span>
           <div className="relative" ref={dateRef}>
             <button onClick={() => dateInputRef.current?.showPicker()}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border/60 hover:bg-bg-hover text-xs text-text-muted transition-colors">
-              <Calendar size={13} /> {getDateLabel(selectedDate)}
+              className="flex items-center gap-1 px-2 py-1 rounded-md border border-border/60 hover:bg-bg-hover text-[10px] text-text-muted transition-colors whitespace-nowrap">
+              <Calendar size={11} /> {getDateLabel(selectedDate)}
             </button>
             <input ref={dateInputRef} type="date" value={selectedDate}
               onChange={(e) => { if (e.target.value) setSelectedDate(e.target.value); }}
@@ -230,8 +230,8 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
           </div>
           <div className="relative" ref={timeRef}>
             <button onClick={() => setShowTime(!showTime)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border/60 hover:bg-bg-hover text-xs text-text-muted transition-colors">
-              <Clock size={13} /> {estimatedTime > 0 ? formatMins(estimatedTime) : "--:--"}
+              className="flex items-center gap-1 px-2 py-1 rounded-md border border-border/60 hover:bg-bg-hover text-[10px] text-text-muted transition-colors whitespace-nowrap">
+              <Clock size={11} /> {estimatedTime > 0 ? formatMins(estimatedTime) : "--:--"}
             </button>
             {showTime && (
               <div className="absolute bottom-full left-0 mb-2 w-52 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-[60] p-2.5">
@@ -257,8 +257,8 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
           </div>
           <div className="relative" ref={channelRef}>
             <button onClick={() => setShowChannel(!showChannel)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border/60 hover:bg-bg-hover text-xs text-text-muted transition-colors">
-              <Hash size={13} /> channel
+              className="flex items-center gap-1 px-2 py-1 rounded-md border border-border/60 hover:bg-bg-hover text-[10px] text-text-muted transition-colors whitespace-nowrap">
+              <Hash size={11} /> channel
             </button>
             {showChannel && (
               <div className="absolute bottom-full left-0 mb-2 w-60 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-[60] p-2 max-h-56 overflow-y-auto">
@@ -277,8 +277,8 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
             )}
           </div>
           <button onClick={submit} disabled={!title.trim()}
-            className="ml-auto p-2.5 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse transition-colors disabled:opacity-30" title="Add task">
-            <ArrowUp size={16} />
+            className="ml-auto p-2 rounded-md bg-accent hover:bg-accent-hover text-text-inverse transition-colors disabled:opacity-30" title="Add task">
+            <ArrowUp size={14} />
           </button>
         </div>
       </div>
