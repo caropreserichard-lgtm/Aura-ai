@@ -192,27 +192,29 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
     <>
       {/* Invisible click-catcher — no blur, no dark overlay */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div ref={overlayRef} className="relative z-50 w-full bg-bg-secondary rounded-2xl border border-border shadow-2xl overflow-visible">
-        <div className="p-3">
+      <div ref={overlayRef} className="relative z-50 w-full bg-bg-secondary rounded-xl border border-border shadow-2xl overflow-visible">
+        {/* Input row */}
+        <div className="px-3 pt-3 pb-2">
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus
             onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") onClose(); }}
             placeholder="Task description..."
             className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none" />
         </div>
-        <div className="px-3 pb-3 flex items-center gap-2 flex-wrap">
-          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-400 text-[11px] font-semibold">
+        {/* Bottom bar — single horizontal row */}
+        <div className="px-3 pb-2.5 flex items-center gap-1.5 overflow-x-auto">
+          <span className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-purple-500/20 text-purple-400 text-[10px] font-semibold">
             TIP <span className="text-text-muted font-normal">Paste a URL</span>
           </span>
-          <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg-tertiary hover:bg-bg-hover text-[11px] text-text-muted transition-colors">
-            <Calendar size={12} /> {dateLabel}
+          <button className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-bg-tertiary hover:bg-bg-hover text-[10px] text-text-muted transition-colors">
+            <Calendar size={11} /> {dateLabel}
           </button>
-          <div className="relative" ref={timeRef}>
+          <div className="relative flex-shrink-0" ref={timeRef}>
             <button onClick={() => setShowTime(!showTime)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg-tertiary hover:bg-bg-hover text-[11px] text-text-muted transition-colors">
-              <Clock size={12} /> {estimatedTime > 0 ? formatMins(estimatedTime) : "--:--"}
+              className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-tertiary hover:bg-bg-hover text-[10px] text-text-muted transition-colors">
+              <Clock size={11} /> {estimatedTime > 0 ? formatMins(estimatedTime) : "--:--"}
             </button>
             {showTime && (
-              <div className="absolute top-full left-0 mt-2 w-52 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 p-2.5 animate-slide-in-right">
+              <div className="absolute bottom-full left-0 mb-2 w-52 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-[60] p-2.5">
                 <input type="text" value={timeInput} onChange={(e) => setTimeInput(e.target.value)} placeholder="e.g. 25 or 1:30"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && timeInput.trim()) {
@@ -233,13 +235,13 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
               </div>
             )}
           </div>
-          <div className="relative" ref={channelRef}>
+          <div className="relative flex-shrink-0" ref={channelRef}>
             <button onClick={() => setShowChannel(!showChannel)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg-tertiary hover:bg-bg-hover text-[11px] text-text-muted transition-colors">
-              <Hash size={12} /> {subcategory || "channel"}
+              className="flex items-center gap-1 px-2 py-1 rounded-md bg-bg-tertiary hover:bg-bg-hover text-[10px] text-text-muted transition-colors">
+              <Hash size={11} /> {subcategory || "channel"}
             </button>
             {showChannel && (
-              <div className="absolute top-full left-0 mt-2 w-60 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 p-2 max-h-56 overflow-y-auto animate-slide-in-right">
+              <div className="absolute bottom-full left-0 mb-2 w-60 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-[60] p-2 max-h-56 overflow-y-auto">
                 {Object.entries(categories).map(([cat, conf]) => (
                   <div key={cat} className="mb-1">
                     <p className="text-[9px] font-semibold uppercase tracking-wide px-2 py-1" style={{ color: conf.color }}>{conf.label}</p>
@@ -254,12 +256,12 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
               </div>
             )}
           </div>
-          <button className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-tertiary hover:bg-bg-hover text-[11px] text-text-muted transition-colors">
-            <Target size={12} />
+          <button className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-bg-tertiary hover:bg-bg-hover text-[10px] text-text-muted transition-colors">
+            <Target size={11} />
           </button>
           <button onClick={submit} disabled={!title.trim()}
-            className="ml-auto p-2 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse transition-colors disabled:opacity-30">
-            <ArrowUp size={14} />
+            className="flex-shrink-0 ml-auto p-1.5 rounded-md bg-accent hover:bg-accent-hover text-text-inverse transition-colors disabled:opacity-30">
+            <ArrowUp size={13} />
           </button>
         </div>
       </div>

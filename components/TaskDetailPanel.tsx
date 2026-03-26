@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   X, Play, Pause, Trash2, Plus, Check, Calendar, Link2, ExternalLink,
   Maximize2, MoreHorizontal, Paperclip, Download, FileText, Image as ImageIcon,
-  Pencil, Save,
+  Pencil, CheckCircle2,
 } from "lucide-react";
 import { Task, PRIORITY_CONFIG } from "@/lib/types";
 import { formatTime } from "@/lib/scoring";
@@ -351,8 +351,8 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
                 <span>Planned</span>
               </div>
               <div className="flex items-center gap-4 font-mono text-sm font-semibold">
-                <span style={{ color: timerRunning ? "#22c55e" : undefined }} className={timerRunning ? "" : "text-text-primary"}>
-                  {timerSeconds > 0 ? formatTimerDisplay(timerSeconds) : "--:--"}
+                <span style={{ color: (timerRunning || timerStore.isRunning) ? "#22c55e" : undefined }} className={(timerRunning || timerStore.isRunning) ? "" : "text-text-primary"}>
+                  {timerRunning ? formatTimerDisplay(timerSeconds) : timerSeconds > 0 ? formatTimerDisplay(timerSeconds) : "--:--"}
                 </span>
                 <div className="relative">
                   <button onClick={() => { setShowTimePicker(!showTimePicker); setShowMoreMenu(false); }}
@@ -580,7 +580,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
           </button>
           <button onClick={handleSaveAndClose}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse text-[13px] font-semibold transition-colors">
-            <Save size={14} /> Save
+            <CheckCircle2 size={14} /> Done
           </button>
         </div>
       </div>
