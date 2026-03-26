@@ -189,16 +189,17 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
   })();
 
   return (
-    <div ref={overlayRef} className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-xl bg-bg-secondary rounded-2xl border border-border shadow-2xl mx-4 overflow-visible">
-        <div className="p-4">
+    <>
+      {/* Invisible click-catcher — no blur, no dark overlay */}
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div ref={overlayRef} className="relative z-50 w-full bg-bg-secondary rounded-2xl border border-border shadow-2xl overflow-visible">
+        <div className="p-3">
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus
             onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") onClose(); }}
             placeholder="Task description..."
-            className="w-full bg-transparent text-base text-text-primary placeholder:text-text-muted focus:outline-none" />
+            className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none" />
         </div>
-        <div className="px-4 pb-4 flex items-center gap-2 flex-wrap">
+        <div className="px-3 pb-3 flex items-center gap-2 flex-wrap">
           <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-400 text-[11px] font-semibold">
             TIP <span className="text-text-muted font-normal">Paste a URL</span>
           </span>
@@ -262,7 +263,7 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -616,6 +617,16 @@ export default function HomePage() {
                       </div>
                     </div>
 
+                    {/* Inline Add Task Popup */}
+                    {addTaskDay === key && (
+                      <AddTaskPopup
+                        dateKey={key}
+                        onAdd={handleInlineAdd}
+                        onClose={() => setAddTaskDay(null)}
+                        categories={CATEGORIES}
+                      />
+                    )}
+
                     {/* Task Cards */}
                     <div className="min-h-[120px] space-y-2">
                       {dayTasks.map((task) => (
@@ -645,15 +656,6 @@ export default function HomePage() {
             </DragOverlay>
           </DndContext>
         </div>
-
-        {addTaskDay && (
-          <AddTaskPopup
-            dateKey={addTaskDay}
-            onAdd={handleInlineAdd}
-            onClose={() => setAddTaskDay(null)}
-            categories={CATEGORIES}
-          />
-        )}
 
         <AddTaskModal
           isOpen={showAddModal}
