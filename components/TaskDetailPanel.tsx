@@ -337,9 +337,13 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
               }`}>
               {isDone && <Check size={12} className="text-text-inverse" />}
             </button>
-            <h2 className={`flex-1 font-heading font-bold text-lg leading-tight ${isDone ? "line-through text-text-muted" : "text-text-primary"}`}>
-              {task.title}
-            </h2>
+            <input
+              type="text"
+              defaultValue={task.title}
+              onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== task.title) onUpdate({ title: v }); }}
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+              className={`flex-1 font-heading font-bold text-lg leading-tight bg-transparent border-none outline-none focus:ring-1 focus:ring-accent/40 rounded px-1 -mx-1 ${isDone ? "line-through text-text-muted" : "text-text-primary"}`}
+            />
             <button onClick={toggleTimer}
               className={`p-2 rounded-lg transition-colors ${timerRunning ? "bg-accent/20 text-accent" : "hover:bg-bg-hover text-text-muted"}`}
               title={timerRunning ? "Pause timer" : "Start timer"}>
