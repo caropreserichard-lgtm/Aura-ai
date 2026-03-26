@@ -148,6 +148,8 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
   const [title, setTitle] = useState("");
   const [showTime, setShowTime] = useState(false);
   const [showChannel, setShowChannel] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(dateKey);
   const [estimatedTime, setEstimatedTime] = useState(0);
   const [category, setCategory] = useState<string>("trabajo");
   const [subcategory, setSubcategory] = useState("");
@@ -155,11 +157,13 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
   const overlayRef = useRef<HTMLDivElement>(null);
   const timeRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<HTMLDivElement>(null);
+  const dateRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
       if (timeRef.current && !timeRef.current.contains(e.target as Node)) setShowTime(false);
       if (channelRef.current && !channelRef.current.contains(e.target as Node)) setShowChannel(false);
+      if (dateRef.current && !dateRef.current.contains(e.target as Node)) setShowDatePicker(false);
     };
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("mousedown", h);
@@ -173,26 +177,28 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
     const sub = subcategory || categories[cat]?.subcategories[0] || "";
     onAdd({
       title: title.trim(), category: cat, subcategory: sub,
-      priority: 3, roi: 5, joy: 5, dueDate: dateKey,
+      priority: 3, roi: 5, joy: 5, dueDate: selectedDate,
       ...(estimatedTime > 0 ? { estimatedTime } : {}),
     });
     setTitle(""); setEstimatedTime(0); setCategory("trabajo"); setSubcategory(""); onClose();
   };
 
-  const dateLabel = (() => {
-    const d = new Date(dateKey + "T00:00:00");
+  const getDateLabel = (dk: string) => {
+    const d = new Date(dk + "T00:00:00");
     const today = new Date();
     const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
     if (d.toDateString() === today.toDateString()) return "Today";
     if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  })();
+    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+    return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  };
 
   return (
     <>
       {/* Invisible click-catcher — no blur, no dark overlay */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div ref={overlayRef} className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[min(680px,90vw)] bg-[#2a2a2e] rounded-2xl border border-border/60 shadow-2xl overflow-visible">
+      <div ref={overlayRef} className="fixed left-1/2 top-[30%] -translate-x-1/2 -translate-y-1/2 z-50 w-[min(680px,90vw)] bg-[#2a2a2e] rounded-2xl border border-border/60 shadow-2xl overflow-visible">
         {/* Input area */}
         <div className="px-5 pt-5 pb-4">
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus
@@ -205,9 +211,20 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
           <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-500/20 text-purple-400 text-xs font-bold">
             TIP <span className="text-text-muted font-normal">Paste a URL</span>
           </span>
-          <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-bg-tertiary hover:bg-bg-hover text-xs text-text-muted transition-colors">
-            <Calendar size={13} /> {dateLabel}
-          </button>
+          <div className="relative" ref={dateRef}>
+            <button onClick={() => setShowDatePicker(!showDatePicker)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-bg-tertiary hover:bg-bg-hover text-xs text-text-muted transition-colors">
+              <Calendar size={13} /> {getDateLabel(selectedDate)}
+            </button>
+            {showDatePicker && (
+              <div className="absolute top-full left-0 mt-2 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-[60] p-3 w-56">
+                <p className="text-[10px] text-text-muted uppercase tracking-wide mb-2 font-semibold">Schedule for</p>
+                <input type="date" value={selectedDate}
+                  onChange={(e) => { setSelectedDate(e.target.value); setShowDatePicker(false); }}
+                  className="w-full px-2.5 py-2 rounded-lg bg-bg-secondary border border-border text-xs text-text-primary focus:outline-none focus:border-accent" />
+              </div>
+            )}
+          </div>
           <div className="relative" ref={timeRef}>
             <button onClick={() => setShowTime(!showTime)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-bg-tertiary hover:bg-bg-hover text-xs text-text-muted transition-colors">
