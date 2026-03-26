@@ -304,7 +304,7 @@ function TaskDetailModal({
 // ─── List Actions Menu (Trello-style) ───────────────────────────
 function ListActionsMenu({
   project, projects, onClose, onArchive, onAddCard, onCopyList,
-  onChangeColor, onMoveAllCards, onSortBy, onArchiveAllCards, anchorRect,
+  onChangeColor, onMoveAllCards, onSortBy, onArchiveAllCards, onDeleteProject, anchorRect,
 }: {
   project: Project; projects: Project[];
   onClose: () => void; onArchive: () => void; onAddCard: () => void;
@@ -313,6 +313,7 @@ function ListActionsMenu({
   onMoveAllCards: (toProjectId: string) => void;
   onSortBy: (sort: string) => void;
   onArchiveAllCards: () => void;
+  onDeleteProject: () => void;
   anchorRect?: { top: number; left: number; width: number };
 }) {
   const [showColors, setShowColors] = useState(false);
@@ -440,6 +441,13 @@ function ListActionsMenu({
           <Archive size={12} className="text-text-muted" /> Archive all cards in this list
         </button>
       </div>
+
+      <div className="border-t border-border py-1">
+        <button onClick={() => { onDeleteProject(); onClose(); }}
+          className="w-full text-left px-3 py-2 text-xs text-danger hover:bg-danger/10 transition-colors flex items-center gap-2">
+          <Trash2 size={12} /> Delete project
+        </button>
+      </div>
     </div>
   );
 }
@@ -460,6 +468,8 @@ export default function ProjectsPage() {
   const [hoverTask, setHoverTask] = useState<string | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; left: number; width: number } | undefined>(undefined);
+  const [editingProjectName, setEditingProjectName] = useState<string | null>(null);
+  const [editNameValue, setEditNameValue] = useState("");
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -600,6 +610,20 @@ export default function ProjectsPage() {
 
   const changeProjectColor = async (projectId: string, color: string) => {
     await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) });
+    fetchProjects();
+  };
+
+  const renameProject = async (projectId: string, name: string) => {
+    if (!name.trim()) return;
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim() }) });
+    setEditingProjectName(null);
+    fetchProjects();
+  };
+
+  const deleteProject = async (id: string) => {
+    if (!confirm("Delete this project and all its tasks? This cannot be undone.")) return;
+    await fetch(`/api/projects/${id}`, { method: "DELETE" });
+    setOpenMenu(null);
     fetchProjects();
   };
 
@@ -787,7 +811,32 @@ export default function ProjectsPage() {
                                   ) : (
                                     <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
                                   )}
-                                  <h3 className="font-heading font-bold text-sm uppercase tracking-wide flex-1 truncate">{project.name}</h3>
+                                  {editingProjectName === project._id ? (
+                                    <input
+                                      value={editNameValue}
+                                      onChange={(e) => setEditNameValue(e.target.value)}
+                                      onBlur={() => renameProject(project._id!, editNameValue)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") renameProject(project._id!, editNameValue);
+                                        if (e.key === "Escape") setEditingProjectName(null);
+                                      }}
+                                      autoFocus
+                                      onClick={(e) => e.stopPropagation()}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                      className="font-heading font-bold text-sm uppercase tracking-wide flex-1 min-w-0 bg-bg-tertiary border border-accent rounded px-1.5 py-0.5 text-text-primary focus:outline-none"
+                                    />
+                                  ) : (
+                                    <h3
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingProjectName(project._id!);
+                                        setEditNameValue(project.name);
+                                      }}
+                                      className="font-heading font-bold text-sm uppercase tracking-wide flex-1 truncate cursor-text hover:bg-bg-tertiary hover:rounded px-1 -mx-1 transition-colors"
+                                    >
+                                      {project.name}
+                                    </h3>
+                                  )}
                                   <span className="text-[11px] text-text-muted">{doneTasks}/{totalTasks}</span>
                                   <button onClick={(e) => {
                                       e.stopPropagation();
@@ -905,6 +954,7 @@ export default function ProjectsPage() {
             onMoveAllCards={(toId) => moveAllCards(menuProject._id!, toId)}
             onSortBy={(sort) => sortProjectTasks(menuProject._id!, sort)}
             onArchiveAllCards={() => archiveAllCards(menuProject._id!)}
+            onDeleteProject={() => deleteProject(menuProject._id!)}
           />
         );
       })()}
