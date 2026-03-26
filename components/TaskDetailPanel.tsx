@@ -357,13 +357,13 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
                 <div className="relative">
                   <button onClick={() => { setShowTimePicker(!showTimePicker); setShowMoreMenu(false); }}
                     className="hover:text-accent transition-colors">
-                    {estimatedTime > 0 ? formatTime(estimatedTime) : "--:--"}
+                    {estimatedTime > 0 ? `${estimatedTime}m` : "--:--"}
                   </button>
                   {showTimePicker && (
                     <div className="absolute top-full right-0 mt-1 w-48 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 overflow-hidden">
                       <div className="px-3 pt-3 pb-2 border-b border-border">
                         <p className="text-[10px] text-text-muted mb-1.5">Set planned time{dueDate ? ` · ${formatDateShort(dueDate)}` : ""}:</p>
-                        <input type="text" value={timeInput} onChange={(e) => setTimeInput(e.target.value)} placeholder={estimatedTime > 0 ? formatTime(estimatedTime) : "0:00"}
+                        <input type="text" value={timeInput} onChange={(e) => setTimeInput(e.target.value)} placeholder={estimatedTime > 0 ? `${estimatedTime}m` : "0:00"}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" && timeInput.trim()) {
                               const parts = timeInput.split(":");

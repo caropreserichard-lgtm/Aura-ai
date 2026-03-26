@@ -5,7 +5,12 @@ import {
   ChevronLeft, ChevronRight, Plus, Check, Calendar, SlidersHorizontal,
   ArrowUpDown, Hash, Clock, Target, ArrowUp, Link2, X, Search,
 } from "lucide-react";
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import {
+  DndContext, closestCenter, DragEndEvent, DragStartEvent, DragOverlay,
+  PointerSensor, useSensor, useSensors, useDroppable,
+} from "@dnd-kit/core";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import AddTaskModal from "@/components/AddTaskModal";
@@ -156,8 +161,11 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
       if (timeRef.current && !timeRef.current.contains(e.target as Node)) setShowTime(false);
       if (channelRef.current && !channelRef.current.contains(e.target as Node)) setShowChannel(false);
     };
-    document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
-  }, []);
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("mousedown", h);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", h); document.removeEventListener("keydown", esc); };
+  }, [onClose]);
 
   const submit = () => {
     if (!title.trim()) return;
@@ -181,9 +189,8 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
   })();
 
   return (
-    <div ref={overlayRef} className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]"
-      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+    <div ref={overlayRef} className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-xl bg-bg-secondary rounded-2xl border border-border shadow-2xl mx-4 overflow-visible">
         <div className="p-4">
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus
@@ -289,6 +296,91 @@ function SortMenu({ onSort, onClose }: { onSort: (by: string) => void; onClose: 
   );
 }
 
+// ─── Droppable Day Column ─────────────────────────────────────
+function DayColumn({ id, children }: { id: string; isOver: boolean; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef}
+      className={`transition-colors rounded-lg ${isOver ? "bg-accent-subtle/20 ring-1 ring-accent/20" : ""}`}>
+      {children}
+    </div>
+  );
+}
+
+// ─── Draggable Task Card ──────────────────────────────────────
+function TaskCard({ task, onSelect, onComplete, isDragging }: {
+  task: Task; onSelect: (t: Task) => void; onComplete: (id: string) => void; isDragging: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task._id! });
+  const color = CAT_COLORS[task.category] || "#666";
+  const isDone = task.status === "done";
+  const est = (task as unknown as Record<string, unknown>).estimatedTime as number | undefined;
+  const spent = task.timeSpent || 0;
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : isDone ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}
+      className={`rounded-xl border transition-all cursor-grab active:cursor-grabbing overflow-hidden ${
+        isDone ? "bg-bg-primary/30 border-border/30" : "bg-bg-secondary border-border hover:border-border/80 shadow-sm hover:shadow-md"
+      }`}>
+      <div className="px-2.5 pt-2 pb-1.5 cursor-pointer" onClick={() => onSelect(task)}>
+        {!!(task.startDate || est) && (
+          <div className="flex items-center justify-between mb-0.5">
+            {task.startDate && (
+              <span className="text-[9px] text-text-muted">
+                {new Date(task.startDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase()}
+              </span>
+            )}
+            {(est || spent > 0) && (
+              <span className="text-[8px] font-mono text-text-muted bg-bg-tertiary px-1 py-0.5 rounded ml-auto">
+                {formatMins(spent)}{est ? ` / ${formatMins(est)}` : ""}
+              </span>
+            )}
+          </div>
+        )}
+        <p className={`text-[11px] font-semibold leading-snug mb-1 ${isDone ? "line-through text-text-muted" : "text-text-primary"}`}
+          style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {task.title}
+        </p>
+        {(task.subtasks || []).length > 0 && (
+          <div className="space-y-0.5 mb-1">
+            {task.subtasks!.map((sub, si) => (
+              <div key={si} className="flex items-center gap-1">
+                <div className={`w-3 h-3 rounded-full border-[1.5px] flex-shrink-0 flex items-center justify-center ${
+                  sub.done ? "bg-emerald-500 border-emerald-500" : "border-text-muted/30"
+                }`}>
+                  {sub.done && <Check size={6} className="text-white" strokeWidth={3} />}
+                </div>
+                <span className={`text-[9px] truncate ${sub.done ? "line-through text-text-muted" : "text-text-secondary"}`}>{sub.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center justify-between mt-1">
+          <div className="flex items-center gap-1.5">
+            <button onClick={(e) => { e.stopPropagation(); onComplete(task._id!); }}
+              className={`w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center transition-all ${
+                isDone ? "bg-emerald-500 border-[1.5px] border-emerald-500" : "border-[1.5px] border-text-muted/30 hover:border-accent"
+              }`}>
+              {isDone && <Check size={7} className="text-white" strokeWidth={3} />}
+            </button>
+            {task.dueDate && !task.startDate && <Calendar size={8} className="text-text-muted/40" />}
+            {est && !task.startDate && <Clock size={8} className="text-text-muted/40" />}
+          </div>
+          <span className="text-[8px] font-medium truncate max-w-[60%] text-right" style={{ color: isDone ? `${color}50` : color }}>
+            # {task.subcategory.length > 14 ? task.subcategory.slice(0, 14) + "..." : task.subcategory}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────
 export default function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -361,24 +453,37 @@ export default function HomePage() {
     } catch (e) { console.error(e); fetchTasks(); }
   };
 
-  const handleDragEnd = (result: DropResult) => {
-    const { draggableId, source, destination } = result;
-    if (!destination) return;
-    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
 
-    // Update local state immediately for instant feedback
-    setTasks((prev) => {
-      const updated = prev.map((t) =>
-        t._id === draggableId ? { ...t, dueDate: destination.droppableId } : t
-      );
-      return updated;
-    });
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragId(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const taskId = active.id as string;
+    const newDateKey = over.id as string;
+
+    // Find current task's date
+    const currentTask = tasks.find((t) => t._id === taskId);
+    if (!currentTask) return;
+    const currentDate = currentTask.dueDate?.split("T")[0];
+    if (currentDate === newDateKey) return;
+
+    // Update local state immediately
+    setTasks((prev) => prev.map((t) => t._id === taskId ? { ...t, dueDate: newDateKey } : t));
 
     // Persist to DB
-    fetch(`/api/tasks/${draggableId}`, {
+    fetch(`/api/tasks/${taskId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dueDate: destination.droppableId }),
+      body: JSON.stringify({ dueDate: newDateKey }),
     }).catch(() => fetchTasks());
   };
 
@@ -470,7 +575,7 @@ export default function HomePage() {
           </div>
 
           {/* ── Weekly Columns ─────────────────────────── */}
-          <DragDropContext onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <div className="grid grid-cols-7 gap-4 mb-8">
               {weekDates.map((date) => {
                 const key = toDateKey(date);
@@ -481,8 +586,8 @@ export default function HomePage() {
                 const progress = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
 
                 return (
-                  <div key={key}>
-                    {/* Day Header — Sunsama style */}
+                  <DayColumn key={key} id={key} isOver={false}>
+                    {/* Day Header */}
                     <div className="mb-3">
                       <h3 className={`text-base font-bold ${today ? "text-accent" : "text-text-primary"}`}>
                         {DAY_NAMES_FULL[date.getDay()]}
@@ -490,14 +595,13 @@ export default function HomePage() {
                       <p className="text-[11px] text-text-muted">
                         {date.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
                       </p>
-                      {/* Progress bar */}
                       <div className="mt-2 h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-700 ease-out"
                           style={{ width: `${progress}%`, backgroundColor: progress === 100 ? "#10B981" : "#22C55E" }} />
                       </div>
                     </div>
 
-                    {/* Add task button + Sort */}
+                    {/* Add task + Sort */}
                     <div className="mb-2 flex items-center gap-1">
                       <button onClick={() => setAddTaskDay(key)}
                         className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-bg-secondary/60 hover:bg-bg-secondary border border-border/50 hover:border-border text-text-muted hover:text-text-secondary transition-all text-xs">
@@ -512,104 +616,34 @@ export default function HomePage() {
                       </div>
                     </div>
 
-                    {/* Droppable Task Cards */}
-                    <Droppable droppableId={key}>
-                      {(provided, snapshot) => (
-                        <div ref={provided.innerRef} {...provided.droppableProps}
-                          className={`min-h-[120px] space-y-2 transition-colors rounded-lg p-1 ${snapshot.isDraggingOver ? "bg-accent-subtle/30 ring-1 ring-accent/20" : ""}`}>
-                          {dayTasks.map((task, index) => {
-                            const color = CAT_COLORS[task.category] || "#666";
-                            const isDone = task.status === "done";
-                            const est = (task as unknown as Record<string, unknown>).estimatedTime as number | undefined;
-                            const spent = task.timeSpent || 0;
-
-                            return (
-                              <Draggable key={task._id} draggableId={task._id!} index={index}>
-                                {(dragProvided, dragSnapshot) => (
-                                  <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps}
-                                    className={`rounded-xl border transition-all cursor-grab active:cursor-grabbing overflow-hidden ${
-                                      dragSnapshot.isDragging
-                                        ? "bg-bg-elevated border-accent/40 shadow-xl scale-[1.02]"
-                                        : isDone
-                                        ? "bg-bg-primary/30 border-border/30"
-                                        : "bg-bg-secondary border-border hover:border-border/80 shadow-sm hover:shadow-md"
-                                    }`}
-                                    style={{ opacity: isDone ? 0.5 : 1 }}>
-                                    <div className="px-2.5 pt-2 pb-1.5 cursor-pointer" onClick={() => setSelectedTask(task)}>
-                                      {/* Start time + estimated time */}
-                                      {!!(task.startDate || est) && (
-                                        <div className="flex items-center justify-between mb-0.5">
-                                          {task.startDate && (
-                                            <span className="text-[9px] text-text-muted">
-                                              {new Date(task.startDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase()}
-                                            </span>
-                                          )}
-                                          {(est || spent > 0) && (
-                                            <span className="text-[8px] font-mono text-text-muted bg-bg-tertiary px-1 py-0.5 rounded ml-auto">
-                                              {formatMins(spent)}{est ? ` / ${formatMins(est)}` : ""}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                      {/* Title — smaller text, clamped */}
-                                      <p className={`text-[11px] font-semibold leading-snug mb-1 ${isDone ? "line-through text-text-muted" : "text-text-primary"}`}
-                                        style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                                        {task.title}
-                                      </p>
-                                      {/* Subtasks */}
-                                      {(task.subtasks || []).length > 0 && (
-                                        <div className="space-y-0.5 mb-1">
-                                          {task.subtasks!.map((sub, si) => (
-                                            <div key={si} className="flex items-center gap-1">
-                                              <div className={`w-3 h-3 rounded-full border-[1.5px] flex-shrink-0 flex items-center justify-center ${
-                                                sub.done ? "bg-emerald-500 border-emerald-500" : "border-text-muted/30"
-                                              }`}>
-                                                {sub.done && <Check size={6} className="text-white" strokeWidth={3} />}
-                                              </div>
-                                              <span className={`text-[9px] truncate ${sub.done ? "line-through text-text-muted" : "text-text-secondary"}`}>{sub.text}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                      {/* Footer: complete checkbox + icons + channel */}
-                                      <div className="flex items-center justify-between mt-1">
-                                        <div className="flex items-center gap-1.5">
-                                          <button onClick={(e) => { e.stopPropagation(); handleComplete(task._id!); }}
-                                            className={`w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center transition-all ${
-                                              isDone
-                                                ? "bg-emerald-500 border-[1.5px] border-emerald-500"
-                                                : "border-[1.5px] border-text-muted/30 hover:border-accent"
-                                            }`}>
-                                            {isDone && <Check size={7} className="text-white" strokeWidth={3} />}
-                                          </button>
-                                          {task.dueDate && !task.startDate && (
-                                            <Calendar size={8} className="text-text-muted/40" />
-                                          )}
-                                          {est && !task.startDate && (
-                                            <Clock size={8} className="text-text-muted/40" />
-                                          )}
-                                        </div>
-                                        <span className="text-[8px] font-medium truncate max-w-[60%] text-right" style={{ color: isDone ? `${color}50` : color }}>
-                                          # {task.subcategory.length > 14 ? task.subcategory.slice(0, 14) + "..." : task.subcategory}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </Draggable>
-                            );
-                          })}
-                          {provided.placeholder}
-                        </div>
-                      )}
-                    </Droppable>
-                  </div>
+                    {/* Task Cards */}
+                    <div className="min-h-[120px] space-y-2">
+                      {dayTasks.map((task) => (
+                        <TaskCard key={task._id} task={task} onSelect={setSelectedTask} onComplete={handleComplete}
+                          isDragging={activeDragId === task._id} />
+                      ))}
+                    </div>
+                  </DayColumn>
                 );
               })}
             </div>
-
-            {/* Backlog moved to /backlog page */}
-          </DragDropContext>
+            <DragOverlay>
+              {activeDragId ? (() => {
+                const task = tasks.find((t) => t._id === activeDragId);
+                if (!task) return null;
+                return (
+                  <div className="rounded-xl border bg-bg-elevated border-accent/40 shadow-xl scale-[1.02] overflow-hidden opacity-90 w-[160px]">
+                    <div className="px-2.5 pt-2 pb-1.5">
+                      <p className="text-[11px] font-semibold leading-snug text-text-primary"
+                        style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                        {task.title}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })() : null}
+            </DragOverlay>
+          </DndContext>
         </div>
 
         {addTaskDay && (
