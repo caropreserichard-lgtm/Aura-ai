@@ -203,22 +203,26 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
 
   return (
     <>
-      {/* Invisible click-catcher — no blur, no dark overlay */}
+      {/* Invisible click-catcher */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div ref={overlayRef} className="relative z-50 w-full bg-[#2a2a2e] rounded-xl border border-border/60 shadow-2xl overflow-visible">
+      {/* Wide rectangular popup — fixed at bottom like Sunsama */}
+      <div ref={overlayRef} className="fixed left-4 right-4 bottom-6 z-50 mx-auto max-w-4xl bg-[#2a2a2e] rounded-2xl border border-border/40 shadow-2xl overflow-visible">
         {/* Input area */}
-        <div className="px-3 pt-3 pb-2">
+        <div className="px-5 pt-4 pb-2">
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus
             onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") onClose(); }}
             placeholder="Task description..."
-            className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-muted/60 focus:outline-none" />
+            className="w-full bg-transparent text-base text-text-primary placeholder:text-text-muted/50 focus:outline-none" />
         </div>
-        {/* Bottom bar — compact row with icons */}
-        <div className="px-3 pb-2.5 flex items-center gap-1">
+        {/* Bottom bar — horizontal row */}
+        <div className="px-5 pb-4 flex items-center gap-2">
+          <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-500/20 text-purple-400 text-xs font-medium">
+            <span className="text-[10px] font-bold">TIP</span> Paste a URL
+          </span>
           <div className="relative" ref={dateRef}>
             <button onClick={() => dateInputRef.current?.showPicker()}
-              className="flex items-center gap-1 px-1.5 py-1 rounded-md hover:bg-bg-hover text-[10px] text-text-muted transition-colors" title="Change date">
-              <Calendar size={11} /> {getDateLabel(selectedDate)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border/60 hover:bg-bg-hover text-xs text-text-muted transition-colors">
+              <Calendar size={13} /> {getDateLabel(selectedDate)}
             </button>
             <input ref={dateInputRef} type="date" value={selectedDate}
               onChange={(e) => { if (e.target.value) setSelectedDate(e.target.value); }}
@@ -226,8 +230,8 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
           </div>
           <div className="relative" ref={timeRef}>
             <button onClick={() => setShowTime(!showTime)}
-              className="flex items-center gap-1 px-1.5 py-1 rounded-md hover:bg-bg-hover text-[10px] text-text-muted transition-colors" title="Set time">
-              <Clock size={11} /> {estimatedTime > 0 ? formatMins(estimatedTime) : "--:--"}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border/60 hover:bg-bg-hover text-xs text-text-muted transition-colors">
+              <Clock size={13} /> {estimatedTime > 0 ? formatMins(estimatedTime) : "--:--"}
             </button>
             {showTime && (
               <div className="absolute bottom-full left-0 mb-2 w-52 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-[60] p-2.5">
@@ -253,8 +257,8 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
           </div>
           <div className="relative" ref={channelRef}>
             <button onClick={() => setShowChannel(!showChannel)}
-              className="flex items-center gap-1 px-1.5 py-1 rounded-md hover:bg-bg-hover text-[10px] text-text-muted transition-colors" title="Channel">
-              <Hash size={11} />
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border/60 hover:bg-bg-hover text-xs text-text-muted transition-colors">
+              <Hash size={13} /> channel
             </button>
             {showChannel && (
               <div className="absolute bottom-full left-0 mb-2 w-60 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-[60] p-2 max-h-56 overflow-y-auto">
@@ -273,8 +277,8 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
             )}
           </div>
           <button onClick={submit} disabled={!title.trim()}
-            className="ml-auto p-1.5 rounded-md bg-accent hover:bg-accent-hover text-text-inverse transition-colors disabled:opacity-30" title="Add task">
-            <ArrowUp size={12} />
+            className="ml-auto p-2.5 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse transition-colors disabled:opacity-30" title="Add task">
+            <ArrowUp size={16} />
           </button>
         </div>
       </div>
@@ -291,19 +295,19 @@ function SortMenu({ onSort, onClose }: { onSort: (by: string) => void; onClose: 
   }, [onClose]);
 
   return (
-    <div ref={ref} className="absolute top-full right-0 mt-2 w-56 bg-bg-tertiary border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-slide-in-right">
-      <div className="px-3 py-2.5 border-b border-border">
-        <p className="text-[11px] text-text-muted">Reorder unscheduled tasks by:</p>
+    <div ref={ref} className="absolute top-full right-0 mt-1 w-36 bg-bg-tertiary border border-border rounded-lg shadow-2xl z-50 overflow-hidden animate-slide-in-right">
+      <div className="px-2 py-1.5 border-b border-border">
+        <p className="text-[9px] text-text-muted">Reorder tasks by:</p>
       </div>
-      <div className="py-1">
+      <div className="py-0.5">
         {[
           { key: "name", label: "Name A-Z", icon: "A-Z" },
           { key: "created", label: "Date created", icon: "📅" },
           { key: "done", label: "Done status", icon: "✓" },
         ].map((opt) => (
           <button key={opt.key} onClick={() => { onSort(opt.key); onClose(); }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-text-primary hover:bg-bg-hover transition-colors">
-            <span className="w-5 text-center text-text-muted text-xs">{opt.icon}</span>
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-[11px] text-text-primary hover:bg-bg-hover transition-colors">
+            <span className="w-4 text-center text-text-muted text-[10px]">{opt.icon}</span>
             {opt.label}
           </button>
         ))}
@@ -341,9 +345,7 @@ function TaskCard({ task, onSelect, onComplete, isDragging }: {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}
-      className={`rounded-xl border transition-all cursor-grab active:cursor-grabbing overflow-hidden ${
-        isDone ? "bg-bg-primary/30 border-border/30" : "bg-bg-secondary border-border hover:border-border/80 shadow-sm hover:shadow-md"
-      }`}>
+      className={`rounded-xl border transition-all cursor-grab active:cursor-grabbing overflow-hidden bg-bg-secondary border-border hover:border-border/80 shadow-sm hover:shadow-md`}>
       <div className="px-2.5 pt-2 pb-1.5 cursor-pointer" onClick={() => onSelect(task)}>
         {!!(task.startDate || est) && (
           <div className="flex items-center justify-between mb-0.5">
@@ -388,7 +390,7 @@ function TaskCard({ task, onSelect, onComplete, isDragging }: {
             {task.dueDate && !task.startDate && <Calendar size={8} className="text-text-muted/40" />}
             {est && !task.startDate && <Clock size={8} className="text-text-muted/40" />}
           </div>
-          <span className="text-[8px] font-medium truncate max-w-[60%] text-right" style={{ color: isDone ? `${color}50` : color }}>
+          <span className="text-[8px] font-medium truncate max-w-[60%] text-right" style={{ color }}>
             # {task.subcategory.length > 14 ? task.subcategory.slice(0, 14) + "..." : task.subcategory}
           </span>
         </div>
