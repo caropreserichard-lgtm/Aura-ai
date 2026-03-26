@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   ChevronLeft, ChevronRight, Plus, Check, Calendar, SlidersHorizontal,
-  ArrowUpDown, Hash, Clock, Target, ArrowUp, Link2, X, Search,
+  ArrowUpDown, Hash, Clock, Target, ArrowUp, Link2, X, Search, Undo2,
 } from "lucide-react";
 import {
   DndContext, closestCenter, DragEndEvent, DragStartEvent, DragOverlay,
@@ -412,6 +412,8 @@ export default function HomePage() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [sortMenuDay, setSortMenuDay] = useState<string | null>(null);
   const [addTaskDay, setAddTaskDay] = useState<string | null>(null);
+  const [undoAction, setUndoAction] = useState<{ taskId: string; prevDueDate: string; label: string } | null>(null);
+  const undoTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -486,23 +488,53 @@ export default function HomePage() {
     if (!over) return;
 
     const taskId = active.id as string;
-    const newDateKey = over.id as string;
+    let targetDateKey = over.id as string;
 
-    // Find current task's date
+    // If over.id is a task ID (not a date), resolve the column date from that task
+    const isDateKey = /^\d{4}-\d{2}-\d{2}$/.test(targetDateKey);
+    if (!isDateKey) {
+      const overTask = tasks.find((t) => t._id === targetDateKey);
+      if (overTask?.dueDate) {
+        targetDateKey = overTask.dueDate.split("T")[0];
+      } else {
+        return; // Can't resolve target date
+      }
+    }
+
     const currentTask = tasks.find((t) => t._id === taskId);
     if (!currentTask) return;
     const currentDate = currentTask.dueDate?.split("T")[0];
-    if (currentDate === newDateKey) return;
+    if (currentDate === targetDateKey) return;
+
+    // Store undo action
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoAction({ taskId, prevDueDate: currentDate || "", label: currentTask.title });
+    undoTimerRef.current = setTimeout(() => setUndoAction(null), 8000);
 
     // Update local state immediately
-    setTasks((prev) => prev.map((t) => t._id === taskId ? { ...t, dueDate: newDateKey } : t));
+    setTasks((prev) => prev.map((t) => t._id === taskId ? { ...t, dueDate: targetDateKey } : t));
 
     // Persist to DB
     fetch(`/api/tasks/${taskId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dueDate: newDateKey }),
+      body: JSON.stringify({ dueDate: targetDateKey }),
     }).catch(() => fetchTasks());
+  };
+
+  const handleUndo = async () => {
+    if (!undoAction) return;
+    const { taskId, prevDueDate } = undoAction;
+    setTasks((prev) => prev.map((t) => t._id === taskId ? { ...t, dueDate: prevDueDate } : t));
+    setUndoAction(null);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    try {
+      await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dueDate: prevDueDate }),
+      });
+    } catch { fetchTasks(); }
   };
 
   const handleTaskUpdate = async (taskId: string, updates: Record<string, unknown>) => {
@@ -573,6 +605,12 @@ export default function HomePage() {
                 </button>
                 {showFilter && <FilterPopover selected={filterCat} onSelect={setFilterCat} onClose={() => setShowFilter(false)} />}
               </div>
+              {undoAction && (
+                <button onClick={handleUndo}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-medium hover:bg-amber-500/25 transition-all animate-pulse">
+                  <Undo2 size={13} /> Undo
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-1">
               <button onClick={() => setWeekOffset((w) => w - 1)} className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors"><ChevronLeft size={18} /></button>
