@@ -638,12 +638,14 @@ export default function HomePage() {
                 </button>
                 {showFilter && <FilterPopover selected={filterCat} onSelect={setFilterCat} onClose={() => setShowFilter(false)} />}
               </div>
-              {undoAction && (
-                <button onClick={handleUndo}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-medium hover:bg-amber-500/25 transition-all animate-pulse">
-                  <Undo2 size={13} /> Undo
-                </button>
-              )}
+              <button onClick={handleUndo} disabled={!undoAction}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                  undoAction
+                    ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25 animate-pulse cursor-pointer"
+                    : "bg-bg-secondary border-border text-text-muted/40 cursor-not-allowed"
+                }`}>
+                <Undo2 size={13} /> Undo
+              </button>
             </div>
             <div className="flex items-center gap-1">
               <button onClick={() => setWeekOffset((w) => w - 1)} className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors"><ChevronLeft size={18} /></button>

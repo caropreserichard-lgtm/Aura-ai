@@ -184,13 +184,22 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert("Max file size is 5MB"); return; }
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (!res.ok) throw new Error("Upload failed");
-      const data = await res.json();
+      const reader = new FileReader();
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const data = {
+        name: file.name,
+        url: dataUrl,
+        size: file.size,
+        type: file.type,
+        uploadedAt: new Date().toISOString(),
+      };
       const updated = [...attachments, data];
       setAttachments(updated);
       onUpdate({ attachments: updated });
@@ -458,7 +467,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
                     <p className="text-[11px] text-text-primary truncate font-medium">{att.name}</p>
                     <p className="text-[9px] text-text-muted">{formatSize(att.size)}</p>
                   </div>
-                  <a href={att.url} target="_blank" rel="noopener noreferrer" download
+                  <a href={att.url} download={att.name}
                     className="p-1 rounded hover:bg-bg-hover text-text-muted hover:text-accent transition-colors">
                     <Download size={12} />
                   </a>
