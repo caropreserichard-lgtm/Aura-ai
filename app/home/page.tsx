@@ -205,8 +205,8 @@ function AddTaskPopup({ dateKey, onAdd, onClose, categories }: {
     <>
       {/* Invisible click-catcher */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      {/* Wide rectangular popup — fixed at bottom like Sunsama */}
-      <div ref={overlayRef} className="fixed left-4 right-4 bottom-6 z-50 mx-auto max-w-4xl bg-[#2a2a2e] rounded-2xl border border-border/40 shadow-2xl overflow-visible">
+      {/* Wide rectangular popup — absolutely positioned below Add task row */}
+      <div ref={overlayRef} className="absolute left-0 right-0 top-[105px] z-50 bg-[#2a2a2e] rounded-2xl border border-border/40 shadow-2xl overflow-visible">
         {/* Input area */}
         <div className="px-5 pt-4 pb-2">
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus
@@ -594,69 +594,71 @@ export default function HomePage() {
 
           {/* ── Weekly Columns ─────────────────────────── */}
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="grid grid-cols-7 gap-4 mb-8">
-              {weekDates.map((date) => {
-                const key = toDateKey(date);
-                const dayTasks = tasksByDay[key] || [];
-                const today = isToday(date);
-                const doneCount = dayTasks.filter((t) => t.status === "done").length;
-                const totalCount = dayTasks.length;
-                const progress = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
+            <div className="relative">
+              <div className="grid grid-cols-7 gap-4 mb-8">
+                {weekDates.map((date) => {
+                  const key = toDateKey(date);
+                  const dayTasks = tasksByDay[key] || [];
+                  const today = isToday(date);
+                  const doneCount = dayTasks.filter((t) => t.status === "done").length;
+                  const totalCount = dayTasks.length;
+                  const progress = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
 
-                return (
-                  <DayColumn key={key} id={key} isOver={false}>
-                    {/* Day Header */}
-                    <div className="mb-3">
-                      <h3 className={`text-base font-bold ${today ? "text-accent" : "text-text-primary"}`}>
-                        {DAY_NAMES_FULL[date.getDay()]}
-                      </h3>
-                      <p className="text-[11px] text-text-muted">
-                        {date.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
-                      </p>
-                      <div className="mt-2 h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-700 ease-out"
-                          style={{ width: `${progress}%`, backgroundColor: progress === 100 ? "#10B981" : "#22C55E" }} />
-                      </div>
-                    </div>
-
-                    {/* Add task row (card-like) */}
-                    <div className="mb-2">
-                      <button onClick={() => setAddTaskDay(key)}
-                        className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-bg-secondary/60 hover:bg-bg-secondary border border-border/50 hover:border-border text-text-muted hover:text-text-secondary transition-all text-xs">
-                        <Plus size={14} />
-                        <span className="flex-1 text-left">Add task</span>
-                        <span onClick={(e) => { e.stopPropagation(); setSortMenuDay(sortMenuDay === key ? null : key); }}
-                          className="p-0.5 rounded hover:bg-bg-hover transition-colors" title="Reorder">
-                          <ArrowUpDown size={12} />
-                        </span>
-                      </button>
-                      {sortMenuDay === key && (
-                        <div className="relative">
-                          <SortMenu onSort={(by) => handleSort(key, by)} onClose={() => setSortMenuDay(null)} />
+                  return (
+                    <DayColumn key={key} id={key} isOver={false}>
+                      {/* Day Header */}
+                      <div className="mb-3">
+                        <h3 className={`text-base font-bold ${today ? "text-accent" : "text-text-primary"}`}>
+                          {DAY_NAMES_FULL[date.getDay()]}
+                        </h3>
+                        <p className="text-[11px] text-text-muted">
+                          {date.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
+                        </p>
+                        <div className="mt-2 h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-700 ease-out"
+                            style={{ width: `${progress}%`, backgroundColor: progress === 100 ? "#10B981" : "#22C55E" }} />
                         </div>
-                      )}
-                    </div>
+                      </div>
 
-                    {/* Inline Add Task Popup */}
-                    {addTaskDay === key && (
-                      <AddTaskPopup
-                        dateKey={key}
-                        onAdd={handleInlineAdd}
-                        onClose={() => setAddTaskDay(null)}
-                        categories={CATEGORIES}
-                      />
-                    )}
+                      {/* Add task row (card-like) */}
+                      <div className="mb-2">
+                        <button onClick={() => setAddTaskDay(addTaskDay === key ? null : key)}
+                          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-bg-secondary/60 hover:bg-bg-secondary border border-border/50 hover:border-border text-text-muted hover:text-text-secondary transition-all text-xs">
+                          <Plus size={14} />
+                          <span className="flex-1 text-left">Add task</span>
+                          <span onClick={(e) => { e.stopPropagation(); setSortMenuDay(sortMenuDay === key ? null : key); }}
+                            className="p-0.5 rounded hover:bg-bg-hover transition-colors" title="Reorder">
+                            <ArrowUpDown size={12} />
+                          </span>
+                        </button>
+                        {sortMenuDay === key && (
+                          <div className="relative">
+                            <SortMenu onSort={(by) => handleSort(key, by)} onClose={() => setSortMenuDay(null)} />
+                          </div>
+                        )}
+                      </div>
 
-                    {/* Task Cards */}
-                    <div className="min-h-[120px] space-y-2">
-                      {dayTasks.map((task) => (
-                        <TaskCard key={task._id} task={task} onSelect={setSelectedTask} onComplete={handleComplete}
-                          isDragging={activeDragId === task._id} />
-                      ))}
-                    </div>
-                  </DayColumn>
-                );
-              })}
+                      {/* Task Cards */}
+                      <div className="min-h-[120px] space-y-2">
+                        {dayTasks.map((task) => (
+                          <TaskCard key={task._id} task={task} onSelect={setSelectedTask} onComplete={handleComplete}
+                            isDragging={activeDragId === task._id} />
+                        ))}
+                      </div>
+                    </DayColumn>
+                  );
+                })}
+              </div>
+
+              {/* Add Task Popup — positioned below Add task row, spanning grid */}
+              {addTaskDay && (
+                <AddTaskPopup
+                  dateKey={addTaskDay}
+                  onAdd={handleInlineAdd}
+                  onClose={() => setAddTaskDay(null)}
+                  categories={CATEGORIES}
+                />
+              )}
             </div>
             <DragOverlay>
               {activeDragId ? (() => {
