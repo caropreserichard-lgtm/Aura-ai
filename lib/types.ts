@@ -30,6 +30,7 @@ export interface Task {
   calendarEventId?: string;
   createdAt: string;
   completedAt?: string;
+  sortOrder?: number;
 }
 
 export interface UserStats {

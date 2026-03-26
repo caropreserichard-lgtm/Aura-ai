@@ -9,7 +9,7 @@ import {
   DndContext, closestCenter, DragEndEvent, DragStartEvent, DragOverlay,
   PointerSensor, useSensor, useSensors, useDroppable,
 } from "@dnd-kit/core";
-import { useSortable } from "@dnd-kit/sortable";
+import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
@@ -437,7 +437,7 @@ export default function HomePage() {
     dayTasks.sort((a, b) => {
       if (a.status === "done" && b.status !== "done") return 1;
       if (a.status !== "done" && b.status === "done") return -1;
-      return 0;
+      return (a.sortOrder ?? 999) - (b.sortOrder ?? 999);
     });
     tasksByDay[key] = dayTasks;
   });
@@ -485,41 +485,74 @@ export default function HomePage() {
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveDragId(null);
     const { active, over } = event;
-    if (!over) return;
+    if (!over || active.id === over.id) return;
 
     const taskId = active.id as string;
-    let targetDateKey = over.id as string;
+    const overId = over.id as string;
 
-    // If over.id is a task ID (not a date), resolve the column date from that task
-    const isDateKey = /^\d{4}-\d{2}-\d{2}$/.test(targetDateKey);
-    if (!isDateKey) {
-      const overTask = tasks.find((t) => t._id === targetDateKey);
+    // Resolve target date key
+    const isOverDateKey = /^\d{4}-\d{2}-\d{2}$/.test(overId);
+    let targetDateKey = overId;
+    if (!isOverDateKey) {
+      const overTask = tasks.find((t) => t._id === overId);
       if (overTask?.dueDate) {
         targetDateKey = overTask.dueDate.split("T")[0];
       } else {
-        return; // Can't resolve target date
+        return;
       }
     }
 
     const currentTask = tasks.find((t) => t._id === taskId);
     if (!currentTask) return;
     const currentDate = currentTask.dueDate?.split("T")[0];
-    if (currentDate === targetDateKey) return;
 
-    // Store undo action
-    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-    setUndoAction({ taskId, prevDueDate: currentDate || "", label: currentTask.title });
-    undoTimerRef.current = setTimeout(() => setUndoAction(null), 8000);
+    // Same column — reorder
+    if (currentDate === targetDateKey && !isOverDateKey) {
+      const dayTasks = tasks
+        .filter((t) => t.dueDate && t.dueDate.startsWith(targetDateKey))
+        .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
 
-    // Update local state immediately
-    setTasks((prev) => prev.map((t) => t._id === taskId ? { ...t, dueDate: targetDateKey } : t));
+      const oldIndex = dayTasks.findIndex((t) => t._id === taskId);
+      const newIndex = dayTasks.findIndex((t) => t._id === overId);
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
 
-    // Persist to DB
-    fetch(`/api/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dueDate: targetDateKey }),
-    }).catch(() => fetchTasks());
+      const reordered = [...dayTasks];
+      const [moved] = reordered.splice(oldIndex, 1);
+      reordered.splice(newIndex, 0, moved);
+
+      // Assign new sortOrder values
+      const updates: Record<string, number> = {};
+      reordered.forEach((t, i) => { updates[t._id!] = i; });
+
+      setTasks((prev) => prev.map((t) => updates[t._id!] !== undefined ? { ...t, sortOrder: updates[t._id!] } : t));
+
+      // Persist sort orders
+      Promise.all(
+        reordered.map((t, i) =>
+          fetch(`/api/tasks/${t._id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sortOrder: i }),
+          })
+        )
+      ).catch(() => fetchTasks());
+      return;
+    }
+
+    // Different column — move task
+    if (currentDate !== targetDateKey) {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      setUndoAction({ taskId, prevDueDate: currentDate || "", label: currentTask.title });
+      undoTimerRef.current = setTimeout(() => setUndoAction(null), 8000);
+
+      setTasks((prev) => prev.map((t) => t._id === taskId ? { ...t, dueDate: targetDateKey } : t));
+
+      fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dueDate: targetDateKey }),
+      }).catch(() => fetchTasks());
+    }
   };
 
   const handleUndo = async () => {
@@ -677,12 +710,14 @@ export default function HomePage() {
                       </div>
 
                       {/* Task Cards */}
-                      <div className="min-h-[120px] space-y-2">
-                        {dayTasks.map((task) => (
-                          <TaskCard key={task._id} task={task} onSelect={setSelectedTask} onComplete={handleComplete}
-                            isDragging={activeDragId === task._id} />
-                        ))}
-                      </div>
+                      <SortableContext items={dayTasks.map((t) => t._id!)} strategy={verticalListSortingStrategy}>
+                        <div className="min-h-[120px] space-y-2">
+                          {dayTasks.map((task) => (
+                            <TaskCard key={task._id} task={task} onSelect={setSelectedTask} onComplete={handleComplete}
+                              isDragging={activeDragId === task._id} />
+                          ))}
+                        </div>
+                      </SortableContext>
                     </DayColumn>
                   );
                 })}
