@@ -27,7 +27,7 @@ export default function KanbanBoard({ tasks, onStatusChange, onEditTask }: Kanba
     if (!destination) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
     const newStatus = destination.droppableId as TaskStatus;
-    if (newStatus === "done") confetti({ particleCount: 20, spread: 40, origin: { y: 0.5 }, colors: ["#4a9e7e", "#6b8aaf"] });
+    if (newStatus === "done") confetti({ particleCount: 20, spread: 40, origin: { y: 0.5 }, colors: ["#e7ca79", "#d4b868"] });
     await onStatusChange(draggableId, newStatus);
   }, [onStatusChange]);
 

@@ -47,14 +47,14 @@ export default function LoginPage() {
         <div className="mx-auto mb-2 flex items-center justify-center rounded-2xl overflow-hidden" style={{ width: 160, height: 160 }}>
           <TayronaLogo size={160} />
         </div>
-        <p className="text-sm" style={{ color: "#8ba4c4" }}>Tu Ciudad Perdida de la Productividad</p>
+        <p className="text-sm" style={{ color: "#a0a0a0" }}>Tu Ciudad Perdida de la Productividad</p>
       </div>
 
       {/* Form Card */}
       <div className="rounded-2xl border p-6"
         style={{
-          background: "rgba(15, 25, 45, 0.8)",
-          borderColor: "rgba(74, 144, 217, 0.15)",
+          background: "rgba(26, 26, 26, 0.9)",
+          borderColor: "rgba(231, 202, 121, 0.15)",
           backdropFilter: "blur(20px)",
         }}>
         <h2 className="text-xl font-semibold text-white mb-6">Iniciar Sesión</h2>
@@ -68,22 +68,22 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative">
-            <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#6b8aaf" }} />
+            <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#a0a0a0" }} />
             <input
               type="email" value={email} onChange={(e) => setEmail(e.target.value)}
               placeholder="Email" required autoFocus
               className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 transition-all"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(74,144,217,0.2)" }}
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(231,202,121,0.2)" }}
             />
           </div>
 
           <div className="relative">
-            <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#6b8aaf" }} />
+            <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#a0a0a0" }} />
             <input
               type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
               placeholder="Contraseña" required
               className="w-full pl-10 pr-10 py-3 rounded-xl text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 transition-all"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(74,144,217,0.2)" }}
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(231,202,121,0.2)" }}
             />
             <button type="button" onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
@@ -103,7 +103,7 @@ export default function LoginPage() {
       </div>
 
       {/* Register link */}
-      <p className="mt-6 text-sm" style={{ color: "#8ba4c4" }}>
+      <p className="mt-6 text-sm" style={{ color: "#a0a0a0" }}>
         ¿No tienes cuenta?{" "}
         <Link href="/register" className="font-medium hover:underline" style={{ color: "#e7ca79" }}>
           Construye tu Imperio

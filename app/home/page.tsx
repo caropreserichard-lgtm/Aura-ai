@@ -325,7 +325,7 @@ function DayColumn({ id, isHighlighted, children }: { id: string; isHighlighted:
       ref={setNodeRef}
       className={`rounded-xl p-2 min-h-[280px] transition-all duration-200 ease-in-out ${
         isHighlighted
-          ? "bg-[#19395c]/10 ring-2 ring-[#19395c]/40 shadow-[0_0_15px_rgba(25,57,92,0.15)]"
+          ? "bg-[#e7ca79]/10 ring-2 ring-[#e7ca79]/30 shadow-[0_0_15px_rgba(231,202,121,0.15)]"
           : "bg-transparent"
       }`}
     >

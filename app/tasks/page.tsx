@@ -56,7 +56,7 @@ export default function TasksPage() {
   };
 
   const handleComplete = async (id: string) => {
-    confetti({ particleCount: 20, spread: 40, origin: { y: 0.7 }, colors: ["#4a9e7e", "#6b8aaf"] });
+    confetti({ particleCount: 20, spread: 40, origin: { y: 0.7 }, colors: ["#e7ca79", "#d4b868"] });
     try {
       await fetch(`/api/tasks/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "done" }) });
       fetchTasks();

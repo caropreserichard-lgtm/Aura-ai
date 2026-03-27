@@ -83,14 +83,14 @@ export default function RegisterPage() {
         <div className="mx-auto mb-2 flex items-center justify-center rounded-2xl overflow-hidden" style={{ width: 160, height: 160 }}>
           <TayronaLogo size={160} />
         </div>
-        <p className="text-sm" style={{ color: "#8ba4c4" }}>Construye tu Ciudad Perdida</p>
+        <p className="text-sm" style={{ color: "#a0a0a0" }}>Construye tu Ciudad Perdida</p>
       </div>
 
       {/* Form Card */}
       <div className="rounded-2xl border p-6"
         style={{
-          background: "rgba(15, 25, 45, 0.8)",
-          borderColor: "rgba(74, 144, 217, 0.15)",
+          background: "rgba(26, 26, 26, 0.9)",
+          borderColor: "rgba(231, 202, 121, 0.15)",
           backdropFilter: "blur(20px)",
         }}>
 
@@ -107,27 +107,27 @@ export default function RegisterPage() {
 
             <div className="space-y-4">
               <div className="relative">
-                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#6b8aaf" }} />
+                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#a0a0a0" }} />
                 <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)}
                   placeholder="Nombre completo" required autoFocus
                   className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 transition-all"
-                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(74,144,217,0.2)" }} />
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(231,202,121,0.15)" }} />
               </div>
 
               <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#6b8aaf" }} />
+                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#a0a0a0" }} />
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
                   placeholder="Email" required
                   className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 transition-all"
-                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(74,144,217,0.2)" }} />
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(231,202,121,0.15)" }} />
               </div>
 
               <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#6b8aaf" }} />
+                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#a0a0a0" }} />
                 <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
                   placeholder="Contraseña" required
                   className="w-full pl-10 pr-10 py-3 rounded-xl text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 transition-all"
-                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(74,144,217,0.2)" }} />
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(231,202,121,0.15)" }} />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -146,8 +146,8 @@ export default function RegisterPage() {
                 disabled={!fullName || !email || !passwordValid}
                 className="w-full py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40"
                 style={{
-                  background: "linear-gradient(135deg, #4A90D9 0%, #2d6cb5 100%)",
-                  boxShadow: "0 4px 20px rgba(74,144,217,0.3)",
+                  background: "linear-gradient(135deg, #e7ca79 0%, #c4a94f 100%)",
+                  boxShadow: "0 4px 20px rgba(231,202,121,0.3)",
                 }}>
                 Siguiente <ArrowRight size={16} />
               </button>
@@ -156,7 +156,7 @@ export default function RegisterPage() {
         ) : (
           <>
             <h2 className="text-xl font-semibold text-white mb-2">Nombra tu Imperio</h2>
-            <p className="text-xs mb-6" style={{ color: "#8ba4c4" }}>
+            <p className="text-xs mb-6" style={{ color: "#a0a0a0" }}>
               Como los Tayronas construyeron Teyuna, tú construirás tu ciudad de productividad.
             </p>
 
@@ -169,7 +169,7 @@ export default function RegisterPage() {
                   style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(231,202,121,0.3)" }} />
               </div>
 
-              <p className="text-[10px]" style={{ color: "#6b8aaf" }}>
+              <p className="text-[10px]" style={{ color: "#a0a0a0" }}>
                 Este será el nombre de tu espacio de trabajo. Puedes cambiarlo después.
               </p>
 
@@ -190,7 +190,7 @@ export default function RegisterPage() {
               </button>
 
               <button type="button" onClick={() => setStep(1)}
-                className="w-full py-2 text-xs font-medium hover:underline" style={{ color: "#8ba4c4" }}>
+                className="w-full py-2 text-xs font-medium hover:underline" style={{ color: "#a0a0a0" }}>
                 ← Volver
               </button>
             </form>
@@ -199,7 +199,7 @@ export default function RegisterPage() {
       </div>
 
       {/* Login link */}
-      <p className="mt-6 text-sm" style={{ color: "#8ba4c4" }}>
+      <p className="mt-6 text-sm" style={{ color: "#a0a0a0" }}>
         ¿Ya tienes un Imperio?{" "}
         <Link href="/login" className="font-medium hover:underline" style={{ color: "#e7ca79" }}>
           Iniciar Sesión
