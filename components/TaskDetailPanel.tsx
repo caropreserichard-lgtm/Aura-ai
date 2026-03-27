@@ -30,10 +30,11 @@ interface TaskDetailPanelProps {
   onUpdate: (updates: Record<string, unknown>) => void;
   onComplete: () => void;
   onDelete: () => void;
+  deleteLabel?: string;
   onStartTimer: () => void;
 }
 
-export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, onDelete, onStartTimer }: TaskDetailPanelProps) {
+export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, onDelete, deleteLabel, onStartTimer }: TaskDetailPanelProps) {
   const [description, setDescription] = useState(task.description || "");
   const [startDate, setStartDate] = useState(task.startDate || task.dueDate || "");
   const [dueDate, setDueDate] = useState(task.dueDate || "");
@@ -591,7 +592,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
         <div className="border-t border-border px-5 py-3 flex items-center justify-between">
           <button onClick={onDelete}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-danger text-[12px] hover:bg-danger-subtle transition-colors">
-            <Trash2 size={13} /> Delete task
+            <Trash2 size={13} /> {deleteLabel || "Delete task"}
           </button>
           <button onClick={handleSaveAndClose}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse text-[13px] font-semibold transition-colors">

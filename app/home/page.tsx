@@ -632,9 +632,14 @@ export default function HomePage() {
     } catch (e) { console.error(e); }
   };
 
-  const handleDeleteTask = async (taskId: string) => {
+  const handleRemoveFromHome = async (taskId: string) => {
     try {
-      await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
+      // Only remove the date — task stays in Tasks module
+      await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dueDate: null, startDate: null }),
+      });
       setTasks((prev) => prev.filter((t) => t._id !== taskId));
       setSelectedTask(null);
     } catch (e) { console.error(e); }
@@ -826,7 +831,8 @@ export default function HomePage() {
             onClose={() => setSelectedTask(null)}
             onUpdate={(updates) => handleTaskUpdate(selectedTask._id!, updates)}
             onComplete={() => { handleComplete(selectedTask._id!); setSelectedTask(null); }}
-            onDelete={() => handleDeleteTask(selectedTask._id!)}
+            onDelete={() => handleRemoveFromHome(selectedTask._id!)}
+            deleteLabel="Remove from schedule"
             onStartTimer={() => {}}
           />
         )}
