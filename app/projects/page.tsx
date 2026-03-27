@@ -29,7 +29,7 @@ const LABEL_COLORS = [
 // ─── Task Detail Modal ─────────────────────────────────────────
 function TaskDetailModal({
   task, project, projects, onClose, onUpdate, onDelete, onToggle,
-  onAddComment, onAddLink, onRemoveLink, onAddChecklist, onToggleChecklist, onDeleteChecklist, onEditChecklist, onMoveTask,
+  onAddComment, onAddLink, onRemoveLink, onAddChecklist, onToggleChecklist, onDeleteChecklist, onEditChecklist, onReorderChecklist, onMoveTask,
 }: {
   task: ProjectTask; project: Project; projects: Project[];
   onClose: () => void;
@@ -42,6 +42,7 @@ function TaskDetailModal({
   onToggleChecklist: (itemId: string) => void;
   onDeleteChecklist: (itemId: string) => void;
   onEditChecklist: (itemId: string, text: string) => void;
+  onReorderChecklist: (reordered: { id: string; text: string; done: boolean }[]) => void;
   onMoveTask: (toProjectId: string, position: number) => void;
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
@@ -208,29 +209,50 @@ function TaskDetailModal({
                     style={{ width: `${(checkDone / checklist.length) * 100}%` }} />
                 </div>
               )}
-              <div className="space-y-1 mb-2">
-                {checklist.map((item) => (
-                  <div key={item.id} className="flex items-center gap-2 group px-1 py-0.5 rounded hover:bg-bg-hover">
-                    <button onClick={() => onToggleChecklist(item.id)}
-                      className={`w-4 h-4 rounded border-[1.5px] flex-shrink-0 flex items-center justify-center transition-colors ${
-                        item.done ? "bg-accent border-accent" : "border-text-muted hover:border-accent"
-                      }`}>
-                      {item.done && <Check size={8} className="text-text-inverse" />}
-                    </button>
-                    {editingCheckId === item.id ? (
-                      <input type="text" value={editingCheckText} onChange={(e) => setEditingCheckText(e.target.value)}
-                        onBlur={() => { if (editingCheckText.trim()) { onEditChecklist(item.id, editingCheckText.trim()); } setEditingCheckId(null); }}
-                        onKeyDown={(e) => { if (e.key === "Enter") { if (editingCheckText.trim()) { onEditChecklist(item.id, editingCheckText.trim()); } setEditingCheckId(null); } if (e.key === "Escape") setEditingCheckId(null); }}
-                        autoFocus className="flex-1 px-1 py-0.5 rounded bg-bg-tertiary border border-accent text-xs text-text-primary focus:outline-none" />
-                    ) : (
-                      <span onClick={() => { setEditingCheckId(item.id); setEditingCheckText(item.text); }}
-                        className={`flex-1 text-xs cursor-pointer ${item.done ? "line-through text-text-muted" : "text-text-primary hover:text-accent"}`}>{item.text}</span>
-                    )}
-                    <button onClick={() => onDeleteChecklist(item.id)}
-                      className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger transition-all"><X size={12} /></button>
-                  </div>
-                ))}
-              </div>
+              <DragDropContext onDragEnd={(result: DropResult) => {
+                if (!result.destination || result.source.index === result.destination.index) return;
+                const reordered = [...checklist];
+                const [moved] = reordered.splice(result.source.index, 1);
+                reordered.splice(result.destination.index, 0, moved);
+                onReorderChecklist(reordered);
+              }}>
+                <Droppable droppableId="checklist-items">
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-1 mb-2">
+                      {checklist.map((item, idx) => (
+                        <Draggable key={item.id} draggableId={`check-${item.id}`} index={idx}>
+                          {(dragProv, snapshot) => (
+                            <div ref={dragProv.innerRef} {...dragProv.draggableProps}
+                              className={`flex items-center gap-2 group px-1 py-0.5 rounded hover:bg-bg-hover ${snapshot.isDragging ? "bg-bg-hover shadow-md" : ""}`}>
+                              <span {...dragProv.dragHandleProps} className="text-text-muted/30 hover:text-text-muted cursor-grab active:cursor-grabbing flex-shrink-0">
+                                <GripVertical size={12} />
+                              </span>
+                              <button onClick={() => onToggleChecklist(item.id)}
+                                className={`w-4 h-4 rounded border-[1.5px] flex-shrink-0 flex items-center justify-center transition-colors ${
+                                  item.done ? "bg-accent border-accent" : "border-text-muted hover:border-accent"
+                                }`}>
+                                {item.done && <Check size={8} className="text-text-inverse" />}
+                              </button>
+                              {editingCheckId === item.id ? (
+                                <input type="text" value={editingCheckText} onChange={(e) => setEditingCheckText(e.target.value)}
+                                  onBlur={() => { if (editingCheckText.trim()) { onEditChecklist(item.id, editingCheckText.trim()); } setEditingCheckId(null); }}
+                                  onKeyDown={(e) => { if (e.key === "Enter") { if (editingCheckText.trim()) { onEditChecklist(item.id, editingCheckText.trim()); } setEditingCheckId(null); } if (e.key === "Escape") setEditingCheckId(null); }}
+                                  autoFocus className="flex-1 px-1 py-0.5 rounded bg-bg-tertiary border border-accent text-xs text-text-primary focus:outline-none" />
+                              ) : (
+                                <span onClick={() => { setEditingCheckId(item.id); setEditingCheckText(item.text); }}
+                                  className={`flex-1 text-xs cursor-pointer ${item.done ? "line-through text-text-muted" : "text-text-primary hover:text-accent"}`}>{item.text}</span>
+                              )}
+                              <button onClick={() => onDeleteChecklist(item.id)}
+                                className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger transition-all"><X size={12} /></button>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
               <div className="flex items-center gap-2">
                 <input id="checklist-input" type="text" value={checkText} onChange={(e) => setCheckText(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && checkText.trim()) { onAddChecklist(checkText.trim()); setCheckText(""); } }}
@@ -616,6 +638,11 @@ export default function ProjectsPage() {
     await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "edit_checklist_item", taskId, itemId, text }) });
     fetchProjects();
   };
+  const reorderChecklist = async (projectId: string, taskId: string, reordered: { id: string; text: string; done: boolean }[]) => {
+    // Optimistic update
+    setProjects(prev => prev.map(p => p._id === projectId ? { ...p, tasks: p.tasks.map(t => t.id === taskId ? { ...t, checklist: reordered } : t) } : p));
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reorder_checklist", taskId, checklist: reordered }) });
+  };
   const moveTask = async (fromProjectId: string, taskId: string, toProjectId: string, position: number) => {
     await fetch(`/api/projects/${fromProjectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "move_task", taskId, toProjectId, position }) });
     setSelectedTask(null); fetchProjects();
@@ -988,6 +1015,7 @@ export default function ProjectsPage() {
             onToggleChecklist={(itemId) => toggleChecklist(freshProject._id!, freshTask.id, itemId)}
             onDeleteChecklist={(itemId) => deleteChecklist(freshProject._id!, freshTask.id, itemId)}
             onEditChecklist={(itemId, text) => editChecklist(freshProject._id!, freshTask.id, itemId, text)}
+            onReorderChecklist={(reordered) => reorderChecklist(freshProject._id!, freshTask.id, reordered)}
             onMoveTask={(toId, pos) => moveTask(freshProject._id!, freshTask.id, toId, pos)}
           />
         );

@@ -122,6 +122,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ ok: true });
     }
 
+    if (action === "reorder_checklist") {
+      const project = await db.collection("projects").findOne({ _id: new ObjectId(id), userId });
+      if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const tasks = (project.tasks || []).map((t: { id: string; checklist?: unknown[] }) => {
+        if (t.id === body.taskId) {
+          return { ...t, checklist: body.checklist };
+        }
+        return t;
+      });
+      await db.collection("projects").updateOne({ _id: new ObjectId(id), userId }, { $set: { tasks, updatedAt: now } });
+      return NextResponse.json({ ok: true });
+    }
+
     if (action === "delete_checklist_item") {
       const project = await db.collection("projects").findOne({ _id: new ObjectId(id), userId });
       if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
