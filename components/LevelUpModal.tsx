@@ -7,7 +7,7 @@ interface LevelUpModalProps { level: number; isOpen: boolean; onClose: () => voi
 
 export default function LevelUpModal({ level, isOpen, onClose }: LevelUpModalProps) {
   useEffect(() => {
-    if (isOpen) confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 }, colors: ["#4a9e7e", "#6b8aaf", "#d4a04e"] });
+    if (isOpen) confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 }, colors: ["#4a9e7e", "#6b8aaf", "#e7ca79"] });
   }, [isOpen]);
 
   if (!isOpen) return null;

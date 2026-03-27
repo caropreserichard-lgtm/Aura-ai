@@ -162,11 +162,11 @@ export default function RegisterPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="relative">
-                <Crown size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#d4a04e" }} />
+                <Crown size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#e7ca79" }} />
                 <input type="text" value={empireName} onChange={(e) => setEmpireName(e.target.value)}
                   placeholder={`${fullName}'s Empire`} autoFocus
                   className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 transition-all"
-                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(212,160,78,0.3)" }} />
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(231,202,121,0.3)" }} />
               </div>
 
               <p className="text-[10px]" style={{ color: "#6b8aaf" }}>
@@ -183,8 +183,8 @@ export default function RegisterPage() {
               <button type="submit" disabled={loading}
                 className="w-full py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                 style={{
-                  background: "linear-gradient(135deg, #d4a04e 0%, #b8860b 100%)",
-                  boxShadow: "0 4px 20px rgba(212,160,78,0.3)",
+                  background: "linear-gradient(135deg, #e7ca79 0%, #c4a94f 100%)",
+                  boxShadow: "0 4px 20px rgba(231,202,121,0.3)",
                 }}>
                 {loading ? <Loader2 size={16} className="animate-spin" /> : <><Crown size={16} /> Fundar mi Imperio</>}
               </button>
@@ -201,7 +201,7 @@ export default function RegisterPage() {
       {/* Login link */}
       <p className="mt-6 text-sm" style={{ color: "#8ba4c4" }}>
         ¿Ya tienes un Imperio?{" "}
-        <Link href="/login" className="font-medium hover:underline" style={{ color: "#d4a04e" }}>
+        <Link href="/login" className="font-medium hover:underline" style={{ color: "#e7ca79" }}>
           Iniciar Sesión
         </Link>
       </p>

@@ -20,10 +20,10 @@
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.15);
 
-  --accent: #4a9e7e;
-  --accent-hover: #3d8a6c;
-  --accent-subtle: rgba(74, 158, 126, 0.12);
-  --accent-text: #5bb894;
+  --accent: #19395c;
+  --accent-hover: #1e4670;
+  --accent-subtle: rgba(25, 57, 92, 0.15);
+  --accent-text: #4a8cc7;
 
   --secondary: #6b8aaf;
   --secondary-subtle: rgba(107, 138, 175, 0.12);
@@ -31,14 +31,18 @@
   --danger: #d4544e;
   --danger-subtle: rgba(212, 84, 78, 0.12);
 
-  --warning: #d4a04e;
-  --warning-subtle: rgba(212, 160, 78, 0.12);
+  --warning: #e7ca79;
+  --warning-subtle: rgba(231, 202, 121, 0.12);
 
   --success: #4a9e7e;
   --success-subtle: rgba(74, 158, 126, 0.12);
 
+  --gold: #e7ca79;
+  --gold-hover: #d4b868;
+  --gold-subtle: rgba(231, 202, 121, 0.10);
+
   --priority-critical: #d4544e;
-  --priority-high: #d4a04e;
+  --priority-high: #e7ca79;
   --priority-medium: #6b8aaf;
   --priority-low: #666666;
 
@@ -66,10 +70,10 @@
   --border: rgba(0, 0, 0, 0.08);
   --border-strong: rgba(0, 0, 0, 0.15);
 
-  --accent: #3d8a6c;
-  --accent-hover: #347a5e;
-  --accent-subtle: rgba(61, 138, 108, 0.08);
-  --accent-text: #2d7a5c;
+  --accent: #19395c;
+  --accent-hover: #122c47;
+  --accent-subtle: rgba(25, 57, 92, 0.10);
+  --accent-text: #19395c;
 
   --secondary: #5a7a9e;
   --secondary-subtle: rgba(90, 122, 158, 0.08);
@@ -77,7 +81,7 @@
   --danger: #c4443e;
   --danger-subtle: rgba(196, 68, 62, 0.08);
 
-  --warning: #c4903e;
+  --warning: #d4b868;
   --warning-subtle: rgba(196, 144, 62, 0.08);
 
   --success: #3d8a6c;
@@ -161,11 +165,11 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
-.cat-trabajo { color: #d4a04e; }
+.cat-trabajo { color: #e7ca79; }
 .cat-aprendizaje { color: #8b7ec8; }
 .cat-lifestyle { color: #4a9e7e; }
 .cat-proyectos { color: #6b8aaf; }
-.cat-bg-trabajo { background-color: rgba(212, 160, 78, 0.12); }
+.cat-bg-trabajo { background-color: rgba(231, 202, 121, 0.12); }
 .cat-bg-aprendizaje { background-color: rgba(139, 126, 200, 0.12); }
 .cat-bg-lifestyle { background-color: rgba(74, 158, 126, 0.12); }
 .cat-bg-proyectos { background-color: rgba(107, 138, 175, 0.12); }
@@ -180,7 +184,7 @@ body {
   transition: box-shadow 0.3s ease, transform 0.2s ease;
 }
 .tools-terraza:hover {
-  box-shadow: 0 4px 20px rgba(212, 160, 78, 0.06);
+  box-shadow: 0 4px 20px rgba(231, 202, 121, 0.06);
 }
 .tools-terraza:hover .tools-terraza-actions {
   opacity: 1;
@@ -213,7 +217,7 @@ body {
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  background: radial-gradient(circle at 50% 50%, rgba(212, 160, 78, 0.12), transparent 70%);
+  background: radial-gradient(circle at 50% 50%, rgba(231, 202, 121, 0.12), transparent 70%);
   opacity: 0;
   transition: opacity 0.3s ease;
   pointer-events: none;
@@ -223,8 +227,8 @@ body {
   opacity: 1;
 }
 .tools-card:hover {
-  border-color: rgba(212, 160, 78, 0.15);
-  box-shadow: 0 0 20px rgba(212, 160, 78, 0.08);
+  border-color: rgba(231, 202, 121, 0.15);
+  box-shadow: 0 0 20px rgba(231, 202, 121, 0.08);
 }
 
 .tools-stone-btn {
@@ -237,21 +241,21 @@ body {
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 .tools-stone-btn:hover {
-  background: rgba(212, 160, 78, 0.1);
-  border-color: rgba(212, 160, 78, 0.2);
-  color: #D4A04E;
-  box-shadow: 0 0 12px rgba(212, 160, 78, 0.08);
+  background: rgba(231, 202, 121, 0.1);
+  border-color: rgba(231, 202, 121, 0.2);
+  color: #e7ca79;
+  box-shadow: 0 0 12px rgba(231, 202, 121, 0.08);
 }
 .tools-stone-btn-active {
-  background: rgba(212, 160, 78, 0.12);
-  border: 1px solid rgba(212, 160, 78, 0.25);
-  color: #D4A04E;
-  box-shadow: 0 0 12px rgba(212, 160, 78, 0.1);
+  background: rgba(231, 202, 121, 0.12);
+  border: 1px solid rgba(231, 202, 121, 0.25);
+  color: #e7ca79;
+  box-shadow: 0 0 12px rgba(231, 202, 121, 0.1);
 }
 
 .tools-header-glow {
-  background: rgba(212, 160, 78, 0.1);
-  box-shadow: 0 0 16px rgba(212, 160, 78, 0.15);
+  background: rgba(231, 202, 121, 0.1);
+  box-shadow: 0 0 16px rgba(231, 202, 121, 0.15);
 }
 
 .line-clamp-2 {

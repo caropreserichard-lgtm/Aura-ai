@@ -5,7 +5,6 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
-import Image from "next/image";
 import {
   User,
   Mail,
@@ -306,7 +305,7 @@ export default function ProfilePage() {
         <main className="flex-1 md:ml-60">
           <TopBar />
           <div className="flex items-center justify-center h-[60vh]">
-            <div className="w-8 h-8 border-3 border-[#d4a04e]/30 border-t-[#d4a04e] rounded-full animate-spin" />
+            <div className="w-8 h-8 border-3 border-[#e7ca79]/30 border-t-[#e7ca79] rounded-full animate-spin" />
           </div>
         </main>
       </div>
@@ -343,7 +342,7 @@ export default function ProfilePage() {
                       ? "bg-bg-elevated text-text-primary shadow-sm"
                       : "text-text-muted hover:text-text-secondary"
                   }`}
-                  style={isActive ? { borderBottom: "2px solid #d4a04e" } : {}}
+                  style={isActive ? { borderBottom: "2px solid #e7ca79" } : {}}
                 >
                   <Icon size={16} />
                   <span className="hidden sm:inline">{tab.label}</span>
@@ -360,19 +359,17 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-5">
                   <div className="relative group">
                     {avatarUrl ? (
-                      <Image
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
                         src={avatarUrl}
                         alt="Avatar"
-                        width={80}
-                        height={80}
                         className="w-20 h-20 rounded-full object-cover border-2"
-                        style={{ borderColor: "#d4a04e" }}
-                        unoptimized
+                        style={{ borderColor: "#e7ca79" }}
                       />
                     ) : (
                       <div
                         className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold text-white border-2"
-                        style={{ background: "linear-gradient(135deg, #d4a04e, #b8860b)", borderColor: "#d4a04e" }}
+                        style={{ background: "linear-gradient(135deg, #e7ca79, #c4a94f)", borderColor: "#e7ca79" }}
                       >
                         {initial}
                       </div>
@@ -390,7 +387,7 @@ export default function ProfilePage() {
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingAvatar}
                       className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border"
-                      style={{ borderColor: "rgba(212,160,78,0.4)", color: "#d4a04e" }}
+                      style={{ borderColor: "rgba(231,202,121,0.4)", color: "#e7ca79" }}
                     >
                       <Camera size={14} />
                       {uploadingAvatar ? "Uploading..." : "Upload a new picture"}
@@ -418,7 +415,7 @@ export default function ProfilePage() {
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       placeholder="First name"
-                      className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#d4a04e]/50 transition-colors"
+                      className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#e7ca79]/50 transition-colors"
                     />
                   </div>
                   <div>
@@ -428,7 +425,7 @@ export default function ProfilePage() {
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       placeholder="Last name"
-                      className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#d4a04e]/50 transition-colors"
+                      className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#e7ca79]/50 transition-colors"
                     />
                   </div>
                 </div>
@@ -448,7 +445,7 @@ export default function ProfilePage() {
 
                 <div>
                   <label className="text-xs text-text-muted uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-                    <Crown size={12} style={{ color: "#d4a04e" }} />
+                    <Crown size={12} style={{ color: "#e7ca79" }} />
                     Empire name
                   </label>
                   <input
@@ -456,8 +453,8 @@ export default function ProfilePage() {
                     value={empireName}
                     onChange={(e) => setEmpireName(e.target.value)}
                     placeholder="My Empire"
-                    className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border text-sm text-text-primary focus:outline-none focus:border-[#d4a04e]/50 transition-colors"
-                    style={{ borderColor: "rgba(212,160,78,0.3)" }}
+                    className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border text-sm text-text-primary focus:outline-none focus:border-[#e7ca79]/50 transition-colors"
+                    style={{ borderColor: "rgba(231,202,121,0.3)" }}
                   />
                 </div>
               </div>
@@ -468,7 +465,7 @@ export default function ProfilePage() {
                 disabled={profileSaving}
                 className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all text-white"
                 style={{
-                  background: profileSaved ? "#10B981" : "linear-gradient(135deg, #d4a04e, #b8860b)",
+                  background: profileSaved ? "#4a9e7e" : "linear-gradient(135deg, #e7ca79, #c4a94f)",
                 }}
               >
                 {profileSaved ? (
@@ -502,7 +499,7 @@ export default function ProfilePage() {
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       placeholder="Enter current password"
-                      className="w-full px-3 py-2.5 pr-10 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#d4a04e]/50 transition-colors"
+                      className="w-full px-3 py-2.5 pr-10 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#e7ca79]/50 transition-colors"
                     />
                     <button
                       onClick={() => setShowCurrentPw(!showCurrentPw)}
@@ -521,7 +518,7 @@ export default function ProfilePage() {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Enter new password (min 8 characters)"
-                      className="w-full px-3 py-2.5 pr-10 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#d4a04e]/50 transition-colors"
+                      className="w-full px-3 py-2.5 pr-10 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#e7ca79]/50 transition-colors"
                     />
                     <button
                       onClick={() => setShowNewPw(!showNewPw)}
@@ -542,7 +539,7 @@ export default function ProfilePage() {
                   onClick={handleChangePassword}
                   disabled={passwordSaving || !currentPassword || !newPassword || newPassword.length < 8}
                   className="px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40"
-                  style={{ background: "rgba(212,160,78,0.15)", color: "#d4a04e" }}
+                  style={{ background: "rgba(231,202,121,0.15)", color: "#e7ca79" }}
                 >
                   {passwordSaving ? "Updating..." : "Update password"}
                 </button>
@@ -569,7 +566,7 @@ export default function ProfilePage() {
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
                     placeholder="new@email.com"
-                    className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#d4a04e]/50 transition-colors"
+                    className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#e7ca79]/50 transition-colors"
                   />
                 </div>
 
@@ -583,7 +580,7 @@ export default function ProfilePage() {
                   onClick={handleChangeEmail}
                   disabled={emailSaving || !newEmail}
                   className="px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40"
-                  style={{ background: "rgba(212,160,78,0.15)", color: "#d4a04e" }}
+                  style={{ background: "rgba(231,202,121,0.15)", color: "#e7ca79" }}
                 >
                   {emailSaving ? "Saving..." : "Save new email"}
                 </button>
@@ -606,7 +603,7 @@ export default function ProfilePage() {
                     onClick={handleExport}
                     disabled={exporting}
                     className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                    style={{ background: "rgba(212,160,78,0.15)", color: "#d4a04e" }}
+                    style={{ background: "rgba(231,202,121,0.15)", color: "#e7ca79" }}
                   >
                     {exporting ? "Exporting..." : "Export"}
                   </button>
@@ -668,7 +665,7 @@ export default function ProfilePage() {
                   <select
                     value={timezone}
                     onChange={(e) => setTimezone(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#d4a04e]/50 transition-colors appearance-none cursor-pointer"
+                    className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#e7ca79]/50 transition-colors appearance-none cursor-pointer"
                   >
                     {TIMEZONES.map((tz) => (
                       <option key={tz} value={tz}>
@@ -696,7 +693,7 @@ export default function ProfilePage() {
                         onClick={() => setTimeFormat(opt.value)}
                         className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-medium border transition-all ${
                           timeFormat === opt.value
-                            ? "border-[#d4a04e]/50 bg-[#d4a04e]/10 text-[#d4a04e]"
+                            ? "border-[#e7ca79]/50 bg-[#e7ca79]/10 text-[#e7ca79]"
                             : "border-border bg-bg-primary text-text-muted hover:text-text-secondary"
                         }`}
                       >
@@ -717,7 +714,7 @@ export default function ProfilePage() {
                   <select
                     value={startOfWeek}
                     onChange={(e) => setStartOfWeek(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#d4a04e]/50 transition-colors appearance-none cursor-pointer"
+                    className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#e7ca79]/50 transition-colors appearance-none cursor-pointer"
                   >
                     <option value="monday">Monday</option>
                     <option value="sunday">Sunday</option>
@@ -735,7 +732,7 @@ export default function ProfilePage() {
                   <select
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#d4a04e]/50 transition-colors appearance-none cursor-pointer"
+                    className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#e7ca79]/50 transition-colors appearance-none cursor-pointer"
                   >
                     <option value="es">Spanish</option>
                     <option value="en">English</option>
@@ -757,7 +754,7 @@ export default function ProfilePage() {
                   <button
                     onClick={() => setCountPlannedAsActual(!countPlannedAsActual)}
                     className={`relative w-11 h-6 rounded-full transition-colors ${
-                      countPlannedAsActual ? "bg-[#d4a04e]" : "bg-bg-tertiary border border-border"
+                      countPlannedAsActual ? "bg-[#e7ca79]" : "bg-bg-tertiary border border-border"
                     }`}
                   >
                     <span
@@ -775,7 +772,7 @@ export default function ProfilePage() {
                 disabled={generalSaving}
                 className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all text-white"
                 style={{
-                  background: generalSaved ? "#10B981" : "linear-gradient(135deg, #d4a04e, #b8860b)",
+                  background: generalSaved ? "#4a9e7e" : "linear-gradient(135deg, #e7ca79, #c4a94f)",
                 }}
               >
                 {generalSaved ? (

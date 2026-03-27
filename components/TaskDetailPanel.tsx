@@ -12,7 +12,7 @@ import SubcategoryPicker from "./SubcategoryPicker";
 import { useTimerStore } from "@/lib/timerStore";
 
 const CAT_COLORS: Record<string, string> = {
-  trabajo: "#d4a04e",
+  trabajo: "#e7ca79",
   aprendizaje: "#8b7ec8",
   lifestyle: "#4a9e7e",
   proyectos: "#6b8aaf",
@@ -364,7 +364,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
                 <span>Planned</span>
               </div>
               <div className="flex items-center gap-4 font-mono text-sm font-semibold">
-                <span style={{ color: (timerRunning || timerStore.isRunning) ? "#22c55e" : undefined }} className={(timerRunning || timerStore.isRunning) ? "" : "text-text-primary"}>
+                <span style={{ color: (timerRunning || timerStore.isRunning) ? "#e7ca79" : undefined }} className={(timerRunning || timerStore.isRunning) ? "" : "text-text-primary"}>
                   {timerRunning ? formatTimerDisplay(timerSeconds) : timerSeconds > 0 ? formatTimerDisplay(timerSeconds) : "--:--"}
                 </span>
                 <div className="relative">

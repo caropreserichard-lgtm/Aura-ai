@@ -20,7 +20,7 @@ import { Task, CATEGORIES, Category } from "@/lib/types";
 import { useTimerStore } from "@/lib/timerStore";
 
 const CAT_COLORS: Record<string, string> = {
-  trabajo: "#d4a04e",
+  trabajo: "#e7ca79",
   aprendizaje: "#8b7ec8",
   lifestyle: "#4a9e7e",
   proyectos: "#6b8aaf",
@@ -325,7 +325,7 @@ function DayColumn({ id, isHighlighted, children }: { id: string; isHighlighted:
       ref={setNodeRef}
       className={`rounded-xl p-2 min-h-[280px] transition-all duration-200 ease-in-out ${
         isHighlighted
-          ? "bg-emerald-500/10 ring-2 ring-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+          ? "bg-[#19395c]/10 ring-2 ring-[#19395c]/40 shadow-[0_0_15px_rgba(25,57,92,0.15)]"
           : "bg-transparent"
       }`}
     >
@@ -742,7 +742,7 @@ export default function HomePage() {
                         </p>
                         <div className="mt-2 h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
                           <div className="h-full rounded-full transition-all duration-700 ease-out"
-                            style={{ width: `${progress}%`, backgroundColor: progress === 100 ? "#10B981" : "#22C55E" }} />
+                            style={{ width: `${progress}%`, backgroundColor: "#e7ca79" }} />
                         </div>
                       </div>
 

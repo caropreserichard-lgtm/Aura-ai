@@ -94,8 +94,8 @@ export default function LoginPage() {
           <button type="submit" disabled={loading}
             className="w-full py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
             style={{
-              background: "linear-gradient(135deg, #d4a04e 0%, #b8860b 100%)",
-              boxShadow: "0 4px 20px rgba(212,160,78,0.3)",
+              background: "linear-gradient(135deg, #e7ca79 0%, #c4a94f 100%)",
+              boxShadow: "0 4px 20px rgba(231,202,121,0.3)",
             }}>
             {loading ? <Loader2 size={16} className="animate-spin" /> : <><span>Entrar a tu Imperio</span><ArrowRight size={16} /></>}
           </button>
@@ -105,7 +105,7 @@ export default function LoginPage() {
       {/* Register link */}
       <p className="mt-6 text-sm" style={{ color: "#8ba4c4" }}>
         ¿No tienes cuenta?{" "}
-        <Link href="/register" className="font-medium hover:underline" style={{ color: "#d4a04e" }}>
+        <Link href="/register" className="font-medium hover:underline" style={{ color: "#e7ca79" }}>
           Construye tu Imperio
         </Link>
       </p>

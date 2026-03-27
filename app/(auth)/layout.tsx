@@ -8,7 +8,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       }}>
       {/* Ambient glow effects */}
       <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full opacity-20"
-        style={{ background: "radial-gradient(circle, #d4a04e 0%, transparent 70%)" }} />
+        style={{ background: "radial-gradient(circle, #e7ca79 0%, transparent 70%)" }} />
       <div className="absolute bottom-[-15%] right-[-5%] w-[400px] h-[400px] rounded-full opacity-15"
         style={{ background: "radial-gradient(circle, #4A90D9 0%, transparent 70%)" }} />
 

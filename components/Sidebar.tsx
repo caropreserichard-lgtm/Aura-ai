@@ -50,11 +50,12 @@ export default function Sidebar() {
         }
       `}</style>
       <aside className="hidden md:flex flex-col w-60 bg-bg-sidebar border-r border-border min-h-screen fixed left-0 top-0 z-40">
-        <div className="px-5 py-5">
-          <h1 className="font-heading font-bold text-base tracking-tight text-text-primary flex items-center gap-2">
-            <TayronaLogo size={28} />
-            Tayrona AI
-          </h1>
+        <div className="px-5 py-4">
+          <Link href="/home" className="flex items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/tayrona-icon.png" alt="Tayrona" width={32} height={32} style={{ objectFit: "contain" }} />
+            <span className="font-heading font-bold text-base tracking-tight text-text-primary">Tayrona AI</span>
+          </Link>
         </div>
         <nav className="flex-1 px-3 space-y-0.5">
           {MAIN_NAV.map((item) => {
@@ -114,7 +115,7 @@ export default function Sidebar() {
               <button onClick={() => setProfileOpen((v) => !v)}
                 className="flex items-center gap-2.5 px-3 py-2 mt-1 w-full rounded-lg hover:bg-bg-hover transition-colors cursor-pointer">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
-                  style={{ background: "linear-gradient(135deg, #d4a04e, #b8860b)" }}>
+                  style={{ background: "linear-gradient(135deg, #e7ca79, #c4a94f)" }}>
                   {session.user.name?.[0]?.toUpperCase() || <User size={12} />}
                 </div>
                 <div className="flex-1 min-w-0 text-left">

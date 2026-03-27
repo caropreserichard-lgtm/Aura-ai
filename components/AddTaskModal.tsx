@@ -7,7 +7,7 @@ import { calculateFlowScore, calculateXP } from "@/lib/scoring";
 import { useSubcategories } from "@/lib/hooks/useSubcategories";
 
 const CAT_COLORS: Record<string, string> = {
-  trabajo: "#d4a04e",
+  trabajo: "#e7ca79",
   aprendizaje: "#8b7ec8",
   lifestyle: "#4a9e7e",
   proyectos: "#6b8aaf",

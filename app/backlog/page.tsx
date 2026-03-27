@@ -9,7 +9,7 @@ import TaskDetailPanel from "@/components/TaskDetailPanel";
 import { Task, CATEGORIES, Category } from "@/lib/types";
 
 const CAT_COLORS: Record<string, string> = {
-  trabajo: "#d4a04e",
+  trabajo: "#e7ca79",
   aprendizaje: "#8b7ec8",
   lifestyle: "#4a9e7e",
   proyectos: "#6b8aaf",
