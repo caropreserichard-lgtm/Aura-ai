@@ -12,7 +12,13 @@ import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import { Project, ProjectTask } from "@/lib/types";
 
-const PROJECT_COLORS = ["#3B82F6", "#8B5CF6", "#F59E0B", "#10B981", "#EF4444", "#EC4899", "#6366F1", "#14B8A6"];
+const PROJECT_COLORS = [
+  "#E8729A", "#E0548E", "#C589D9", "#9B7EC8", "#8B6CC1", "#A07BE5",
+  "#7C9AE6", "#8CB4E8", "#6DB0D4", "#96B5B0", "#7CC4BC", "#8CCFAC",
+  "#B5CC6A", "#C4D47A",
+  "#6B9E5D", "#96B86B", "#E8E066", "#EDCA73", "#F0B86D", "#E8A064",
+  "#E88B78", "#D97070", "#D49090", "#A08080",
+];
 const LABEL_COLORS = [
   { name: "Red", color: "#EF4444" }, { name: "Orange", color: "#F97316" },
   { name: "Yellow", color: "#EAB308" }, { name: "Green", color: "#22C55E" },
@@ -748,22 +754,11 @@ export default function ProjectsPage() {
                 className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-border text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent text-sm" />
               <div>
                 <span className="text-[11px] text-text-muted mb-1 block">Color:</span>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap gap-2 max-w-[320px]">
                   {PROJECT_COLORS.map((c) => (
                     <button key={c} onClick={() => setNewColor(c)}
-                      className={`w-6 h-6 rounded-full transition-all ${newColor === c ? "ring-2 ring-offset-2 ring-offset-bg-secondary" : "hover:scale-110"}`}
+                      className={`w-6 h-6 rounded-full transition-all ${newColor === c ? "ring-2 ring-offset-2 ring-offset-bg-secondary scale-110" : "hover:scale-110"}`}
                       style={{ backgroundColor: c, ["--tw-ring-color" as string]: c }} />
-                  ))}
-                </div>
-              </div>
-              <div>
-                <span className="text-[11px] text-text-muted mb-1 block">Labels (multi-select):</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {LABEL_COLORS.map((l) => (
-                    <button key={l.color}
-                      onClick={() => setNewLabels((prev) => prev.includes(l.color) ? prev.filter((c) => c !== l.color) : [...prev, l.color])}
-                      className={`w-8 h-5 rounded transition-all ${newLabels.includes(l.color) ? "ring-2 ring-offset-1 ring-offset-bg-secondary" : "opacity-50 hover:opacity-80"}`}
-                      style={{ backgroundColor: l.color, ["--tw-ring-color" as string]: l.color }} />
                   ))}
                 </div>
               </div>

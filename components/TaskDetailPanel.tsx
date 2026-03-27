@@ -130,7 +130,9 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
   };
 
   const toggleSubtask = (index: number) => {
-    const updated = subtasks.map((s, i) => i === index ? { ...s, done: !s.done } : s);
+    const toggled = subtasks.map((s, i) => i === index ? { ...s, done: !s.done } : s);
+    // Auto-sort: incomplete first, completed at bottom
+    const updated = [...toggled.filter(s => !s.done), ...toggled.filter(s => s.done)];
     setSubtasks(updated);
     onUpdate({ subtasks: updated });
   };

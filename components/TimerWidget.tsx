@@ -64,23 +64,26 @@ export default function TimerWidget() {
   } = useTimerStore();
 
   const tickRef = useRef<NodeJS.Timeout | null>(null);
+  const tickFnRef = useRef(tick);
+  tickFnRef.current = tick;
   const dragControls = useDragControls();
   const hasPlayedAlarm = useRef(false);
   const constraintsRef = useRef<HTMLDivElement>(null);
   const [blinkOn, setBlinkOn] = useState(true);
 
-  // Tick interval
+  // Tick interval — use ref to avoid dependency on tick changing
   useEffect(() => {
     if (isRunning) {
-      tickRef.current = setInterval(() => tick(), 1000);
+      if (tickRef.current) clearInterval(tickRef.current);
+      tickRef.current = setInterval(() => tickFnRef.current(), 1000);
     } else if (tickRef.current) {
       clearInterval(tickRef.current);
       tickRef.current = null;
     }
     return () => {
-      if (tickRef.current) clearInterval(tickRef.current);
+      if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
     };
-  }, [isRunning, tick]);
+  }, [isRunning]);
 
   // Play alarm when finished
   useEffect(() => {
