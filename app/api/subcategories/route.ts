@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSubcategories, updateSubcategories } from "@/lib/subcategories";
+import { requireUserId } from "@/lib/auth-helpers";
 import { Category } from "@/lib/types";
 
 export async function GET() {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+
   try {
-    const subcategories = await getSubcategories();
+    const subcategories = await getSubcategories(userId);
     return NextResponse.json({ subcategories });
   } catch (error) {
     console.error("GET /api/subcategories error:", error);
@@ -16,6 +20,9 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+
   try {
     const { category, subcategories } = await req.json();
 
@@ -26,7 +33,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    await updateSubcategories(category as Category, subcategories);
+    await updateSubcategories(category as Category, subcategories, userId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
+import { requireUserId } from "@/lib/auth-helpers";
 
 function getWeekStart(date: Date): string {
   const d = new Date(date);
@@ -10,6 +11,9 @@ function getWeekStart(date: Date): string {
 }
 
 export async function GET(req: NextRequest) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+
   try {
     const db = await getDb();
     const { searchParams } = new URL(req.url);
@@ -17,7 +21,7 @@ export async function GET(req: NextRequest) {
 
     const objectives = await db
       .collection("objectives")
-      .find({ weekStart })
+      .find({ weekStart, userId })
       .sort({ createdAt: 1 })
       .toArray();
 
@@ -29,15 +33,18 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+
   try {
     const db = await getDb();
     const body = await req.json();
 
     if (body.action === "toggle" && body.id) {
-      const obj = await db.collection("objectives").findOne({ _id: new ObjectId(body.id) });
+      const obj = await db.collection("objectives").findOne({ _id: new ObjectId(body.id), userId });
       if (obj) {
         await db.collection("objectives").updateOne(
-          { _id: new ObjectId(body.id) },
+          { _id: new ObjectId(body.id), userId },
           { $set: { done: !obj.done } }
         );
       }
@@ -45,7 +52,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "delete" && body.id) {
-      await db.collection("objectives").deleteOne({ _id: new ObjectId(body.id) });
+      await db.collection("objectives").deleteOne({ _id: new ObjectId(body.id), userId });
       return NextResponse.json({ success: true });
     }
 
@@ -56,6 +63,7 @@ export async function POST(req: NextRequest) {
 
     const weekStart = body.weekStart || getWeekStart(new Date());
     const objective = {
+      userId,
       text: text.trim(),
       done: false,
       weekStart,

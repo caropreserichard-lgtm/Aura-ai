@@ -2,7 +2,6 @@ import { getDb } from "./mongodb";
 import type { CalendarToken, Task } from "./types";
 
 const SCOPES = ["https://www.googleapis.com/auth/calendar.events"];
-const USER_ID = "default"; // Single-user MVP
 
 async function getGoogle() {
   const { google } = await import("googleapis");
@@ -37,14 +36,15 @@ export async function saveTokens(
   accessToken: string,
   refreshToken: string,
   expiryDate: number,
-  email: string
+  email: string,
+  userId: string
 ) {
   const db = await getDb();
   await db.collection("calendar_tokens").updateOne(
-    { userId: USER_ID },
+    { userId },
     {
       $set: {
-        userId: USER_ID,
+        userId,
         accessToken,
         refreshToken,
         expiryDate,
@@ -56,21 +56,21 @@ export async function saveTokens(
   );
 }
 
-export async function getStoredTokens(): Promise<CalendarToken | null> {
+export async function getStoredTokens(userId: string): Promise<CalendarToken | null> {
   const db = await getDb();
   const token = await db
     .collection<CalendarToken>("calendar_tokens")
-    .findOne({ userId: USER_ID });
+    .findOne({ userId });
   return token;
 }
 
-export async function deleteTokens() {
+export async function deleteTokens(userId: string) {
   const db = await getDb();
-  await db.collection("calendar_tokens").deleteOne({ userId: USER_ID });
+  await db.collection("calendar_tokens").deleteOne({ userId });
 }
 
-export async function getAuthenticatedClient() {
-  const tokens = await getStoredTokens();
+export async function getAuthenticatedClient(userId: string) {
+  const tokens = await getStoredTokens(userId);
   if (!tokens) return null;
 
   const oauth2Client = await getOAuth2Client();
@@ -87,7 +87,8 @@ export async function getAuthenticatedClient() {
         newTokens.access_token,
         tokens.refreshToken,
         newTokens.expiry_date || tokens.expiryDate,
-        tokens.email
+        tokens.email,
+        userId
       );
     }
   });
@@ -95,8 +96,8 @@ export async function getAuthenticatedClient() {
   return oauth2Client;
 }
 
-export async function listUpcomingEvents(maxResults = 10) {
-  const auth = await getAuthenticatedClient();
+export async function listUpcomingEvents(userId: string, maxResults = 10) {
+  const auth = await getAuthenticatedClient(userId);
   if (!auth) return [];
 
   const google = await getGoogle();
@@ -116,8 +117,8 @@ export async function listUpcomingEvents(maxResults = 10) {
   return res.data.items || [];
 }
 
-export async function createCalendarEvent(task: Task) {
-  const auth = await getAuthenticatedClient();
+export async function createCalendarEvent(task: Task, userId: string) {
+  const auth = await getAuthenticatedClient(userId);
   if (!auth || !task.dueDate) return null;
 
   const google = await getGoogle();
@@ -145,8 +146,8 @@ export async function createCalendarEvent(task: Task) {
   return event.data.id;
 }
 
-export async function deleteCalendarEvent(eventId: string) {
-  const auth = await getAuthenticatedClient();
+export async function deleteCalendarEvent(eventId: string, userId: string) {
+  const auth = await getAuthenticatedClient(userId);
   if (!auth) return;
 
   const google = await getGoogle();
@@ -161,8 +162,8 @@ export async function deleteCalendarEvent(eventId: string) {
   }
 }
 
-export async function getUserEmail() {
-  const auth = await getAuthenticatedClient();
+export async function getUserEmail(userId: string) {
+  const auth = await getAuthenticatedClient(userId);
   if (!auth) return null;
 
   const google = await getGoogle();

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTokensFromCode, saveTokens } from "@/lib/google-calendar";
+import { requireUserId } from "@/lib/auth-helpers";
 import { google } from "googleapis";
 
 export async function GET(request: NextRequest) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.redirect(new URL("/login", request.url)); }
+
   try {
     const code = request.nextUrl.searchParams.get("code");
 
@@ -29,7 +33,8 @@ export async function GET(request: NextRequest) {
       tokens.access_token,
       tokens.refresh_token,
       tokens.expiry_date || Date.now() + 3600 * 1000,
-      email
+      email,
+      userId
     );
 
     return NextResponse.redirect(

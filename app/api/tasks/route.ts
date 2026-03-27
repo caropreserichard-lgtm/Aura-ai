@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
+import { requireUserId } from "@/lib/auth-helpers";
 import { calculateFlowScore, calculateXP } from "@/lib/scoring";
 import { Category, Priority } from "@/lib/types";
 
 export async function GET(req: NextRequest) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+
   try {
     const db = await getDb();
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const category = searchParams.get("category");
 
-    const filter: Record<string, string> = {};
+    const filter: Record<string, string> = { userId };
     if (status) filter.status = status;
     if (category) filter.category = category;
 
@@ -31,6 +35,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+
   try {
     const db = await getDb();
     const body = await req.json();
@@ -61,6 +68,7 @@ export async function POST(req: NextRequest) {
     const xp = calculateXP(flowScore, category as Category);
 
     const task = {
+      userId,
       title,
       description: description || "",
       category: category as Category,

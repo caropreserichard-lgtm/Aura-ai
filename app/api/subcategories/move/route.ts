@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
+import { requireUserId } from "@/lib/auth-helpers";
 import { getSubcategories, updateSubcategories } from "@/lib/subcategories";
 import { Category } from "@/lib/types";
 
 const VALID_CATEGORIES: Category[] = ["trabajo", "aprendizaje", "lifestyle", "proyectos"];
 
 export async function POST(req: NextRequest) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+
   try {
     const { subcategory, fromCategory, toCategory } = await req.json();
 
@@ -31,7 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Update subcategory lists
-    const allSubs = await getSubcategories();
+    const allSubs = await getSubcategories(userId);
 
     const fromSubs = allSubs[fromCategory as Category].filter(
       (s: string) => s !== subcategory
@@ -46,13 +50,13 @@ export async function POST(req: NextRequest) {
       fromSubs.push("General");
     }
 
-    await updateSubcategories(fromCategory as Category, fromSubs);
-    await updateSubcategories(toCategory as Category, toSubs);
+    await updateSubcategories(fromCategory as Category, fromSubs, userId);
+    await updateSubcategories(toCategory as Category, toSubs, userId);
 
     // 2. Move all tasks with this subcategory from old to new category
     const db = await getDb();
     const result = await db.collection("tasks").updateMany(
-      { category: fromCategory, subcategory: subcategory },
+      { category: fromCategory, subcategory: subcategory, userId },
       { $set: { category: toCategory } }
     );
 

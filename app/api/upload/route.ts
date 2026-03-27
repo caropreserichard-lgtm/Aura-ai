@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
+import { requireUserId } from "@/lib/auth-helpers";
 
 export async function POST(req: NextRequest) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -37,6 +41,7 @@ export async function POST(req: NextRequest) {
     const url = `/uploads/${uniqueName}`;
 
     return NextResponse.json({
+      userId,
       name: file.name,
       url,
       size: file.size,

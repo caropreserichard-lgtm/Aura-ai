@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
+import { requireUserId } from "@/lib/auth-helpers";
 import { calculateFlowScore, calculateXP } from "@/lib/scoring";
 import { Category, Priority } from "@/lib/types";
 
@@ -71,11 +72,14 @@ const SEED_TASKS = [
 ];
 
 export async function POST() {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+
   try {
     const db = await getDb();
 
-    // Only seed if DB is empty
-    const count = await db.collection("tasks").countDocuments();
+    // Only seed if DB is empty for this user
+    const count = await db.collection("tasks").countDocuments({ userId });
     if (count > 0) {
       return NextResponse.json({
         message: "La base de datos ya tiene tareas",
@@ -89,6 +93,7 @@ export async function POST() {
 
       return {
         ...seed,
+        userId,
         description: "",
         flowScore,
         xp,

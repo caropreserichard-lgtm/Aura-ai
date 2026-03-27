@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
+import { requireUserId } from "@/lib/auth-helpers";
 import {
   getStoredTokens,
   createCalendarEvent,
@@ -8,8 +9,11 @@ import {
 import type { Task } from "@/lib/types";
 
 export async function POST() {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+
   try {
-    const tokens = await getStoredTokens();
+    const tokens = await getStoredTokens(userId);
     if (!tokens) {
       return NextResponse.json(
         { error: "Google Calendar no est\u00E1 conectado" },
@@ -21,6 +25,7 @@ export async function POST() {
     const tasks = await db
       .collection("tasks")
       .find({
+        userId,
         dueDate: { $exists: true, $ne: "" },
         calendarEventId: { $exists: false },
         status: { $ne: "done" },
@@ -32,12 +37,12 @@ export async function POST() {
 
     for (const task of tasks) {
       try {
-        const eventId = await createCalendarEvent(task as unknown as Task);
+        const eventId = await createCalendarEvent(task as unknown as Task, userId);
         if (eventId) {
           await db
             .collection("tasks")
             .updateOne(
-              { _id: new ObjectId(task._id) },
+              { _id: new ObjectId(task._id), userId },
               { $set: { calendarEventId: eventId } }
             );
           synced++;

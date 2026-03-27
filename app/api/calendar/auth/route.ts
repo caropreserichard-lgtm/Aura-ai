@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { getAuthUrl } from "@/lib/google-calendar";
+import { requireUserId } from "@/lib/auth-helpers";
 
 export async function GET() {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+  // userId verified - user is authenticated
+  void userId;
+
   try {
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
       return NextResponse.json(

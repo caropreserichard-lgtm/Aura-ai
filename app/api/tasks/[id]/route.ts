@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
+import { requireUserId } from "@/lib/auth-helpers";
 import { calculateFlowScore, calculateXP } from "@/lib/scoring";
 import { Category } from "@/lib/types";
 
@@ -8,6 +9,9 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+
   try {
     const db = await getDb();
     const { id } = await params;
@@ -50,7 +54,7 @@ export async function PATCH(
     if (body.roi !== undefined || body.joy !== undefined) {
       const existing = await db
         .collection("tasks")
-        .findOne({ _id: new ObjectId(id) });
+        .findOne({ _id: new ObjectId(id), userId });
       if (existing) {
         const roi = body.roi ?? existing.roi;
         const joy = body.joy ?? existing.joy;
@@ -64,7 +68,7 @@ export async function PATCH(
     if (body.addTime) {
       const existing = await db
         .collection("tasks")
-        .findOne({ _id: new ObjectId(id) });
+        .findOne({ _id: new ObjectId(id), userId });
       updates.timeSpent = (existing?.timeSpent || 0) + body.addTime;
     }
 
@@ -75,20 +79,20 @@ export async function PATCH(
       // Update daily stats
       const task = await db
         .collection("tasks")
-        .findOne({ _id: new ObjectId(id) });
+        .findOne({ _id: new ObjectId(id), userId });
       if (task) {
         const today = new Date().toISOString().split("T")[0];
         const xpToAdd = task.xp;
 
         await db.collection("stats").updateOne(
-          { date: today },
+          { date: today, userId },
           {
             $inc: {
               totalXP: xpToAdd,
               tasksCompleted: 1,
               [`tasksByCategory.${task.category}`]: 1,
             },
-            $setOnInsert: { date: today },
+            $setOnInsert: { date: today, userId },
           },
           { upsert: true }
         );
@@ -111,7 +115,7 @@ export async function PATCH(
 
     const result = await db
       .collection("tasks")
-      .updateOne({ _id: new ObjectId(id) }, { $set: updates });
+      .updateOne({ _id: new ObjectId(id), userId }, { $set: updates });
 
     if (result.matchedCount === 0) {
       return NextResponse.json(
@@ -122,7 +126,7 @@ export async function PATCH(
 
     const updated = await db
       .collection("tasks")
-      .findOne({ _id: new ObjectId(id) });
+      .findOne({ _id: new ObjectId(id), userId });
     return NextResponse.json(updated);
   } catch (error) {
     console.error("PATCH /api/tasks/[id] error:", error);
@@ -137,6 +141,9 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+
   try {
     const db = await getDb();
     const { id } = await params;
@@ -147,7 +154,7 @@ export async function DELETE(
 
     const result = await db
       .collection("tasks")
-      .deleteOne({ _id: new ObjectId(id) });
+      .deleteOne({ _id: new ObjectId(id), userId });
 
     if (result.deletedCount === 0) {
       return NextResponse.json(

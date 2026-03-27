@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
+import { requireUserId } from "@/lib/auth-helpers";
 import { getLevel } from "@/lib/scoring";
 
 export async function GET() {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+
   try {
     const db = await getDb();
 
     // Get all stats to calculate total XP
-    const allStats = await db.collection("stats").find().toArray();
+    const allStats = await db.collection("stats").find({ userId }).toArray();
 
     const totalXP = allStats.reduce((sum, s) => sum + (s.totalXP || 0), 0);
     const totalTasksCompleted = allStats.reduce(
@@ -50,6 +54,7 @@ export async function GET() {
     const todayTasks = await db
       .collection("tasks")
       .find({
+        userId,
         $or: [
           { status: { $in: ["pending", "in_progress"] } },
           { completedAt: { $regex: `^${today}` } },

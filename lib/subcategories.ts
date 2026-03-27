@@ -11,12 +11,13 @@ export function getDefaultSubcategories(): Record<Category, string[]> {
   return defaults as Record<Category, string[]>;
 }
 
-export async function getSubcategories(): Promise<Record<Category, string[]>> {
+export async function getSubcategories(userId?: string): Promise<Record<Category, string[]>> {
   const defaults = getDefaultSubcategories();
 
   try {
     const db = await getDb();
-    const docs = await db.collection("subcategories").find({}).toArray();
+    const filter = userId ? { userId } : {};
+    const docs = await db.collection("subcategories").find(filter).toArray();
 
     for (const doc of docs) {
       const cat = doc.category as Category;
@@ -33,7 +34,8 @@ export async function getSubcategories(): Promise<Record<Category, string[]>> {
 
 export async function updateSubcategories(
   category: Category,
-  subcategories: string[]
+  subcategories: string[],
+  userId?: string
 ): Promise<void> {
   if (!VALID_CATEGORIES.includes(category)) {
     throw new Error(`Categoría inválida: ${category}`);
@@ -47,9 +49,12 @@ export async function updateSubcategories(
   const cleaned = [...new Set(subcategories.map((s) => s.trim()).filter(Boolean))];
 
   const db = await getDb();
+  const filter = userId ? { category, userId } : { category };
+  const setFields: Record<string, unknown> = { category, subcategories: cleaned, updatedAt: new Date() };
+  if (userId) setFields.userId = userId;
   await db.collection("subcategories").updateOne(
-    { category },
-    { $set: { category, subcategories: cleaned, updatedAt: new Date() } },
+    filter,
+    { $set: setFields },
     { upsert: true }
   );
 }

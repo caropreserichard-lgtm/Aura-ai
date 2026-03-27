@@ -2,7 +2,8 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Home, CalendarDays, Inbox, ListTodo, BarChart3, Timer, Focus, Settings, ClipboardCheck, FolderKanban, Wrench, Archive } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
+import { Home, CalendarDays, Inbox, ListTodo, BarChart3, Timer, Focus, Settings, ClipboardCheck, FolderKanban, Wrench, Archive, LogOut, User } from "lucide-react";
 
 const MAIN_NAV = [
   { href: "/home", label: "Home", icon: Home },
@@ -20,13 +21,14 @@ const MAIN_NAV = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
 
   return (
     <>
       <aside className="hidden md:flex flex-col w-60 bg-bg-sidebar border-r border-border min-h-screen fixed left-0 top-0 z-40">
         <div className="px-5 py-5">
           <h1 className="font-heading font-bold text-base tracking-tight text-text-primary">
-            Ricky Flow
+            Tayrona AI
           </h1>
         </div>
         <nav className="flex-1 px-3 space-y-0.5">
@@ -44,7 +46,7 @@ export default function Sidebar() {
             );
           })}
         </nav>
-        <div className="px-3 pb-4 border-t border-border pt-3 mt-2">
+        <div className="px-3 pb-4 border-t border-border pt-3 mt-2 space-y-1">
           <Link href="/settings"
             className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-[13px] font-medium ${
               pathname === "/settings" ? "bg-accent-subtle text-accent-text" : "text-text-muted hover:bg-bg-hover hover:text-text-secondary"
@@ -52,6 +54,22 @@ export default function Sidebar() {
             <Settings size={18} strokeWidth={1.5} />
             <span>Settings</span>
           </Link>
+          {session?.user && (
+            <div className="flex items-center gap-2.5 px-3 py-2 mt-1">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
+                style={{ background: "linear-gradient(135deg, #d4a04e, #b8860b)" }}>
+                {session.user.name?.[0]?.toUpperCase() || <User size={12} />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-medium text-text-primary truncate">{session.user.name}</p>
+                <p className="text-[9px] text-text-muted truncate">{session.user.email}</p>
+              </div>
+              <button onClick={() => signOut({ callbackUrl: "/login" })}
+                className="p-1 rounded hover:bg-bg-hover text-text-muted hover:text-red-400 transition-colors" title="Cerrar sesión">
+                <LogOut size={14} />
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 

@@ -3,6 +3,7 @@ import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import ThemeProvider from "@/components/ThemeProvider";
 import PWARegister from "@/components/PWARegister";
 import GlobalTimerProvider from "@/components/GlobalTimerProvider";
+import AuthProvider from "@/components/AuthProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -30,13 +31,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "RICKY FLOW",
-  description: "Tu Sistema Operativo Personal de Productividad",
+  title: "Tayrona AI",
+  description: "Tu Ciudad Perdida de la Productividad",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "RICKY FLOW",
+    title: "Tayrona AI",
   },
   icons: {
     icon: "/icons/icon-192.png",
@@ -56,12 +57,14 @@ export default function RootLayout({
       className={`${inter.variable} ${jakarta.variable} ${jetbrains.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-bg-primary text-text-primary font-sans">
-        <ThemeProvider>
-          <PWARegister />
-          <GlobalTimerProvider>
-            {children}
-          </GlobalTimerProvider>
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <PWARegister />
+            <GlobalTimerProvider>
+              {children}
+            </GlobalTimerProvider>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );
