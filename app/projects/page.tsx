@@ -29,7 +29,7 @@ const LABEL_COLORS = [
 // ─── Task Detail Modal ─────────────────────────────────────────
 function TaskDetailModal({
   task, project, projects, onClose, onUpdate, onDelete, onToggle,
-  onAddComment, onAddLink, onRemoveLink, onAddChecklist, onToggleChecklist, onDeleteChecklist, onMoveTask,
+  onAddComment, onAddLink, onRemoveLink, onAddChecklist, onToggleChecklist, onDeleteChecklist, onEditChecklist, onMoveTask,
 }: {
   task: ProjectTask; project: Project; projects: Project[];
   onClose: () => void;
@@ -41,6 +41,7 @@ function TaskDetailModal({
   onAddChecklist: (text: string) => void;
   onToggleChecklist: (itemId: string) => void;
   onDeleteChecklist: (itemId: string) => void;
+  onEditChecklist: (itemId: string, text: string) => void;
   onMoveTask: (toProjectId: string, position: number) => void;
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
@@ -50,6 +51,8 @@ function TaskDetailModal({
   const [comment, setComment] = useState("");
   const [link, setLink] = useState("");
   const [checkText, setCheckText] = useState("");
+  const [editingCheckId, setEditingCheckId] = useState<string | null>(null);
+  const [editingCheckText, setEditingCheckText] = useState("");
   const [showLabels, setShowLabels] = useState(false);
   const [showDates, setShowDates] = useState(false);
   const [showMove, setShowMove] = useState(false);
@@ -214,7 +217,15 @@ function TaskDetailModal({
                       }`}>
                       {item.done && <Check size={8} className="text-text-inverse" />}
                     </button>
-                    <span className={`flex-1 text-xs ${item.done ? "line-through text-text-muted" : "text-text-primary"}`}>{item.text}</span>
+                    {editingCheckId === item.id ? (
+                      <input type="text" value={editingCheckText} onChange={(e) => setEditingCheckText(e.target.value)}
+                        onBlur={() => { if (editingCheckText.trim()) { onEditChecklist(item.id, editingCheckText.trim()); } setEditingCheckId(null); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { if (editingCheckText.trim()) { onEditChecklist(item.id, editingCheckText.trim()); } setEditingCheckId(null); } if (e.key === "Escape") setEditingCheckId(null); }}
+                        autoFocus className="flex-1 px-1 py-0.5 rounded bg-bg-tertiary border border-accent text-xs text-text-primary focus:outline-none" />
+                    ) : (
+                      <span onClick={() => { setEditingCheckId(item.id); setEditingCheckText(item.text); }}
+                        className={`flex-1 text-xs cursor-pointer ${item.done ? "line-through text-text-muted" : "text-text-primary hover:text-accent"}`}>{item.text}</span>
+                    )}
                     <button onClick={() => onDeleteChecklist(item.id)}
                       className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger transition-all"><X size={12} /></button>
                   </div>
@@ -601,6 +612,10 @@ export default function ProjectsPage() {
     await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete_checklist_item", taskId, itemId }) });
     fetchProjects();
   };
+  const editChecklist = async (projectId: string, taskId: string, itemId: string, text: string) => {
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "edit_checklist_item", taskId, itemId, text }) });
+    fetchProjects();
+  };
   const moveTask = async (fromProjectId: string, taskId: string, toProjectId: string, position: number) => {
     await fetch(`/api/projects/${fromProjectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "move_task", taskId, toProjectId, position }) });
     setSelectedTask(null); fetchProjects();
@@ -972,6 +987,7 @@ export default function ProjectsPage() {
             onAddChecklist={(text) => addChecklist(freshProject._id!, freshTask.id, text)}
             onToggleChecklist={(itemId) => toggleChecklist(freshProject._id!, freshTask.id, itemId)}
             onDeleteChecklist={(itemId) => deleteChecklist(freshProject._id!, freshTask.id, itemId)}
+            onEditChecklist={(itemId, text) => editChecklist(freshProject._id!, freshTask.id, itemId, text)}
             onMoveTask={(toId, pos) => moveTask(freshProject._id!, freshTask.id, toId, pos)}
           />
         );

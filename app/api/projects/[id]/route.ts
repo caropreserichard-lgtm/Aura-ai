@@ -99,7 +99,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
       const tasks = (project.tasks || []).map((t: { id: string; checklist?: { id: string; done: boolean }[] }) => {
         if (t.id === body.taskId) {
-          return { ...t, checklist: (t.checklist || []).map((c) => c.id === body.itemId ? { ...c, done: !c.done } : c) };
+          const toggled = (t.checklist || []).map((c: { id: string; done: boolean }) => c.id === body.itemId ? { ...c, done: !c.done } : c);
+          // Auto-sort: incomplete first, completed at bottom
+          return { ...t, checklist: [...toggled.filter((c: { done: boolean }) => !c.done), ...toggled.filter((c: { done: boolean }) => c.done)] };
+        }
+        return t;
+      });
+      await db.collection("projects").updateOne({ _id: new ObjectId(id), userId }, { $set: { tasks, updatedAt: now } });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "edit_checklist_item") {
+      const project = await db.collection("projects").findOne({ _id: new ObjectId(id), userId });
+      if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const tasks = (project.tasks || []).map((t: { id: string; checklist?: { id: string; text: string }[] }) => {
+        if (t.id === body.taskId) {
+          return { ...t, checklist: (t.checklist || []).map((c) => c.id === body.itemId ? { ...c, text: body.text } : c) };
         }
         return t;
       });
@@ -128,13 +143,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (action === "toggle_task") {
       const project = await db.collection("projects").findOne({ _id: new ObjectId(id), userId });
       if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
-      const tasks = (project.tasks || []).map((t: { id: string; done: boolean; completedAt?: string }) => {
+      const toggled = (project.tasks || []).map((t: { id: string; done: boolean; completedAt?: string }) => {
         if (t.id === body.taskId) {
           const newDone = !t.done;
           return { ...t, done: newDone, completedAt: newDone ? now : undefined };
         }
         return t;
       });
+      // Auto-sort: incomplete first, completed at bottom
+      const tasks = [...toggled.filter((t: { done: boolean }) => !t.done), ...toggled.filter((t: { done: boolean }) => t.done)];
       await db.collection("projects").updateOne({ _id: new ObjectId(id), userId }, { $set: { tasks, updatedAt: now } });
       return NextResponse.json({ ok: true });
     }
