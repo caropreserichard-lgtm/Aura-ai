@@ -209,50 +209,39 @@ function TaskDetailModal({
                     style={{ width: `${(checkDone / checklist.length) * 100}%` }} />
                 </div>
               )}
-              <DragDropContext onDragEnd={(result: DropResult) => {
-                if (!result.destination || result.source.index === result.destination.index) return;
-                const reordered = [...checklist];
-                const [moved] = reordered.splice(result.source.index, 1);
-                reordered.splice(result.destination.index, 0, moved);
-                onReorderChecklist(reordered);
-              }}>
-                <Droppable droppableId="checklist-items">
-                  {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-1 mb-2">
-                      {checklist.map((item, idx) => (
-                        <Draggable key={item.id} draggableId={`check-${item.id}`} index={idx}>
-                          {(dragProv, snapshot) => (
-                            <div ref={dragProv.innerRef} {...dragProv.draggableProps}
-                              className={`flex items-center gap-2 group px-1 py-0.5 rounded hover:bg-bg-hover ${snapshot.isDragging ? "bg-bg-hover shadow-md" : ""}`}>
-                              <span {...dragProv.dragHandleProps} className="text-text-muted/30 hover:text-text-muted cursor-grab active:cursor-grabbing flex-shrink-0">
-                                <GripVertical size={12} />
-                              </span>
-                              <button onClick={() => onToggleChecklist(item.id)}
-                                className={`w-4 h-4 rounded border-[1.5px] flex-shrink-0 flex items-center justify-center transition-colors ${
-                                  item.done ? "bg-accent border-accent" : "border-text-muted hover:border-accent"
-                                }`}>
-                                {item.done && <Check size={8} className="text-text-inverse" />}
-                              </button>
-                              {editingCheckId === item.id ? (
-                                <input type="text" value={editingCheckText} onChange={(e) => setEditingCheckText(e.target.value)}
-                                  onBlur={() => { if (editingCheckText.trim()) { onEditChecklist(item.id, editingCheckText.trim()); } setEditingCheckId(null); }}
-                                  onKeyDown={(e) => { if (e.key === "Enter") { if (editingCheckText.trim()) { onEditChecklist(item.id, editingCheckText.trim()); } setEditingCheckId(null); } if (e.key === "Escape") setEditingCheckId(null); }}
-                                  autoFocus className="flex-1 px-1 py-0.5 rounded bg-bg-tertiary border border-accent text-xs text-text-primary focus:outline-none" />
-                              ) : (
-                                <span onClick={() => { setEditingCheckId(item.id); setEditingCheckText(item.text); }}
-                                  className={`flex-1 text-xs cursor-pointer ${item.done ? "line-through text-text-muted" : "text-text-primary hover:text-accent"}`}>{item.text}</span>
-                              )}
-                              <button onClick={() => onDeleteChecklist(item.id)}
-                                className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger transition-all"><X size={12} /></button>
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </DragDropContext>
+              <div className="space-y-1 mb-2">
+                {checklist.map((item, idx) => (
+                  <div key={item.id} className="flex items-center gap-2 group px-1 py-0.5 rounded hover:bg-bg-hover">
+                    <span className="text-text-muted/30 hover:text-text-muted flex-shrink-0 flex gap-0.5">
+                      <button onClick={() => { if (idx === 0) return; const r = [...checklist]; [r[idx-1], r[idx]] = [r[idx], r[idx-1]]; onReorderChecklist(r); }}
+                        className="hover:text-text-primary disabled:opacity-20 transition-colors p-0.5" disabled={idx === 0}>
+                        <ChevronUp size={10} />
+                      </button>
+                      <button onClick={() => { if (idx === checklist.length - 1) return; const r = [...checklist]; [r[idx], r[idx+1]] = [r[idx+1], r[idx]]; onReorderChecklist(r); }}
+                        className="hover:text-text-primary disabled:opacity-20 transition-colors p-0.5" disabled={idx === checklist.length - 1}>
+                        <ChevronDown size={10} />
+                      </button>
+                    </span>
+                    <button onClick={() => onToggleChecklist(item.id)}
+                      className={`w-4 h-4 rounded border-[1.5px] flex-shrink-0 flex items-center justify-center transition-colors ${
+                        item.done ? "bg-accent border-accent" : "border-text-muted hover:border-accent"
+                      }`}>
+                      {item.done && <Check size={8} className="text-text-inverse" />}
+                    </button>
+                    {editingCheckId === item.id ? (
+                      <input type="text" value={editingCheckText} onChange={(e) => setEditingCheckText(e.target.value)}
+                        onBlur={() => { if (editingCheckText.trim()) { onEditChecklist(item.id, editingCheckText.trim()); } setEditingCheckId(null); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { if (editingCheckText.trim()) { onEditChecklist(item.id, editingCheckText.trim()); } setEditingCheckId(null); } if (e.key === "Escape") setEditingCheckId(null); }}
+                        autoFocus className="flex-1 px-1 py-0.5 rounded bg-bg-tertiary border border-accent text-xs text-text-primary focus:outline-none" />
+                    ) : (
+                      <span onClick={() => { setEditingCheckId(item.id); setEditingCheckText(item.text); }}
+                        className={`flex-1 text-xs cursor-pointer ${item.done ? "line-through text-text-muted" : "text-text-primary hover:text-accent"}`}>{item.text}</span>
+                    )}
+                    <button onClick={() => onDeleteChecklist(item.id)}
+                      className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger transition-all"><X size={12} /></button>
+                  </div>
+                ))}
+              </div>
               <div className="flex items-center gap-2">
                 <input id="checklist-input" type="text" value={checkText} onChange={(e) => setCheckText(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && checkText.trim()) { onAddChecklist(checkText.trim()); setCheckText(""); } }}

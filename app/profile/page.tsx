@@ -706,29 +706,6 @@ export default function ProfilePage() {
                 {/* Divider */}
                 <div className="border-t border-border" />
 
-                {/* Start of week */}
-                <div>
-                  <label className="text-xs text-text-muted uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-                    <Calendar size={12} /> Start of week
-                  </label>
-                  <select
-                    value={startOfWeek}
-                    onChange={(e) => setStartOfWeek(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#e7ca79]/50 transition-colors appearance-none cursor-pointer"
-                  >
-                    <option value="monday">Monday</option>
-                    <option value="tuesday">Tuesday</option>
-                    <option value="wednesday">Wednesday</option>
-                    <option value="thursday">Thursday</option>
-                    <option value="friday">Friday</option>
-                    <option value="saturday">Saturday</option>
-                    <option value="sunday">Sunday</option>
-                  </select>
-                </div>
-
-                {/* Divider */}
-                <div className="border-t border-border" />
-
                 {/* Language */}
                 <div>
                   <label className="text-xs text-text-muted uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
