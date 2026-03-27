@@ -5,6 +5,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
+import Image from "next/image";
 import {
   User,
   Mail,
@@ -28,6 +29,7 @@ import {
   EyeOff,
   Shield,
 } from "lucide-react";
+import { useLanguage } from "@/lib/LanguageContext";
 
 type TabKey = "profile" | "account" | "general";
 
@@ -282,6 +284,7 @@ export default function ProfilePage() {
           preferences: { timezone, timeFormat, startOfWeek, language, countPlannedAsActual },
         }),
       });
+      setLang(language as "es" | "en");
       setGeneralSaved(true);
       setTimeout(() => setGeneralSaved(false), 2500);
     } catch {
@@ -290,6 +293,8 @@ export default function ProfilePage() {
       setGeneralSaving(false);
     }
   };
+
+  const { setLang } = useLanguage();
 
   const displayName = [firstName, lastName].filter(Boolean).join(" ") || session?.user?.name || "User";
   const initial = firstName?.[0]?.toUpperCase() || session?.user?.name?.[0]?.toUpperCase() || "T";
@@ -355,11 +360,14 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-5">
                   <div className="relative group">
                     {avatarUrl ? (
-                      <img
+                      <Image
                         src={avatarUrl}
                         alt="Avatar"
+                        width={80}
+                        height={80}
                         className="w-20 h-20 rounded-full object-cover border-2"
                         style={{ borderColor: "#d4a04e" }}
+                        unoptimized
                       />
                     ) : (
                       <div

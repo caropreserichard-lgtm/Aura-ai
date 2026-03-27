@@ -27,7 +27,12 @@ export default withAuth(
           pathname.startsWith("/icons") ||
           pathname.startsWith("/uploads") ||
           pathname === "/favicon.ico" ||
-          pathname === "/manifest.json"
+          pathname === "/manifest.json" ||
+          pathname === "/tayrona-logo.png" ||
+          pathname.endsWith(".png") ||
+          pathname.endsWith(".svg") ||
+          pathname.endsWith(".jpg") ||
+          pathname.endsWith(".webp")
         ) {
           return true;
         }
@@ -43,5 +48,5 @@ export default withAuth(
 );
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icons|manifest.json).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|tayrona-logo\\.png|.*\\.png$|.*\\.svg$|.*\\.jpg$).*)"],
 };

@@ -4,6 +4,7 @@ import ThemeProvider from "@/components/ThemeProvider";
 import PWARegister from "@/components/PWARegister";
 import GlobalTimerProvider from "@/components/GlobalTimerProvider";
 import AuthProvider from "@/components/AuthProvider";
+import { LanguageProvider } from "@/lib/LanguageContext";
 import "./globals.css";
 
 const inter = Inter({
@@ -58,12 +59,14 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-bg-primary text-text-primary font-sans">
         <AuthProvider>
-          <ThemeProvider>
-            <PWARegister />
-            <GlobalTimerProvider>
-              {children}
-            </GlobalTimerProvider>
-          </ThemeProvider>
+          <LanguageProvider>
+            <ThemeProvider>
+              <PWARegister />
+              <GlobalTimerProvider>
+                {children}
+              </GlobalTimerProvider>
+            </ThemeProvider>
+          </LanguageProvider>
         </AuthProvider>
       </body>
     </html>

@@ -80,10 +80,9 @@ export default function RegisterPage() {
     <div className="text-center">
       {/* Logo & Title */}
       <div className="mb-8">
-        <div className="mx-auto mb-4 flex items-center justify-center" style={{ filter: "drop-shadow(0 0 20px rgba(212,160,78,0.4))" }}>
-          <TayronaLogo size={80} />
+        <div className="mx-auto mb-2 flex items-center justify-center rounded-2xl overflow-hidden" style={{ width: 160, height: 160 }}>
+          <TayronaLogo size={160} />
         </div>
-        <h1 className="text-3xl font-bold text-white mb-1">Tayrona AI</h1>
         <p className="text-sm" style={{ color: "#8ba4c4" }}>Construye tu Ciudad Perdida</p>
       </div>
 

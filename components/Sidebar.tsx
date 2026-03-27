@@ -5,24 +5,27 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { Home, CalendarDays, Inbox, ListTodo, BarChart3, Timer, Focus, Settings, Settings2, ClipboardCheck, FolderKanban, Wrench, Archive, LogOut, User, Shield } from "lucide-react";
+import TayronaLogo from "@/components/TayronaLogo";
+import { useLanguage } from "@/lib/LanguageContext";
 
 const MAIN_NAV = [
-  { href: "/home", label: "Home", icon: Home },
-  { href: "/", label: "Today", icon: CalendarDays },
-  { href: "/inbox", label: "Inbox", icon: Inbox },
-  { href: "/tasks", label: "Tasks", icon: ListTodo },
-  { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/tools", label: "Tools", icon: Wrench },
-  { href: "/deepwork", label: "Focus", icon: Focus },
-  { href: "/stats", label: "Stats", icon: BarChart3 },
-  { href: "/weekly-review", label: "Weekly Review", icon: ClipboardCheck },
-  { href: "/timer", label: "Timer", icon: Timer },
-  { href: "/backlog", label: "Backlog", icon: Archive },
+  { href: "/home", labelKey: "nav.home", icon: Home },
+  { href: "/", labelKey: "nav.today", icon: CalendarDays },
+  { href: "/inbox", labelKey: "nav.inbox", icon: Inbox },
+  { href: "/tasks", labelKey: "nav.tasks", icon: ListTodo },
+  { href: "/projects", labelKey: "nav.projects", icon: FolderKanban },
+  { href: "/tools", labelKey: "nav.tools", icon: Wrench },
+  { href: "/deepwork", labelKey: "nav.focus", icon: Focus },
+  { href: "/stats", labelKey: "nav.stats", icon: BarChart3 },
+  { href: "/weekly-review", labelKey: "nav.weekly_review", icon: ClipboardCheck },
+  { href: "/timer", labelKey: "nav.timer", icon: Timer },
+  { href: "/backlog", labelKey: "nav.backlog", icon: Archive },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { t } = useLanguage();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -49,10 +52,7 @@ export default function Sidebar() {
       <aside className="hidden md:flex flex-col w-60 bg-bg-sidebar border-r border-border min-h-screen fixed left-0 top-0 z-40">
         <div className="px-5 py-5">
           <h1 className="font-heading font-bold text-base tracking-tight text-text-primary flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black text-white flex-shrink-0"
-              style={{ background: "linear-gradient(135deg, #f5c842, #d4a04e, #b8860b)" }}>
-              T
-            </span>
+            <TayronaLogo size={28} />
             Tayrona AI
           </h1>
         </div>
@@ -66,7 +66,7 @@ export default function Sidebar() {
                   isActive ? "bg-accent-subtle text-accent-text" : "text-text-secondary hover:bg-bg-hover hover:text-text-primary"
                 }`}>
                 <Icon size={18} strokeWidth={isActive ? 2 : 1.5} />
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </Link>
             );
           })}
@@ -77,7 +77,7 @@ export default function Sidebar() {
               pathname === "/settings" ? "bg-accent-subtle text-accent-text" : "text-text-muted hover:bg-bg-hover hover:text-text-secondary"
             }`}>
             <Settings size={18} strokeWidth={1.5} />
-            <span>Settings</span>
+            <span>{t("nav.settings")}</span>
           </Link>
           {session?.user && (
             <div className="relative" ref={profileRef}>
@@ -129,7 +129,7 @@ export default function Sidebar() {
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-bg-sidebar border-t border-border z-50">
         <div className="flex justify-around items-center py-1.5 px-1">
-          {[...MAIN_NAV.slice(0, 5), { href: "/settings", label: "Settings", icon: Settings }].map((item) => {
+          {[...MAIN_NAV.slice(0, 5), { href: "/settings", labelKey: "nav.settings", icon: Settings }].map((item) => {
             const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
             const Icon = item.icon;
             return (
@@ -138,7 +138,7 @@ export default function Sidebar() {
                   isActive ? "text-accent-text" : "text-text-muted"
                 }`}>
                 <Icon size={20} strokeWidth={isActive ? 2 : 1.5} />
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </Link>
             );
           })}

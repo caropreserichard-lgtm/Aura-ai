@@ -6,8 +6,9 @@ import {
   ArrowUpDown, Hash, Clock, Target, ArrowUp, Link2, X, Search, Undo2,
 } from "lucide-react";
 import {
-  DndContext, closestCenter, DragEndEvent, DragStartEvent, DragOverlay,
-  PointerSensor, useSensor, useSensors, useDroppable,
+  DndContext, rectIntersection, DragEndEvent, DragStartEvent, DragOverEvent, DragOverlay,
+  PointerSensor, TouchSensor, useSensor, useSensors, useDroppable,
+  CollisionDetection,
 } from "@dnd-kit/core";
 import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -317,13 +318,13 @@ function SortMenu({ onSort, onClose }: { onSort: (by: string) => void; onClose: 
 }
 
 // ─── Droppable Day Column ─────────────────────────────────────
-function DayColumn({ id, children }: { id: string; children: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
+function DayColumn({ id, isHighlighted, children }: { id: string; isHighlighted: boolean; children: React.ReactNode }) {
+  const { setNodeRef } = useDroppable({ id });
   return (
     <div
       ref={setNodeRef}
       className={`rounded-xl p-2 min-h-[280px] transition-all duration-200 ease-in-out ${
-        isOver
+        isHighlighted
           ? "bg-emerald-500/10 ring-2 ring-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
           : "bg-transparent"
       }`}
@@ -480,16 +481,62 @@ export default function HomePage() {
   };
 
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [overColumnId, setOverColumnId] = useState<string | null>(null);
+
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   );
+
+  // Custom collision detection: prioritize droppable day columns over sortable items
+  const customCollisionDetection: CollisionDetection = useCallback((args) => {
+    // First check for collisions with droppable containers (day columns)
+    const rectCollisions = rectIntersection(args);
+
+    // Find collisions that are date-key droppable containers
+    const containerCollisions = rectCollisions.filter(
+      (collision) => /^\d{4}-\d{2}-\d{2}$/.test(collision.id as string)
+    );
+
+    // If we have sortable item collisions, prefer those for within-column reordering
+    const itemCollisions = rectCollisions.filter(
+      (collision) => !/^\d{4}-\d{2}-\d{2}$/.test(collision.id as string)
+    );
+
+    // If there are item collisions, return them (enables reorder within column)
+    if (itemCollisions.length > 0) {
+      return itemCollisions;
+    }
+
+    // Otherwise return container collisions (enables dropping on empty columns)
+    if (containerCollisions.length > 0) {
+      return containerCollisions;
+    }
+
+    return rectCollisions;
+  }, []);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragId(event.active.id as string);
   };
 
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    if (!over) { setOverColumnId(null); return; }
+    const overId = over.id as string;
+    // If over a date key directly (droppable container)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(overId)) {
+      setOverColumnId(overId);
+    } else {
+      // Over a task — find which column it belongs to
+      const task = tasks.find(t => t._id === overId);
+      if (task?.dueDate) setOverColumnId(task.dueDate.split("T")[0]);
+    }
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveDragId(null);
+    setOverColumnId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -672,7 +719,7 @@ export default function HomePage() {
           </div>
 
           {/* ── Weekly Columns ─────────────────────────── */}
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
             <div className="relative">
               <div className="grid grid-cols-7 gap-4 mb-8">
                 {weekDates.map((date) => {
@@ -684,7 +731,7 @@ export default function HomePage() {
                   const progress = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
 
                   return (
-                    <DayColumn key={key} id={key}>
+                    <DayColumn key={key} id={key} isHighlighted={overColumnId === key}>
                       {/* Day Header */}
                       <div className="mb-3">
                         <h3 className={`text-base font-bold ${today ? "text-accent" : "text-text-primary"}`}>
