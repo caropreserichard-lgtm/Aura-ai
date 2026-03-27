@@ -72,9 +72,9 @@ function TaskDetailModal({
   };
 
   return (
-    <div ref={overlayRef} className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center pt-12 overflow-y-auto pb-12"
+    <div ref={overlayRef} className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}>
-      <div className="w-full max-w-[768px] bg-bg-secondary rounded-xl border border-border shadow-2xl animate-slide-in-right mx-4">
+      <div className="w-full max-w-[768px] max-h-[85vh] overflow-y-auto bg-bg-secondary rounded-xl border border-border shadow-2xl animate-slide-in-right mx-4">
         <div className="px-5 pt-4 pb-3 flex items-start gap-3">
           <div className="flex-1 min-w-0">
             <div className="relative mb-2">
@@ -586,6 +586,12 @@ export default function ProjectsPage() {
   };
 
   const toggleTask = async (projectId: string, taskId: string) => {
+    // Optimistic: toggle + sort (completed to bottom)
+    setProjects(prev => prev.map(p => {
+      if (p._id !== projectId) return p;
+      const toggled = p.tasks.map(t => t.id === taskId ? { ...t, done: !t.done, completedAt: !t.done ? new Date().toISOString() : undefined } : t);
+      return { ...p, tasks: [...toggled.filter(t => !t.done), ...toggled.filter(t => t.done)] };
+    }));
     await fetch(`/api/projects/${projectId}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "toggle_task", taskId }),

@@ -717,6 +717,11 @@ export default function ProfilePage() {
                     className="w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-border text-sm text-text-primary focus:outline-none focus:border-[#e7ca79]/50 transition-colors appearance-none cursor-pointer"
                   >
                     <option value="monday">Monday</option>
+                    <option value="tuesday">Tuesday</option>
+                    <option value="wednesday">Wednesday</option>
+                    <option value="thursday">Thursday</option>
+                    <option value="friday">Friday</option>
+                    <option value="saturday">Saturday</option>
                     <option value="sunday">Sunday</option>
                   </select>
                 </div>

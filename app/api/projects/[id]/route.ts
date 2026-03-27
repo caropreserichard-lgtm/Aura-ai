@@ -86,7 +86,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const itemId = new ObjectId().toString();
       const tasks = (project.tasks || []).map((t: { id: string; checklist?: unknown[] }) => {
         if (t.id === body.taskId) {
-          return { ...t, checklist: [...(t.checklist || []), { id: itemId, text: body.text, done: false }] };
+          const existing = (t.checklist || []) as { id: string; text: string; done: boolean }[];
+          const incomplete = existing.filter((c) => !c.done);
+          const completed = existing.filter((c) => c.done);
+          return { ...t, checklist: [...incomplete, { id: itemId, text: body.text, done: false }, ...completed] };
         }
         return t;
       });

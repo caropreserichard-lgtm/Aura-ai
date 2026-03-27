@@ -596,7 +596,7 @@ export default function HomePage() {
     if (currentDate !== targetDateKey) {
       if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
       setUndoAction({ taskId, prevDueDate: currentDate || "", label: currentTask.title });
-      undoTimerRef.current = setTimeout(() => setUndoAction(null), 8000);
+      undoTimerRef.current = setTimeout(() => setUndoAction(null), 30000);
 
       setTasks((prev) => prev.map((t) => t._id === taskId ? { ...t, dueDate: targetDateKey } : t));
 
