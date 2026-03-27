@@ -317,11 +317,17 @@ function SortMenu({ onSort, onClose }: { onSort: (by: string) => void; onClose: 
 }
 
 // ─── Droppable Day Column ─────────────────────────────────────
-function DayColumn({ id, children }: { id: string; isOver: boolean; children: React.ReactNode }) {
+function DayColumn({ id, children }: { id: string; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    <div ref={setNodeRef}
-      className={`transition-colors rounded-lg ${isOver ? "bg-accent-subtle/20 ring-1 ring-accent/20" : ""}`}>
+    <div
+      ref={setNodeRef}
+      className={`rounded-xl p-2 min-h-[280px] transition-all duration-200 ease-in-out ${
+        isOver
+          ? "bg-emerald-500/10 ring-2 ring-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+          : "bg-transparent"
+      }`}
+    >
       {children}
     </div>
   );
@@ -678,7 +684,7 @@ export default function HomePage() {
                   const progress = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
 
                   return (
-                    <DayColumn key={key} id={key} isOver={false}>
+                    <DayColumn key={key} id={key}>
                       {/* Day Header */}
                       <div className="mb-3">
                         <h3 className={`text-base font-bold ${today ? "text-accent" : "text-text-primary"}`}>
@@ -735,17 +741,23 @@ export default function HomePage() {
                 />
               )}
             </div>
-            <DragOverlay>
+            <DragOverlay dropAnimation={{
+              duration: 200,
+              easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
+            }}>
               {activeDragId ? (() => {
                 const task = tasks.find((t) => t._id === activeDragId);
                 if (!task) return null;
+                const color = CAT_COLORS[task.category] || "#666";
                 return (
-                  <div className="rounded-xl border bg-bg-elevated border-accent/40 shadow-xl scale-[1.02] overflow-hidden opacity-90 w-[160px]">
+                  <div className="rounded-xl border bg-bg-secondary border-border shadow-2xl overflow-hidden w-[160px] rotate-[2deg]"
+                    style={{ borderLeftColor: color, borderLeftWidth: 3 }}>
                     <div className="px-2.5 pt-2 pb-1.5">
                       <p className="text-[11px] font-semibold leading-snug text-text-primary"
                         style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                         {task.title}
                       </p>
+                      <span className="text-[8px] text-text-muted capitalize">{task.category}</span>
                     </div>
                   </div>
                 );

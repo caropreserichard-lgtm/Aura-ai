@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import TayronaLogo from "@/components/TayronaLogo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -43,9 +44,8 @@ export default function LoginPage() {
     <div className="text-center">
       {/* Logo & Title */}
       <div className="mb-8">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
-          style={{ background: "linear-gradient(135deg, #d4a04e 0%, #b8860b 100%)", boxShadow: "0 0 30px rgba(212,160,78,0.3)" }}>
-          <span className="text-2xl font-bold text-white">T</span>
+        <div className="mx-auto mb-4 flex items-center justify-center" style={{ filter: "drop-shadow(0 0 20px rgba(212,160,78,0.4))" }}>
+          <TayronaLogo size={80} />
         </div>
         <h1 className="text-3xl font-bold text-white mb-1">Tayrona AI</h1>
         <p className="text-sm" style={{ color: "#8ba4c4" }}>Tu Ciudad Perdida de la Productividad</p>
