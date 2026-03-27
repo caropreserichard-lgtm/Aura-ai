@@ -27,7 +27,10 @@ if (process.env.NODE_ENV === "development") {
 
 export async function getDb(): Promise<Db> {
   const client = await clientPromise;
-  return client.db("ricky-flow");
+  const db = client.db("ricky-flow");
+  // Ensure unique email index (idempotent)
+  db.collection("users").createIndex({ email: 1 }, { unique: true }).catch(() => {});
+  return db;
 }
 
 export default clientPromise;

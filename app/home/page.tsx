@@ -323,7 +323,7 @@ function DayColumn({ id, isHighlighted, children }: { id: string; isHighlighted:
   return (
     <div
       ref={setNodeRef}
-      className={`rounded-xl p-2 min-h-[280px] transition-all duration-200 ease-in-out ${
+      className={`rounded-xl p-2 min-h-[280px] min-w-[160px] md:min-w-0 flex-shrink-0 md:flex-shrink snap-center transition-all duration-200 ease-in-out ${
         isHighlighted
           ? "bg-[#e7ca79]/10 ring-2 ring-[#e7ca79]/30 shadow-[0_0_15px_rgba(231,202,121,0.15)]"
           : "bg-transparent"
@@ -675,7 +675,7 @@ export default function HomePage() {
 
         <div className="p-4 md:p-6 pb-24 md:pb-6">
           {/* ── Global Header: Today + Filter + Nav ─────── */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
             <div className="flex items-center gap-2">
               <div className="relative">
                 <button onClick={() => { setShowCalendar(!showCalendar); setShowFilter(false); }}
@@ -721,7 +721,7 @@ export default function HomePage() {
           {/* ── Weekly Columns ─────────────────────────── */}
           <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
             <div className="relative">
-              <div className="grid grid-cols-7 gap-4 mb-8">
+              <div className="flex md:grid md:grid-cols-7 gap-4 mb-8 overflow-x-auto pb-4 md:pb-0 snap-x snap-mandatory md:snap-none -mx-4 px-4 md:mx-0 md:px-0">
                 {weekDates.map((date) => {
                   const key = toDateKey(date);
                   const dayTasks = tasksByDay[key] || [];
