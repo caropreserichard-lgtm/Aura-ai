@@ -1,22 +1,22 @@
 {
   "name": "Tayrona AI",
   "short_name": "Tayrona",
-  "description": "Tu Ciudad Perdida de la Productividad",
+  "description": "Organiza tu Día, Diseña tu Imperio",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0F0F1A",
-  "theme_color": "#0F0F1A",
+  "background_color": "#1a1a1a",
+  "theme_color": "#1a1a1a",
   "orientation": "portrait-primary",
   "categories": ["productivity", "utilities"],
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "/tayrona-icon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/tayrona-logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

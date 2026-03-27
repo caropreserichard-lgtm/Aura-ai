@@ -33,7 +33,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "Tayrona AI",
-  description: "Tu Ciudad Perdida de la Productividad",
+  description: "Organiza tu Día, Diseña tu Imperio",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -41,8 +41,8 @@ export const metadata: Metadata = {
     title: "Tayrona AI",
   },
   icons: {
-    icon: "/icons/icon-192.png",
-    apple: "/icons/apple-touch-icon.png",
+    icon: "/tayrona-icon.png",
+    apple: "/tayrona-icon.png",
   },
 };
 

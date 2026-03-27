@@ -83,7 +83,7 @@ export default function RegisterPage() {
         <div className="mx-auto mb-2 flex items-center justify-center rounded-2xl overflow-hidden" style={{ width: 160, height: 160 }}>
           <TayronaLogo size={160} />
         </div>
-        <p className="text-sm" style={{ color: "#a0a0a0" }}>Construye tu Ciudad Perdida</p>
+        <p className="text-sm" style={{ color: "#a0a0a0" }}>Organiza tu Día, Diseña tu Imperio</p>
       </div>
 
       {/* Form Card */}

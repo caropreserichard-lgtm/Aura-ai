@@ -47,7 +47,7 @@ export default function LoginPage() {
         <div className="mx-auto mb-2 flex items-center justify-center rounded-2xl overflow-hidden" style={{ width: 160, height: 160 }}>
           <TayronaLogo size={160} />
         </div>
-        <p className="text-sm" style={{ color: "#a0a0a0" }}>Tu Ciudad Perdida de la Productividad</p>
+        <p className="text-sm" style={{ color: "#a0a0a0" }}>Organiza tu Día, Diseña tu Imperio</p>
       </div>
 
       {/* Form Card */}
