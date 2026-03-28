@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
-import { Home, CalendarDays, Inbox, ListTodo, BarChart3, Timer, Focus, Settings, Settings2, ClipboardCheck, FolderKanban, Wrench, Archive, LogOut, User, Shield } from "lucide-react";
+import { Home, CalendarDays, Inbox, ListTodo, BarChart3, Timer, Focus, Settings, Settings2, FolderKanban, Wrench, Archive, LogOut, User, Shield } from "lucide-react";
 import TayronaLogo from "@/components/TayronaLogo";
 import { useLanguage } from "@/lib/LanguageContext";
 
@@ -17,7 +17,6 @@ const MAIN_NAV = [
   { href: "/tools", labelKey: "nav.tools", icon: Wrench },
   { href: "/deepwork", labelKey: "nav.focus", icon: Focus },
   { href: "/stats", labelKey: "nav.stats", icon: BarChart3 },
-  { href: "/weekly-review", labelKey: "nav.weekly_review", icon: ClipboardCheck },
   { href: "/timer", labelKey: "nav.timer", icon: Timer },
   { href: "/backlog", labelKey: "nav.backlog", icon: Archive },
 ];
