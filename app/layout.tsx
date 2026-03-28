@@ -3,6 +3,7 @@ import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import ThemeProvider from "@/components/ThemeProvider";
 import PWARegister from "@/components/PWARegister";
 import GlobalTimerProvider from "@/components/GlobalTimerProvider";
+import PulseProvider from "@/components/PulseProvider";
 import AuthProvider from "@/components/AuthProvider";
 import { LanguageProvider } from "@/lib/LanguageContext";
 import "./globals.css";
@@ -63,7 +64,9 @@ export default function RootLayout({
             <ThemeProvider>
               <PWARegister />
               <GlobalTimerProvider>
-                {children}
+                <PulseProvider>
+                  {children}
+                </PulseProvider>
               </GlobalTimerProvider>
             </ThemeProvider>
           </LanguageProvider>

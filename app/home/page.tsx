@@ -453,6 +453,10 @@ export default function HomePage() {
     const task = tasks.find((t) => t._id === id);
     const newStatus = task?.status === "done" ? "pending" : "done";
     setTasks((prev) => prev.map((t) => t._id === id ? { ...t, status: newStatus, completedAt: newStatus === "done" ? new Date().toISOString() : undefined } : t));
+    // Update pulse when completing a task
+    if (newStatus === "done") {
+      try { const { usePulseStore } = await import("@/lib/pulseStore"); usePulseStore.getState().recordTaskComplete(); } catch { /* ignore */ }
+    }
     try {
       await fetch(`/api/tasks/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: newStatus }) });
       fetchTasks();
