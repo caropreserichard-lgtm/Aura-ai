@@ -11,6 +11,15 @@ export interface PulseState {
   badgeBg: string;
 }
 
+export interface ActivitySignals {
+  minutesActive: number;
+  tasksCompleted: number;
+  timerRunning: boolean;
+  tabVisible: boolean;
+  recentInteractions: number;  // interactions in last 5 min
+  sessionDepthMinutes: number; // how long user has been in continuous session
+}
+
 export function calculatePulse(
   minutesActive: number,
   tasksCompleted: number,
@@ -22,7 +31,48 @@ export function calculatePulse(
     (timerRunning ? 8 : 0);
 
   const percentage = Math.min(Math.round(rawScore), 100);
+  return levelFromPercentage(percentage);
+}
 
+/**
+ * Advanced pulse calculation using all activity signals
+ */
+export function calculatePulseAdvanced(signals: ActivitySignals): PulseState {
+  let score = 0;
+
+  // Base: time in session (diminishing returns after 60min)
+  const timeScore = signals.minutesActive <= 60
+    ? signals.minutesActive * 0.5
+    : 30 + (signals.minutesActive - 60) * 0.2;
+  score += timeScore;
+
+  // Tasks completed: each one is a strong signal
+  score += signals.tasksCompleted * 12;
+
+  // Timer running: strong engagement signal
+  if (signals.timerRunning) score += 10;
+
+  // Tab visible: mild positive signal
+  if (signals.tabVisible) score += 2;
+
+  // Recent interaction density: rewards consistent engagement
+  // 0 interactions = 0, 1-5 = +3, 6-15 = +6, 16+ = +8
+  if (signals.recentInteractions >= 16) score += 8;
+  else if (signals.recentInteractions >= 6) score += 6;
+  else if (signals.recentInteractions >= 1) score += 3;
+
+  // Session depth bonus: rewards long uninterrupted sessions
+  // After 30min continuous, bonus starts; maxes at 90min
+  if (signals.sessionDepthMinutes >= 30) {
+    const depthBonus = Math.min((signals.sessionDepthMinutes - 30) * 0.15, 9);
+    score += depthBonus;
+  }
+
+  const percentage = Math.min(Math.round(score), 100);
+  return levelFromPercentage(percentage);
+}
+
+export function levelFromPercentage(percentage: number): PulseState {
   if (percentage < 20) {
     return {
       level: "warming_up",
@@ -62,9 +112,33 @@ export function calculatePulse(
   }
 }
 
-export function applyDecay(currentPercentage: number, inactiveMinutes: number): number {
+/**
+ * Smarter decay: considers timer state and tab visibility
+ */
+export function applyDecay(
+  currentPercentage: number,
+  inactiveMinutes: number,
+  timerRunning: boolean = false,
+  tabVisible: boolean = true
+): number {
+  // RULE: If timer is running, NO decay — user is working outside the app
+  if (timerRunning) return currentPercentage;
+
+  // If inactive less than 5 min, no decay yet (grace period)
   if (inactiveMinutes < 5) return currentPercentage;
-  const decayRate = inactiveMinutes > 15 ? 4 : 2;
+
+  // Tab hidden + no timer = faster decay (user left)
+  // Tab visible + no interaction = slower decay (maybe reading/thinking)
+  let decayRate: number;
+
+  if (!tabVisible) {
+    // Tab hidden, no timer → user probably left
+    decayRate = inactiveMinutes > 10 ? 5 : 3;
+  } else {
+    // Tab visible but no clicks → maybe reading, thinking
+    decayRate = inactiveMinutes > 15 ? 3 : 1.5;
+  }
+
   const decayed = currentPercentage - ((inactiveMinutes - 5) * decayRate);
   return Math.max(decayed, 5);
 }

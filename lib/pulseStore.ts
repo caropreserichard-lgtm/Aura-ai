@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { calculatePulse, applyDecay, PulseState } from "./pulse";
+import { persist } from "zustand/middleware";
+import { calculatePulseAdvanced, applyDecay, levelFromPercentage, PulseState, ActivitySignals } from "./pulse";
 
 interface PulseStore {
   // Session data
@@ -7,8 +8,13 @@ interface PulseStore {
   minutesActive: number;
   tasksCompletedToday: number;
   totalTasksToday: number;
+  // Activity tracking
   lastActivityTime: number;
   inactiveMinutes: number;
+  tabVisible: boolean;
+  interactionTimestamps: number[];  // timestamps of recent interactions
+  lastBreakTime: number | null;     // when the last break started (inactivity gap)
+  continuousSessionStart: number;   // start of current unbroken session
   // Streak
   streakDays: number;
   // Pulse state
@@ -17,116 +23,194 @@ interface PulseStore {
   // Actions
   startSession: () => void;
   tickSession: () => void;
+  recordActivity: () => void;
   recordTaskComplete: () => void;
+  setTabVisible: (visible: boolean) => void;
   setTodayStats: (completed: number, total: number) => void;
   setStreak: (days: number) => void;
   resetSession: () => void;
 }
 
-const defaultPulse = calculatePulse(0, 0, false);
+const defaultPulse = levelFromPercentage(0);
 
-export const usePulseStore = create<PulseStore>((set, get) => ({
-  sessionStartTime: null,
-  minutesActive: 0,
-  tasksCompletedToday: 0,
-  totalTasksToday: 0,
-  lastActivityTime: Date.now(),
-  inactiveMinutes: 0,
-  streakDays: 0,
-  pulse: defaultPulse,
-  peakPulse: defaultPulse,
-
-  startSession: () => {
-    set({
-      sessionStartTime: Date.now(),
-      minutesActive: 0,
-      lastActivityTime: Date.now(),
-      inactiveMinutes: 0,
-    });
-  },
-
-  tickSession: () => {
-    const state = get();
-    if (!state.sessionStartTime) return;
-
-    const now = Date.now();
-    const totalMins = Math.floor((now - state.sessionStartTime) / 60000);
-    const inactiveMins = Math.floor((now - state.lastActivityTime) / 60000);
-
-    // Calculate base pulse
-    const timerRunning = typeof window !== "undefined" && (() => {
-      try {
-        const stored = localStorage.getItem("tayrona-timer-prefs");
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          return parsed?.state?.isRunning === true;
-        }
-      } catch { /* ignore */ }
-      return false;
-    })();
-
-    let basePulse = calculatePulse(totalMins, state.tasksCompletedToday, timerRunning);
-
-    // Apply decay if inactive
-    if (inactiveMins >= 5) {
-      const decayedPct = applyDecay(basePulse.percentage, inactiveMins);
-      basePulse = calculatePulse(0, 0, false); // recalc from percentage
-      // Override percentage manually
-      basePulse = { ...basePulse, percentage: decayedPct };
-      // Recategorize level based on decayed percentage
-      if (decayedPct < 20) {
-        basePulse = { ...basePulse, level: "warming_up", label: "Warming up...", color: "#85B7EB", barHeight: 6, badgeBg: "rgba(133, 183, 235, 0.10)" };
-      } else if (decayedPct < 45) {
-        basePulse = { ...basePulse, level: "locking_in", label: "Locking in", color: "#5DCAA5", barHeight: 6, badgeBg: "rgba(93, 202, 165, 0.10)" };
-      } else if (decayedPct < 75) {
-        basePulse = { ...basePulse, level: "in_the_zone", label: "In the zone", color: "#EF9F27", barHeight: 7, badgeBg: "rgba(239, 159, 39, 0.10)" };
-      } else {
-        basePulse = { ...basePulse, level: "deep_flow", label: "Deep flow", color: "#D4537E", barHeight: 8, badgeBg: "rgba(212, 83, 126, 0.12)" };
-      }
-    }
-
-    const currentPeak = state.peakPulse;
-    const newPeak = basePulse.percentage > currentPeak.percentage ? basePulse : currentPeak;
-
-    set({
-      minutesActive: totalMins,
-      inactiveMinutes: inactiveMins,
-      pulse: basePulse,
-      peakPulse: newPeak,
-    });
-  },
-
-  recordTaskComplete: () => {
-    const state = get();
-    const newCompleted = state.tasksCompletedToday + 1;
-    set({
-      tasksCompletedToday: newCompleted,
-      lastActivityTime: Date.now(),
-      inactiveMinutes: 0,
-    });
-    // Immediately recalculate pulse
-    get().tickSession();
-  },
-
-  setTodayStats: (completed, total) => {
-    set({
-      tasksCompletedToday: completed,
-      totalTasksToday: total,
-      lastActivityTime: Date.now(),
-    });
-  },
-
-  setStreak: (days) => set({ streakDays: days }),
-
-  resetSession: () => {
-    set({
-      sessionStartTime: Date.now(),
+// Persist session across page refreshes (so it doesn't reset when navigating)
+export const usePulseStore = create<PulseStore>()(
+  persist(
+    (set, get) => ({
+      sessionStartTime: null,
       minutesActive: 0,
       tasksCompletedToday: 0,
+      totalTasksToday: 0,
       lastActivityTime: Date.now(),
       inactiveMinutes: 0,
+      tabVisible: true,
+      interactionTimestamps: [],
+      lastBreakTime: null,
+      continuousSessionStart: Date.now(),
+      streakDays: 0,
       pulse: defaultPulse,
       peakPulse: defaultPulse,
-    });
-  },
-}));
+
+      startSession: () => {
+        const now = Date.now();
+        set({
+          sessionStartTime: now,
+          minutesActive: 0,
+          lastActivityTime: now,
+          inactiveMinutes: 0,
+          interactionTimestamps: [],
+          continuousSessionStart: now,
+          lastBreakTime: null,
+        });
+      },
+
+      tickSession: () => {
+        const state = get();
+        if (!state.sessionStartTime) return;
+
+        const now = Date.now();
+        const totalMins = Math.floor((now - state.sessionStartTime) / 60000);
+        const inactiveMins = Math.floor((now - state.lastActivityTime) / 60000);
+
+        // Check timer state directly from the store (avoid localStorage parse every tick)
+        const timerRunning = (() => {
+          try {
+            const stored = localStorage.getItem("tayrona-timer-prefs");
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              return parsed?.state?.isRunning === true;
+            }
+          } catch { /* ignore */ }
+          return false;
+        })();
+
+        // Count interactions in last 5 minutes
+        const fiveMinAgo = now - 5 * 60 * 1000;
+        const recentInteractions = state.interactionTimestamps.filter(t => t > fiveMinAgo).length;
+
+        // Continuous session depth: time since last break or session start
+        // A "break" = 10+ min of inactivity without timer
+        let continuousStart = state.continuousSessionStart;
+        if (inactiveMins >= 10 && !timerRunning) {
+          // User took a break — reset continuous session when they come back
+          continuousStart = now;
+        }
+        const sessionDepthMinutes = Math.floor((now - continuousStart) / 60000);
+
+        // Build signals
+        const signals: ActivitySignals = {
+          minutesActive: totalMins,
+          tasksCompleted: state.tasksCompletedToday,
+          timerRunning,
+          tabVisible: state.tabVisible,
+          recentInteractions,
+          sessionDepthMinutes,
+        };
+
+        // Calculate base pulse from all signals
+        let basePulse = calculatePulseAdvanced(signals);
+
+        // Apply decay if inactive (but NOT if timer is running)
+        if (inactiveMins >= 5) {
+          const decayedPct = applyDecay(
+            basePulse.percentage,
+            inactiveMins,
+            timerRunning,
+            state.tabVisible
+          );
+          basePulse = levelFromPercentage(decayedPct);
+        }
+
+        // Track peak
+        const newPeak = basePulse.percentage > state.peakPulse.percentage ? basePulse : state.peakPulse;
+
+        // Prune old interaction timestamps (keep only last 10 min)
+        const tenMinAgo = now - 10 * 60 * 1000;
+        const prunedTimestamps = state.interactionTimestamps.filter(t => t > tenMinAgo);
+
+        set({
+          minutesActive: totalMins,
+          inactiveMinutes: inactiveMins,
+          pulse: basePulse,
+          peakPulse: newPeak,
+          interactionTimestamps: prunedTimestamps,
+          continuousSessionStart: continuousStart,
+        });
+      },
+
+      recordActivity: () => {
+        const now = Date.now();
+        const state = get();
+        const wasInactive = state.inactiveMinutes >= 10;
+
+        set({
+          lastActivityTime: now,
+          inactiveMinutes: 0,
+          interactionTimestamps: [...state.interactionTimestamps, now],
+          // If coming back from a break, reset continuous session
+          continuousSessionStart: wasInactive ? now : state.continuousSessionStart,
+        });
+      },
+
+      recordTaskComplete: () => {
+        const state = get();
+        const now = Date.now();
+        const newCompleted = state.tasksCompletedToday + 1;
+        set({
+          tasksCompletedToday: newCompleted,
+          lastActivityTime: now,
+          inactiveMinutes: 0,
+          interactionTimestamps: [...state.interactionTimestamps, now],
+        });
+        // Immediately recalculate pulse
+        get().tickSession();
+      },
+
+      setTabVisible: (visible) => {
+        const now = Date.now();
+        set({
+          tabVisible: visible,
+          // Returning to tab = activity signal
+          ...(visible ? { lastActivityTime: now, inactiveMinutes: 0 } : {}),
+        });
+      },
+
+      setTodayStats: (completed, total) => {
+        set({
+          tasksCompletedToday: completed,
+          totalTasksToday: total,
+        });
+      },
+
+      setStreak: (days) => set({ streakDays: days }),
+
+      resetSession: () => {
+        const now = Date.now();
+        set({
+          sessionStartTime: now,
+          minutesActive: 0,
+          tasksCompletedToday: 0,
+          lastActivityTime: now,
+          inactiveMinutes: 0,
+          interactionTimestamps: [],
+          continuousSessionStart: now,
+          lastBreakTime: null,
+          pulse: defaultPulse,
+          peakPulse: defaultPulse,
+        });
+      },
+    }),
+    {
+      name: "tayrona-pulse-session",
+      partialize: (state) => ({
+        // Persist session across page refreshes/navigation
+        sessionStartTime: state.sessionStartTime,
+        tasksCompletedToday: state.tasksCompletedToday,
+        totalTasksToday: state.totalTasksToday,
+        streakDays: state.streakDays,
+        peakPulse: state.peakPulse,
+        continuousSessionStart: state.continuousSessionStart,
+      }),
+    }
+  )
+);
