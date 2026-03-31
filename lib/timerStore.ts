@@ -3,6 +3,9 @@ import { persist } from "zustand/middleware";
 
 export type WidgetSize = "compact" | "normal" | "large";
 export type WidgetShape = "rounded" | "pill" | "square";
+export type DialStyle = "cenital" | "piedra" | "eclipse";
+export type TimerTheme = "dorado" | "luna" | "amatista";
+export type TimerBackground = "pizarra" | "cielo" | "mural";
 
 export interface TimerState {
   taskId: string | null;
@@ -17,6 +20,9 @@ export interface TimerState {
   widgetSize: WidgetSize;
   widgetShape: WidgetShape;
   widgetOpacity: number;
+  dialStyle: DialStyle;
+  timerTheme: TimerTheme;
+  timerBackground: TimerBackground;
   // Actions
   startTimer: (taskId: string, taskTitle: string, minutes: number) => void;
   pauseTimer: () => void;
@@ -30,6 +36,9 @@ export interface TimerState {
   setWidgetSize: (size: WidgetSize) => void;
   setWidgetShape: (shape: WidgetShape) => void;
   setWidgetOpacity: (opacity: number) => void;
+  setDialStyle: (style: DialStyle) => void;
+  setTimerTheme: (theme: TimerTheme) => void;
+  setTimerBackground: (bg: TimerBackground) => void;
 }
 
 export const useTimerStore = create<TimerState>()(
@@ -46,6 +55,9 @@ export const useTimerStore = create<TimerState>()(
       widgetSize: "normal" as WidgetSize,
       widgetShape: "rounded" as WidgetShape,
       widgetOpacity: 0.75,
+      dialStyle: "cenital" as DialStyle,
+      timerTheme: "dorado" as TimerTheme,
+      timerBackground: "pizarra" as TimerBackground,
 
       startTimer: (taskId, taskTitle, minutes) => {
         const totalSeconds = minutes * 60;
@@ -98,6 +110,9 @@ export const useTimerStore = create<TimerState>()(
       setWidgetSize: (size) => set({ widgetSize: size }),
       setWidgetShape: (shape) => set({ widgetShape: shape }),
       setWidgetOpacity: (opacity) => set({ widgetOpacity: opacity }),
+      setDialStyle: (style) => set({ dialStyle: style }),
+      setTimerTheme: (theme) => set({ timerTheme: theme }),
+      setTimerBackground: (bg) => set({ timerBackground: bg }),
     }),
     {
       name: "tayrona-timer-prefs",
@@ -106,6 +121,9 @@ export const useTimerStore = create<TimerState>()(
         widgetSize: state.widgetSize,
         widgetShape: state.widgetShape,
         widgetOpacity: state.widgetOpacity,
+        dialStyle: state.dialStyle,
+        timerTheme: state.timerTheme,
+        timerBackground: state.timerBackground,
       }),
     }
   )
