@@ -30,7 +30,7 @@ export default function TimerPage() {
   const store = useTimerStore();
   const {
     isRunning, remainingSeconds, totalSeconds, isFinished, taskTitle,
-    startTimer, pauseTimer, resumeTimer, stopTimer, tick,
+    startTimer, pauseTimer, resumeTimer, stopTimer,
     soundId, setSoundId, widgetSize, setWidgetSize, widgetShape, setWidgetShape,
     widgetOpacity, setWidgetOpacity,
   } = store;
@@ -38,22 +38,9 @@ export default function TimerPage() {
   const [selectedMins, setSelectedMins] = useState(25);
   const [showPresets, setShowPresets] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const tickRef = useRef<NodeJS.Timeout | null>(null);
-  const tickFnRef = useRef(tick);
-  tickFnRef.current = tick;
   const presetsRef = useRef<HTMLDivElement>(null);
 
-  // Tick — use ref to avoid stale closure
-  useEffect(() => {
-    if (isRunning) {
-      if (tickRef.current) clearInterval(tickRef.current);
-      tickRef.current = setInterval(() => tickFnRef.current(), 1000);
-    } else if (tickRef.current) {
-      clearInterval(tickRef.current);
-      tickRef.current = null;
-    }
-    return () => { if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; } };
-  }, [isRunning]);
+  // NOTE: tick interval lives ONLY in TimerWidget.tsx to avoid double-speed bug
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
