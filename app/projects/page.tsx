@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Plus, X, Check, Trash2, Link2, ExternalLink, MessageSquare,
   FolderKanban, MoreHorizontal, ChevronDown, ChevronUp, Calendar, Tags,
   CheckSquare, AlignLeft, Clock, GripVertical, Copy, ArrowRightLeft,
-  Eye, Archive, Zap, RotateCcw,
+  Eye, Archive, Zap, RotateCcw, Search, LayoutGrid, List, BarChart3,
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import { Project, ProjectTask } from "@/lib/types";
@@ -25,6 +26,8 @@ const LABEL_COLORS = [
   { name: "Blue", color: "#3B82F6" }, { name: "Purple", color: "#8B5CF6" },
   { name: "Pink", color: "#EC4899" }, { name: "Teal", color: "#14B8A6" },
 ];
+
+type ViewMode = "grid" | "list";
 
 // ─── Task Detail Modal ─────────────────────────────────────────
 function TaskDetailModal({
@@ -358,21 +361,14 @@ function ListActionsMenu({
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
 
-  // Position the menu near the anchor button
   useEffect(() => {
     if (ref.current && anchorRect) {
       const menu = ref.current;
       const menuRect = menu.getBoundingClientRect();
       let top = anchorRect.top;
       let left = anchorRect.left + anchorRect.width + 8;
-      // If overflows right, put it to the left of the anchor
-      if (left + menuRect.width > window.innerWidth - 16) {
-        left = anchorRect.left - menuRect.width - 8;
-      }
-      // If overflows bottom, shift up
-      if (top + menuRect.height > window.innerHeight - 16) {
-        top = window.innerHeight - menuRect.height - 16;
-      }
+      if (left + menuRect.width > window.innerWidth - 16) left = anchorRect.left - menuRect.width - 8;
+      if (top + menuRect.height > window.innerHeight - 16) top = window.innerHeight - menuRect.height - 16;
       if (top < 8) top = 8;
       if (left < 8) left = 8;
       menu.style.top = `${top}px`;
@@ -388,7 +384,6 @@ function ListActionsMenu({
         <h4 className="text-xs font-semibold text-text-primary">List actions</h4>
         <button onClick={onClose} className="text-text-muted hover:text-text-primary"><X size={14} /></button>
       </div>
-
       <div className="py-1">
         <button onClick={() => { onAddCard(); onClose(); }}
           className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors">Add card</button>
@@ -424,7 +419,6 @@ function ListActionsMenu({
           <Eye size={12} className="text-text-muted" /> Watch
         </button>
       </div>
-
       <div className="border-t border-border py-1">
         <button onClick={() => setShowColors(!showColors)}
           className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors flex items-center justify-between">
@@ -442,7 +436,6 @@ function ListActionsMenu({
           </div>
         )}
       </div>
-
       <div className="border-t border-border py-1">
         <button onClick={() => setShowAutomation(!showAutomation)}
           className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors flex items-center justify-between">
@@ -458,7 +451,6 @@ function ListActionsMenu({
           </div>
         )}
       </div>
-
       <div className="border-t border-border py-1">
         <button onClick={() => { onArchive(); onClose(); }}
           className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors flex items-center gap-2">
@@ -469,7 +461,6 @@ function ListActionsMenu({
           <Archive size={12} className="text-text-muted" /> Archive all cards in this list
         </button>
       </div>
-
       <div className="border-t border-border py-1">
         <button onClick={() => { onDeleteProject(); onClose(); }}
           className="w-full text-left px-3 py-2 text-xs text-danger hover:bg-danger/10 transition-colors flex items-center gap-2">
@@ -499,6 +490,12 @@ export default function ProjectsPage() {
   const [editingProjectName, setEditingProjectName] = useState<string | null>(null);
   const [editNameValue, setEditNameValue] = useState("");
 
+  // ─── NEW: search + view mode ──────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+
   const fetchProjects = useCallback(async () => {
     try {
       const [activeRes, archivedRes] = await Promise.all([
@@ -515,6 +512,33 @@ export default function ProjectsPage() {
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
+  // Keyboard shortcut: Cmd+K to focus search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+      if (e.key === "Escape" && searchFocused) {
+        setSearchQuery("");
+        searchRef.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [searchFocused]);
+
+  // ─── Filtered projects ────────────────────────
+  const filteredProjects = useMemo(() => {
+    if (!searchQuery.trim()) return projects;
+    const q = searchQuery.toLowerCase();
+    return projects.filter((p) =>
+      p.name.toLowerCase().includes(q) ||
+      (p.description || "").toLowerCase().includes(q) ||
+      (p.tasks || []).some((t) => t.title.toLowerCase().includes(q))
+    );
+  }, [projects, searchQuery]);
+
   const createProject = async () => {
     if (!newName.trim()) return;
     await fetch("/api/projects", {
@@ -526,85 +550,50 @@ export default function ProjectsPage() {
   };
 
   const archiveProject = async (id: string) => {
-    await fetch(`/api/projects/${id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "archive" }),
-    });
+    await fetch(`/api/projects/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "archive" }) });
     fetchProjects();
   };
-
   const unarchiveProject = async (id: string) => {
-    await fetch(`/api/projects/${id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "unarchive" }),
-    });
+    await fetch(`/api/projects/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "unarchive" }) });
     fetchProjects();
   };
-
   const permanentDelete = async (id: string) => {
-    // Only for truly deleting from archive
     await fetch(`/api/projects/${id}`, { method: "DELETE" });
     fetchProjects();
   };
-
   const copyList = async (id: string) => {
-    await fetch(`/api/projects/${id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "copy_list" }),
-    });
+    await fetch(`/api/projects/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "copy_list" }) });
     fetchProjects();
   };
-
   const archiveAllCards = async (id: string) => {
-    await fetch(`/api/projects/${id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "archive_all_cards" }),
-    });
+    await fetch(`/api/projects/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "archive_all_cards" }) });
     fetchProjects();
   };
-
   const addTask = async (projectId: string) => {
     const title = newTaskTitle[projectId]?.trim();
     if (!title) return;
-    await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "add_task", title }),
-    });
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_task", title }) });
     setNewTaskTitle((prev) => ({ ...prev, [projectId]: "" }));
     fetchProjects();
   };
-
   const toggleTask = async (projectId: string, taskId: string) => {
-    // Optimistic: toggle + sort (completed to bottom)
     setProjects(prev => prev.map(p => {
       if (p._id !== projectId) return p;
       const toggled = p.tasks.map(t => t.id === taskId ? { ...t, done: !t.done, completedAt: !t.done ? new Date().toISOString() : undefined } : t);
       return { ...p, tasks: [...toggled.filter(t => !t.done), ...toggled.filter(t => t.done)] };
     }));
-    await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "toggle_task", taskId }),
-    });
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "toggle_task", taskId }) });
     fetchProjects();
   };
-
   const deleteTask = async (projectId: string, taskId: string) => {
-    await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "delete_task", taskId }),
-    });
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete_task", taskId }) });
     if (selectedTask?.task.id === taskId) setSelectedTask(null);
     fetchProjects();
   };
-
   const updateTask = async (projectId: string, taskId: string, updates: Record<string, unknown>) => {
-    await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "update_task", taskId, ...updates }),
-    });
+    await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_task", taskId, ...updates }) });
     fetchProjects();
   };
-
   const addComment = async (projectId: string, taskId: string, text: string) => {
     await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_comment", taskId, text }) });
     fetchProjects();
@@ -634,7 +623,6 @@ export default function ProjectsPage() {
     fetchProjects();
   };
   const reorderChecklist = async (projectId: string, taskId: string, reordered: { id: string; text: string; done: boolean }[]) => {
-    // Optimistic update
     setProjects(prev => prev.map(p => p._id === projectId ? { ...p, tasks: p.tasks.map(t => t.id === taskId ? { ...t, checklist: reordered } : t) } : p));
     await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reorder_checklist", taskId, checklist: reordered }) });
   };
@@ -642,34 +630,26 @@ export default function ProjectsPage() {
     await fetch(`/api/projects/${fromProjectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "move_task", taskId, toProjectId, position }) });
     setSelectedTask(null); fetchProjects();
   };
-
   const reorderProjects = async (newOrder: Project[]) => {
     setProjects(newOrder);
-    await fetch("/api/projects", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "reorder", projectIds: newOrder.map((p) => p._id) }),
-    });
+    await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reorder", projectIds: newOrder.map((p) => p._id) }) });
   };
-
   const changeProjectColor = async (projectId: string, color: string) => {
     await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) });
     fetchProjects();
   };
-
   const renameProject = async (projectId: string, name: string) => {
     if (!name.trim()) return;
     await fetch(`/api/projects/${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim() }) });
     setEditingProjectName(null);
     fetchProjects();
   };
-
   const deleteProject = async (id: string) => {
     if (!confirm("Delete this project and all its tasks? This cannot be undone.")) return;
     await fetch(`/api/projects/${id}`, { method: "DELETE" });
     setOpenMenu(null);
     fetchProjects();
   };
-
   const moveAllCards = async (fromProjectId: string, toProjectId: string) => {
     const from = projects.find((p) => p._id === fromProjectId);
     if (!from || !from.tasks.length) return;
@@ -678,7 +658,6 @@ export default function ProjectsPage() {
     }
     fetchProjects();
   };
-
   const sortProjectTasks = async (projectId: string, sortBy: string) => {
     const project = projects.find((p) => p._id === projectId);
     if (!project) return;
@@ -724,13 +703,72 @@ export default function ProjectsPage() {
     return Math.round((tasks.filter((t) => t.done).length / tasks.length) * 100);
   };
 
+  /* ═══════════════════════════════════════════════
+     RENDER
+     ═══════════════════════════════════════════════ */
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 md:ml-60">
-        <TopBar hideAdd
-          leftContent={
+      <main className="flex-1 md:ml-60 flex flex-col h-screen overflow-hidden">
+        <TopBar hideAdd />
+
+        {/* ═══ STICKY PROJECTS HEADER ═══ */}
+        <div className="sticky top-0 z-30 bg-bg-primary/80 backdrop-blur-xl border-b border-border px-4 md:px-6 py-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Left: Title */}
+            <div className="flex items-center gap-2 mr-auto">
+              <FolderKanban size={20} className="text-accent" />
+              <h1 className="font-heading font-semibold text-lg">Projects</h1>
+              <span className="text-[11px] text-text-muted bg-bg-secondary px-2 py-0.5 rounded-full font-medium">
+                {filteredProjects.length}
+              </span>
+            </div>
+
+            {/* Center: Search */}
+            <div className={`relative flex items-center transition-all duration-300 ${searchFocused ? "w-72" : "w-52"}`}>
+              <Search size={14} className="absolute left-3 text-text-muted pointer-events-none" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                placeholder="Buscar proyectos..."
+                className="w-full pl-9 pr-8 py-2 rounded-xl bg-bg-secondary border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:bg-bg-tertiary transition-all"
+              />
+              {searchQuery ? (
+                <button onClick={() => setSearchQuery("")} className="absolute right-2.5 text-text-muted hover:text-text-primary">
+                  <X size={13} />
+                </button>
+              ) : (
+                <kbd className="absolute right-2.5 text-[9px] text-text-muted bg-bg-tertiary border border-border rounded px-1 py-0.5 font-mono">
+                  ⌘K
+                </kbd>
+              )}
+            </div>
+
+            {/* Right: Actions */}
             <div className="flex items-center gap-2">
+              {/* View mode toggle */}
+              <div className="flex items-center rounded-lg bg-bg-secondary border border-border p-0.5">
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`p-1.5 rounded-md transition-all ${viewMode === "grid" ? "bg-accent/15 text-accent" : "text-text-muted hover:text-text-secondary"}`}
+                  title="Vista Grid"
+                >
+                  <LayoutGrid size={14} />
+                </button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`p-1.5 rounded-md transition-all ${viewMode === "list" ? "bg-accent/15 text-accent" : "text-text-muted hover:text-text-secondary"}`}
+                  title="Vista Lista"
+                >
+                  <List size={14} />
+                </button>
+              </div>
+
               {archivedProjects.length > 0 && (
                 <button onClick={() => setShowArchive(!showArchive)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-secondary border border-border text-text-muted text-[12px] font-medium hover:text-text-secondary transition-colors">
@@ -738,17 +776,24 @@ export default function ProjectsPage() {
                 </button>
               )}
               <button onClick={() => setShowNewProject(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse text-[12px] font-medium transition-colors">
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse text-[12px] font-semibold transition-colors shadow-sm">
                 <Plus size={14} /> New Project
               </button>
             </div>
-          }
-        />
-        <div className="p-4 md:p-6 pb-24 md:pb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <FolderKanban size={20} className="text-accent" />
-            <h1 className="font-heading font-semibold text-lg">Projects</h1>
           </div>
+
+          {/* Search results hint */}
+          {searchQuery && (
+            <p className="text-[10px] text-text-muted mt-2">
+              {filteredProjects.length === 0
+                ? `No se encontraron proyectos para "${searchQuery}"`
+                : `${filteredProjects.length} proyecto${filteredProjects.length !== 1 ? "s" : ""} encontrado${filteredProjects.length !== 1 ? "s" : ""}`}
+            </p>
+          )}
+        </div>
+
+        {/* ═══ SCROLLABLE CONTENT ═══ */}
+        <div className="flex-1 overflow-auto p-4 md:p-6 pb-24 md:pb-6">
 
           {/* Archived Projects */}
           {showArchive && archivedProjects.length > 0 && (
@@ -806,172 +851,271 @@ export default function ProjectsPage() {
             </div>
           )}
 
-          {/* Projects Board */}
+          {/* ─── BOARD VIEW ─── */}
           {loading ? (
             <div className="flex gap-4">{[1, 2, 3].map((i) => <div key={i} className="w-64 h-48 rounded-lg bg-bg-secondary border border-border animate-pulse flex-shrink-0" />)}</div>
-          ) : projects.length === 0 && !showNewProject ? (
+          ) : filteredProjects.length === 0 && !showNewProject ? (
             <div className="text-center py-16 rounded-lg bg-bg-secondary border border-border">
               <FolderKanban size={40} className="mx-auto text-text-muted mb-3" />
-              <p className="text-text-muted text-sm">No projects yet</p>
-              <button onClick={() => setShowNewProject(true)} className="mt-3 text-accent text-sm font-medium hover:underline">Create your first project</button>
+              <p className="text-text-muted text-sm">{searchQuery ? "No se encontraron proyectos" : "No projects yet"}</p>
+              {!searchQuery && <button onClick={() => setShowNewProject(true)} className="mt-3 text-accent text-sm font-medium hover:underline">Create your first project</button>}
             </div>
-          ) : (
+          ) : viewMode === "grid" ? (
+            /* ═══ GRID VIEW (Cards/Kanban) ═══ */
             <DragDropContext onDragEnd={handleDragEnd}>
               <Droppable droppableId="board" type="COLUMN" direction="horizontal">
                 {(boardProvided) => (
                   <div ref={boardProvided.innerRef} {...boardProvided.droppableProps}
                     className="flex gap-3 overflow-x-auto pb-4 items-start" style={{ scrollbarWidth: "thin" }}>
-                    {projects.map((project, projectIdx) => {
-                      const progress = getProgress(project.tasks || []);
-                      const totalTasks = (project.tasks || []).length;
-                      const doneTasks = (project.tasks || []).filter((t) => t.done).length;
-                      const projectLabels = project.labels || [];
+                    <AnimatePresence mode="popLayout">
+                      {filteredProjects.map((project, projectIdx) => {
+                        const progress = getProgress(project.tasks || []);
+                        const totalTasks = (project.tasks || []).length;
+                        const doneTasks = (project.tasks || []).filter((t) => t.done).length;
+                        const projectLabels = project.labels || [];
 
-                      return (
-                        <Draggable key={project._id} draggableId={`project-${project._id}`} index={projectIdx}>
-                          {(colProvided, colSnapshot) => (
-                            <div ref={colProvided.innerRef} {...colProvided.draggableProps}
-                              className={`w-64 flex-shrink-0 rounded-lg bg-bg-secondary border border-border overflow-visible flex flex-col transition-shadow ${colSnapshot.isDragging ? "shadow-2xl opacity-95 rotate-1" : ""}`}>
-                              {/* Project Header — drag handle */}
-                              <div {...colProvided.dragHandleProps} className="px-3 py-2.5 border-b cursor-grab active:cursor-grabbing" style={{ borderBottomColor: `${project.color}30` }}>
-                                <div className="flex items-center gap-2 mb-1 relative">
-                                  {/* Multi-color labels or single dot */}
-                                  {projectLabels.length > 0 ? (
-                                    <div className="flex gap-0.5 flex-shrink-0">
-                                      {projectLabels.map((l) => <div key={l} className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: l }} />)}
-                                    </div>
-                                  ) : (
-                                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
-                                  )}
-                                  {editingProjectName === project._id ? (
-                                    <input
-                                      value={editNameValue}
-                                      onChange={(e) => setEditNameValue(e.target.value)}
-                                      onBlur={() => renameProject(project._id!, editNameValue)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Enter") renameProject(project._id!, editNameValue);
-                                        if (e.key === "Escape") setEditingProjectName(null);
-                                      }}
-                                      autoFocus
-                                      onClick={(e) => e.stopPropagation()}
-                                      onMouseDown={(e) => e.stopPropagation()}
-                                      className="font-heading font-bold text-sm uppercase tracking-wide flex-1 min-w-0 bg-bg-tertiary border border-accent rounded px-1.5 py-0.5 text-text-primary focus:outline-none"
-                                    />
-                                  ) : (
-                                    <h3
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingProjectName(project._id!);
-                                        setEditNameValue(project.name);
-                                      }}
-                                      className="font-heading font-bold text-sm uppercase tracking-wide flex-1 truncate cursor-text hover:bg-bg-tertiary hover:rounded px-1 -mx-1 transition-colors"
-                                    >
-                                      {project.name}
-                                    </h3>
-                                  )}
-                                  <span className="text-[11px] text-text-muted">{doneTasks}/{totalTasks}</span>
-                                  <button onClick={(e) => {
+                        return (
+                          <Draggable key={project._id} draggableId={`project-${project._id}`} index={projectIdx}>
+                            {(colProvided, colSnapshot) => (
+                              <motion.div
+                                layout
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                transition={{ duration: 0.25, ease: "easeOut" }}
+                                ref={colProvided.innerRef} {...colProvided.draggableProps}
+                                className={`w-64 flex-shrink-0 rounded-lg bg-bg-secondary border border-border overflow-visible flex flex-col transition-shadow ${colSnapshot.isDragging ? "shadow-2xl opacity-95 rotate-1" : ""}`}
+                              >
+                                {/* Project Header — drag handle */}
+                                <div {...colProvided.dragHandleProps} className="px-3 py-2.5 border-b cursor-grab active:cursor-grabbing" style={{ borderBottomColor: `${project.color}30` }}>
+                                  <div className="flex items-center gap-2 mb-1 relative">
+                                    {projectLabels.length > 0 ? (
+                                      <div className="flex gap-0.5 flex-shrink-0">
+                                        {projectLabels.map((l) => <div key={l} className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: l }} />)}
+                                      </div>
+                                    ) : (
+                                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
+                                    )}
+                                    {editingProjectName === project._id ? (
+                                      <input value={editNameValue} onChange={(e) => setEditNameValue(e.target.value)}
+                                        onBlur={() => renameProject(project._id!, editNameValue)}
+                                        onKeyDown={(e) => { if (e.key === "Enter") renameProject(project._id!, editNameValue); if (e.key === "Escape") setEditingProjectName(null); }}
+                                        autoFocus onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}
+                                        className="font-heading font-bold text-sm uppercase tracking-wide flex-1 min-w-0 bg-bg-tertiary border border-accent rounded px-1.5 py-0.5 text-text-primary focus:outline-none" />
+                                    ) : (
+                                      <h3 onClick={(e) => { e.stopPropagation(); setEditingProjectName(project._id!); setEditNameValue(project.name); }}
+                                        className="font-heading font-bold text-sm uppercase tracking-wide flex-1 truncate cursor-text hover:bg-bg-tertiary hover:rounded px-1 -mx-1 transition-colors">
+                                        {project.name}
+                                      </h3>
+                                    )}
+                                    <span className="text-[11px] text-text-muted">{doneTasks}/{totalTasks}</span>
+                                    <button onClick={(e) => {
                                       e.stopPropagation();
                                       if (openMenu === project._id) { setOpenMenu(null); setMenuAnchor(undefined); }
-                                      else {
-                                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                        setMenuAnchor({ top: rect.top, left: rect.left, width: rect.width });
-                                        setOpenMenu(project._id!);
-                                      }
-                                    }}
-                                    className="text-text-muted hover:text-text-primary transition-colors p-0.5">
-                                    <MoreHorizontal size={14} />
-                                  </button>
-                                </div>
-                                {project.description && <p className="text-[10px] text-text-muted truncate mb-1">{project.description}</p>}
-                                <div className="flex items-center gap-2">
-                                  <div className="flex-1 h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
-                                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, backgroundColor: progress === 100 ? "#10B981" : project.color }} />
+                                      else { const rect = (e.currentTarget as HTMLElement).getBoundingClientRect(); setMenuAnchor({ top: rect.top, left: rect.left, width: rect.width }); setOpenMenu(project._id!); }
+                                    }} className="text-text-muted hover:text-text-primary transition-colors p-0.5">
+                                      <MoreHorizontal size={14} />
+                                    </button>
                                   </div>
-                                  <span className="text-[10px] font-mono font-semibold" style={{ color: progress === 100 ? "#10B981" : project.color }}>{progress}%</span>
+                                  {project.description && <p className="text-[10px] text-text-muted truncate mb-1">{project.description}</p>}
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
+                                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, backgroundColor: progress === 100 ? "#10B981" : project.color }} />
+                                    </div>
+                                    <span className="text-[10px] font-mono font-semibold" style={{ color: progress === 100 ? "#10B981" : project.color }}>{progress}%</span>
+                                  </div>
                                 </div>
-                              </div>
 
-                              {/* Tasks */}
-                              <Droppable droppableId={project._id!} type="CARD">
-                                {(provided, snapshot) => (
-                                  <div ref={provided.innerRef} {...provided.droppableProps}
-                                    className={`flex-1 p-2 space-y-1 min-h-[40px] overflow-y-auto max-h-[60vh] transition-colors ${snapshot.isDraggingOver ? "bg-bg-hover" : ""}`}>
-                                    {(project.tasks || []).map((task, idx) => (
-                                      <Draggable key={task.id} draggableId={task.id} index={idx}>
-                                        {(provided, snapshot) => (
-                                          <div ref={provided.innerRef} {...provided.draggableProps}
-                                            onMouseEnter={() => setHoverTask(task.id)}
-                                            onMouseLeave={() => setHoverTask(null)}
-                                            className={`rounded-md border border-border bg-bg-primary hover:bg-bg-hover transition-all cursor-pointer ${snapshot.isDragging ? "shadow-lg border-accent/30" : ""}`}>
-                                            {(task.labels || []).length > 0 && (
-                                              <div className="flex gap-1 px-2.5 pt-2">
-                                                {task.labels!.map((l) => <div key={l} className="w-8 h-1.5 rounded-full" style={{ backgroundColor: l }} />)}
-                                              </div>
-                                            )}
-                                            <div className="flex items-center gap-2 px-2.5 py-2">
-                                              <span {...provided.dragHandleProps} className="text-text-muted/30 hover:text-text-muted cursor-grab active:cursor-grabbing flex-shrink-0">
-                                                <GripVertical size={12} />
-                                              </span>
-                                              {(hoverTask === task.id || task.done) ? (
-                                                <button onClick={(e) => { e.stopPropagation(); toggleTask(project._id!, task.id); }}
-                                                  className={`w-4 h-4 rounded-full border-[1.5px] flex-shrink-0 flex items-center justify-center transition-colors ${task.done ? "bg-accent border-accent" : "border-text-muted hover:border-accent"}`}>
-                                                  {task.done && <Check size={8} className="text-text-inverse" />}
+                                {/* Tasks */}
+                                <Droppable droppableId={project._id!} type="CARD">
+                                  {(provided, snapshot) => (
+                                    <div ref={provided.innerRef} {...provided.droppableProps}
+                                      className={`flex-1 p-2 space-y-1 min-h-[40px] overflow-y-auto max-h-[60vh] transition-colors ${snapshot.isDraggingOver ? "bg-bg-hover" : ""}`}>
+                                      {(project.tasks || []).map((task, idx) => (
+                                        <Draggable key={task.id} draggableId={task.id} index={idx}>
+                                          {(provided, snapshot) => (
+                                            <div ref={provided.innerRef} {...provided.draggableProps}
+                                              onMouseEnter={() => setHoverTask(task.id)} onMouseLeave={() => setHoverTask(null)}
+                                              className={`rounded-md border border-border bg-bg-primary hover:bg-bg-hover transition-all cursor-pointer ${snapshot.isDragging ? "shadow-lg border-accent/30" : ""}`}>
+                                              {(task.labels || []).length > 0 && (
+                                                <div className="flex gap-1 px-2.5 pt-2">
+                                                  {task.labels!.map((l) => <div key={l} className="w-8 h-1.5 rounded-full" style={{ backgroundColor: l }} />)}
+                                                </div>
+                                              )}
+                                              <div className="flex items-center gap-2 px-2.5 py-2">
+                                                <span {...provided.dragHandleProps} className="text-text-muted/30 hover:text-text-muted cursor-grab active:cursor-grabbing flex-shrink-0">
+                                                  <GripVertical size={12} />
+                                                </span>
+                                                {(hoverTask === task.id || task.done) ? (
+                                                  <button onClick={(e) => { e.stopPropagation(); toggleTask(project._id!, task.id); }}
+                                                    className={`w-4 h-4 rounded-full border-[1.5px] flex-shrink-0 flex items-center justify-center transition-colors ${task.done ? "bg-accent border-accent" : "border-text-muted hover:border-accent"}`}>
+                                                    {task.done && <Check size={8} className="text-text-inverse" />}
+                                                  </button>
+                                                ) : <div className="w-4 flex-shrink-0" />}
+                                                <button onClick={() => setSelectedTask({ task, project })}
+                                                  className={`flex-1 text-left text-[12px] ${task.done ? "line-through text-text-muted" : "text-text-primary"}`}>
+                                                  {task.title}
                                                 </button>
-                                              ) : <div className="w-4 flex-shrink-0" />}
-                                              <button onClick={() => setSelectedTask({ task, project })}
-                                                className={`flex-1 text-left text-[12px] ${task.done ? "line-through text-text-muted" : "text-text-primary"}`}>
-                                                {task.title}
-                                              </button>
-                                              <div className="flex items-center gap-1 flex-shrink-0">
-                                                {(task.links || []).length > 0 && <Link2 size={10} className="text-accent" />}
-                                                {(task.comments || []).length > 0 && (
-                                                  <span className="flex items-center gap-0.5 text-text-muted text-[9px]"><MessageSquare size={9} /> {task.comments.length}</span>
-                                                )}
-                                                {(task.checklist || []).length > 0 && (
-                                                  <span className={`flex items-center gap-0.5 text-[9px] ${(task.checklist || []).every((c) => c.done) ? "text-accent" : "text-text-muted"}`}>
-                                                    <CheckSquare size={9} /> {(task.checklist || []).filter((c) => c.done).length}/{(task.checklist || []).length}
-                                                  </span>
-                                                )}
+                                                <div className="flex items-center gap-1 flex-shrink-0">
+                                                  {(task.links || []).length > 0 && <Link2 size={10} className="text-accent" />}
+                                                  {(task.comments || []).length > 0 && (
+                                                    <span className="flex items-center gap-0.5 text-text-muted text-[9px]"><MessageSquare size={9} /> {task.comments.length}</span>
+                                                  )}
+                                                  {(task.checklist || []).length > 0 && (
+                                                    <span className={`flex items-center gap-0.5 text-[9px] ${(task.checklist || []).every((c) => c.done) ? "text-accent" : "text-text-muted"}`}>
+                                                      <CheckSquare size={9} /> {(task.checklist || []).filter((c) => c.done).length}/{(task.checklist || []).length}
+                                                    </span>
+                                                  )}
+                                                </div>
                                               </div>
                                             </div>
-                                          </div>
-                                        )}
-                                      </Draggable>
-                                    ))}
-                                    {provided.placeholder}
-                                  </div>
-                                )}
-                              </Droppable>
+                                          )}
+                                        </Draggable>
+                                      ))}
+                                      {provided.placeholder}
+                                    </div>
+                                  )}
+                                </Droppable>
 
-                              {/* Add card */}
-                              <div className="px-2 pb-2 pt-1 border-t border-border">
-                                <div className="flex items-center gap-2">
-                                  <Plus size={14} className="text-text-muted flex-shrink-0" />
-                                  <input type="text" data-project={project._id}
-                                    value={newTaskTitle[project._id!] || ""}
-                                    onChange={(e) => setNewTaskTitle((p) => ({ ...p, [project._id!]: e.target.value }))}
-                                    onKeyDown={(e) => e.key === "Enter" && addTask(project._id!)}
-                                    placeholder="Add a card"
-                                    className="flex-1 bg-transparent text-[12px] text-text-primary placeholder:text-text-muted focus:outline-none py-1.5" />
+                                {/* Add card */}
+                                <div className="px-2 pb-2 pt-1 border-t border-border">
+                                  <div className="flex items-center gap-2">
+                                    <Plus size={14} className="text-text-muted flex-shrink-0" />
+                                    <input type="text" data-project={project._id}
+                                      value={newTaskTitle[project._id!] || ""}
+                                      onChange={(e) => setNewTaskTitle((p) => ({ ...p, [project._id!]: e.target.value }))}
+                                      onKeyDown={(e) => e.key === "Enter" && addTask(project._id!)}
+                                      placeholder="Add a card"
+                                      className="flex-1 bg-transparent text-[12px] text-text-primary placeholder:text-text-muted focus:outline-none py-1.5" />
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
-                          )}
-                        </Draggable>
-                      );
-                    })}
+                              </motion.div>
+                            )}
+                          </Draggable>
+                        );
+                      })}
+                    </AnimatePresence>
                     {boardProvided.placeholder}
                   </div>
                 )}
               </Droppable>
             </DragDropContext>
+          ) : (
+            /* ═══ LIST VIEW (Compact rows) ═══ */
+            <div className="space-y-2 max-w-4xl">
+              <AnimatePresence mode="popLayout">
+                {filteredProjects.map((project) => {
+                  const progress = getProgress(project.tasks || []);
+                  const totalTasks = (project.tasks || []).length;
+                  const doneTasks = (project.tasks || []).filter((t) => t.done).length;
+
+                  return (
+                    <motion.div
+                      key={project._id}
+                      layout
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                      className="group flex items-center gap-4 px-4 py-3 rounded-xl bg-bg-secondary border border-border hover:border-border/80 transition-all cursor-pointer"
+                      onClick={() => {
+                        // Expand to show tasks inline (toggle)
+                        setOpenMenu(openMenu === `list-${project._id}` ? null : `list-${project._id}`);
+                      }}
+                    >
+                      {/* Color dot */}
+                      <div className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: project.color }} />
+
+                      {/* Name + description */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-heading font-semibold text-sm truncate">{project.name}</h3>
+                          {project.description && (
+                            <span className="text-[10px] text-text-muted truncate max-w-[200px] hidden sm:inline">{project.description}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Stats */}
+                      <div className="flex items-center gap-4 flex-shrink-0">
+                        <span className="text-[11px] text-text-muted font-mono">{doneTasks}/{totalTasks}</span>
+
+                        {/* Progress bar */}
+                        <div className="w-24 h-1.5 rounded-full bg-bg-tertiary overflow-hidden hidden sm:block">
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, backgroundColor: progress === 100 ? "#10B981" : project.color }} />
+                        </div>
+                        <span className="text-[10px] font-mono font-semibold w-8 text-right" style={{ color: progress === 100 ? "#10B981" : project.color }}>
+                          {progress}%
+                        </span>
+
+                        {/* Actions */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            setMenuAnchor({ top: rect.top, left: rect.left, width: rect.width });
+                            setOpenMenu(project._id!);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-text-primary transition-all p-1"
+                        >
+                          <MoreHorizontal size={14} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+
+              {/* Expanded tasks for list view */}
+              {filteredProjects.map((project) => {
+                if (openMenu !== `list-${project._id}`) return null;
+                return (
+                  <motion.div
+                    key={`tasks-${project._id}`}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="ml-7 pl-4 border-l-2 space-y-1 pb-2"
+                    style={{ borderColor: `${project.color}40` }}
+                  >
+                    {(project.tasks || []).map((task) => (
+                      <div key={task.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-bg-hover transition-colors">
+                        <button onClick={() => toggleTask(project._id!, task.id)}
+                          className={`w-3.5 h-3.5 rounded-full border-[1.5px] flex-shrink-0 flex items-center justify-center transition-colors ${task.done ? "bg-accent border-accent" : "border-text-muted hover:border-accent"}`}>
+                          {task.done && <Check size={7} className="text-text-inverse" />}
+                        </button>
+                        <button onClick={() => setSelectedTask({ task, project })}
+                          className={`flex-1 text-left text-xs ${task.done ? "line-through text-text-muted" : "text-text-primary hover:text-accent"}`}>
+                          {task.title}
+                        </button>
+                        {(task.checklist || []).length > 0 && (
+                          <span className="text-[9px] text-text-muted">
+                            <CheckSquare size={9} className="inline" /> {(task.checklist || []).filter((c) => c.done).length}/{(task.checklist || []).length}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    {/* Quick add in list mode */}
+                    <div className="flex items-center gap-2 px-3 py-1">
+                      <Plus size={12} className="text-text-muted" />
+                      <input type="text" data-project={project._id}
+                        value={newTaskTitle[project._id!] || ""}
+                        onChange={(e) => setNewTaskTitle((p) => ({ ...p, [project._id!]: e.target.value }))}
+                        onKeyDown={(e) => e.key === "Enter" && addTask(project._id!)}
+                        placeholder="Add a card..."
+                        className="flex-1 bg-transparent text-[11px] text-text-muted placeholder:text-text-muted focus:outline-none py-1" />
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
           )}
         </div>
       </main>
 
       {/* List Actions Menu (rendered outside board for proper positioning) */}
-      {openMenu && (() => {
+      {openMenu && !openMenu.startsWith("list-") && (() => {
         const menuProject = projects.find((p) => p._id === openMenu);
         if (!menuProject) return null;
         return (
