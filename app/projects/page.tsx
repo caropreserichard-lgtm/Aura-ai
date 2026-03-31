@@ -1000,7 +1000,7 @@ export default function ProjectsPage() {
               <Droppable droppableId="board" type="COLUMN" direction="vertical">
                 {(boardProvided) => (
                   <div ref={boardProvided.innerRef} {...boardProvided.droppableProps}
-                    className="flex flex-col gap-3 pb-4 max-w-sm">
+                    className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-4 max-w-3xl mx-auto">
                       {filteredProjects.map((project, projectIdx) => {
                         const progress = getProgress(project.tasks || []);
                         const totalTasks = (project.tasks || []).length;
