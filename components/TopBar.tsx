@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Search, Sun, Moon, Flame } from "lucide-react";
+import { Plus, Sun, Moon, Flame } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import PulseBar from "./PulseBar";
 import { usePulseStore } from "@/lib/pulseStore";
@@ -72,9 +72,6 @@ export default function TopBar({ onAddTask, addLabel = "New Task", hideAdd = fal
             style={{ backgroundColor: pulse.badgeBg, color: pulse.color }}>
             {pulse.label}
           </div>
-          <button className="p-2 rounded-lg hover:bg-bg-hover text-text-muted hover:text-text-secondary transition-colors">
-            <Search size={18} />
-          </button>
           <button onClick={toggleTheme}
             className="p-2 rounded-lg hover:bg-bg-hover text-text-muted hover:text-text-secondary transition-colors"
             title={theme === "dark" ? "Light mode" : "Dark mode"}>
