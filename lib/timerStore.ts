@@ -15,6 +15,9 @@ export interface TimerState {
   isRunning: boolean;
   isFinished: boolean;
   isWidgetVisible: boolean;
+  // Timestamp-based tracking (survives tab throttling)
+  _startedAt: number | null;      // Date.now() when timer was started/resumed
+  _pausedRemaining: number | null; // seconds left when paused
   // Preferences (persisted)
   soundId: string;
   widgetSize: WidgetSize;
@@ -51,6 +54,8 @@ export const useTimerStore = create<TimerState>()(
       isRunning: false,
       isFinished: false,
       isWidgetVisible: false,
+      _startedAt: null,
+      _pausedRemaining: null,
       soundId: "zen-bell",
       widgetSize: "normal" as WidgetSize,
       widgetShape: "rounded" as WidgetShape,
@@ -65,15 +70,39 @@ export const useTimerStore = create<TimerState>()(
           taskId, taskTitle, totalSeconds,
           remainingSeconds: totalSeconds,
           isRunning: true, isFinished: false, isWidgetVisible: true,
+          _startedAt: Date.now(),
+          _pausedRemaining: null,
         });
       },
 
-      pauseTimer: () => set({ isRunning: false }),
+      pauseTimer: () => {
+        const state = get();
+        // Snapshot the actual remaining based on timestamps
+        const remaining = state._startedAt
+          ? Math.max(0, state.totalSeconds - Math.floor((Date.now() - state._startedAt) / 1000))
+          : state.remainingSeconds;
+        set({
+          isRunning: false,
+          remainingSeconds: remaining,
+          _pausedRemaining: remaining,
+          _startedAt: null,
+        });
+      },
 
       resumeTimer: () => {
         const state = get();
-        if (state.remainingSeconds > 0 && !state.isFinished) {
-          set({ isRunning: true });
+        const remaining = state._pausedRemaining ?? state.remainingSeconds;
+        if (remaining > 0 && !state.isFinished) {
+          // _startedAt = now, but we're resuming with `remaining` seconds left
+          // So _startedAt should be set so that totalSeconds - elapsed = remaining
+          // elapsed = totalSeconds - remaining → _startedAt = now - elapsed*1000
+          const elapsed = state.totalSeconds - remaining;
+          set({
+            isRunning: true,
+            remainingSeconds: remaining,
+            _startedAt: Date.now() - elapsed * 1000,
+            _pausedRemaining: null,
+          });
         }
       },
 
@@ -81,26 +110,35 @@ export const useTimerStore = create<TimerState>()(
         set({
           taskId: null, taskTitle: "", totalSeconds: 0, remainingSeconds: 0,
           isRunning: false, isFinished: false, isWidgetVisible: false,
+          _startedAt: null, _pausedRemaining: null,
         }),
 
       tick: () => {
         const state = get();
-        if (!state.isRunning || state.remainingSeconds <= 0) return;
-        const next = state.remainingSeconds - 1;
-        if (next <= 0) {
-          set({ remainingSeconds: 0, isRunning: false, isFinished: true });
+        if (!state.isRunning || !state._startedAt) return;
+
+        // Calculate remaining from timestamps — immune to tab throttling
+        const elapsedSecs = Math.floor((Date.now() - state._startedAt) / 1000);
+        const remaining = Math.max(0, state.totalSeconds - elapsedSecs);
+
+        if (remaining <= 0) {
+          set({ remainingSeconds: 0, isRunning: false, isFinished: true, _startedAt: null });
         } else {
-          set({ remainingSeconds: next });
+          set({ remainingSeconds: remaining });
         }
       },
 
       addTime: (minutes) => {
         const state = get();
         const addSec = minutes * 60;
+        const newTotal = state.totalSeconds + addSec;
+        const newRemaining = state.remainingSeconds + addSec;
         set({
-          totalSeconds: state.totalSeconds + addSec,
-          remainingSeconds: state.remainingSeconds + addSec,
+          totalSeconds: newTotal,
+          remainingSeconds: newRemaining,
           isFinished: false,
+          // If paused, update _pausedRemaining too
+          _pausedRemaining: state._pausedRemaining != null ? newRemaining : null,
         });
       },
 
@@ -124,6 +162,14 @@ export const useTimerStore = create<TimerState>()(
         dialStyle: state.dialStyle,
         timerTheme: state.timerTheme,
         timerBackground: state.timerBackground,
+        // Persist running timer state so it survives full page reload
+        taskId: state.taskId,
+        taskTitle: state.taskTitle,
+        totalSeconds: state.totalSeconds,
+        isRunning: state.isRunning,
+        isWidgetVisible: state.isWidgetVisible,
+        _startedAt: state._startedAt,
+        _pausedRemaining: state._pausedRemaining,
       }),
     }
   )

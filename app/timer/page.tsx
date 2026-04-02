@@ -116,10 +116,12 @@ export default function TimerPage() {
   } = store;
 
   const [selectedMins, setSelectedMins] = useState(25);
+  const [customInput, setCustomInput] = useState("");
   const [showPresets, setShowPresets] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"dial" | "theme" | "bg" | "sound" | "widget">("dial");
   const presetsRef = useRef<HTMLDivElement>(null);
+  const customInputRef = useRef<HTMLInputElement>(null);
   const [blinkPhase, setBlinkPhase] = useState(0);
 
   // NOTE: tick interval lives ONLY in TimerWidget.tsx to avoid double-speed bug
@@ -382,26 +384,71 @@ export default function TimerPage() {
 
           {/* ── Duration Selector ────────────────────────── */}
           {!hasActiveTimer && (
-            <div className="relative mb-6 z-10" ref={presetsRef}>
-              <button
-                onClick={() => setShowPresets(!showPresets)}
-                className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl border transition-all duration-300 hover:scale-[1.02]"
-                style={{
-                  backgroundColor: "rgba(255,255,255,0.04)",
-                  borderColor: "rgba(255,255,255,0.08)",
-                }}
-              >
-                <Timer size={15} className="text-white/40" />
-                <span className="text-white/80 font-medium text-sm">
-                  {selectedMins >= 60 ? `${selectedMins / 60} hr` : `${selectedMins} min`}
-                </span>
-                <ChevronDown size={13} className="text-white/30" />
-              </button>
+            <div className="relative mb-6 z-20" ref={presetsRef}>
+              <div className="flex items-center gap-2">
+                {/* Preset dropdown button */}
+                <button
+                  onClick={() => setShowPresets(!showPresets)}
+                  className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl border transition-all duration-300 hover:scale-[1.02]"
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.04)",
+                    borderColor: "rgba(255,255,255,0.08)",
+                  }}
+                >
+                  <Timer size={15} className="text-white/40" />
+                  <span className="text-white/80 font-medium text-sm">
+                    {selectedMins >= 60 ? `${selectedMins / 60} hr` : `${selectedMins} min`}
+                  </span>
+                  <ChevronDown size={13} className={`text-white/30 transition-transform duration-200 ${showPresets ? "rotate-180" : ""}`} />
+                </button>
+
+                {/* Separator */}
+                <span className="text-white/15 text-xs">o</span>
+
+                {/* Manual input */}
+                <div className="flex items-center gap-1">
+                  <input
+                    ref={customInputRef}
+                    type="number"
+                    min="1"
+                    max="480"
+                    value={customInput}
+                    onChange={(e) => setCustomInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const val = parseInt(customInput);
+                        if (val > 0 && val <= 480) {
+                          setSelectedMins(val);
+                          setCustomInput("");
+                          customInputRef.current?.blur();
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      const val = parseInt(customInput);
+                      if (val > 0 && val <= 480) {
+                        setSelectedMins(val);
+                        setCustomInput("");
+                      }
+                    }}
+                    placeholder="Min"
+                    className="w-16 px-2.5 py-2.5 rounded-xl border text-center text-sm font-medium transition-all duration-300 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    style={{
+                      backgroundColor: "rgba(255,255,255,0.04)",
+                      borderColor: customInput ? `${theme.primary}60` : "rgba(255,255,255,0.08)",
+                      color: "rgba(255,255,255,0.8)",
+                    }}
+                  />
+                  <span className="text-[10px] text-white/25">min</span>
+                </div>
+              </div>
+
+              {/* Dropdown opens ABOVE the button */}
               {showPresets && (
                 <div
-                  className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-52 rounded-xl shadow-2xl z-50 py-1 overflow-hidden border"
+                  className="absolute bottom-full left-0 mb-2 w-52 rounded-xl shadow-2xl z-50 py-1 overflow-hidden border max-h-[320px] overflow-y-auto"
                   style={{
-                    backgroundColor: "rgba(22, 24, 30, 0.95)",
+                    backgroundColor: "rgba(22, 24, 30, 0.97)",
                     borderColor: "rgba(255,255,255,0.08)",
                     backdropFilter: "blur(20px)",
                   }}

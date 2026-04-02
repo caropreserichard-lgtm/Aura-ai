@@ -32,7 +32,7 @@ export default function TimerWidget() {
     soundId, widgetSize, widgetShape, widgetOpacity,
   } = store;
 
-  const tickRef = useRef<NodeJS.Timeout | null>(null);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tickFnRef = useRef(tick);
   tickFnRef.current = tick;
   const dragControls = useDragControls();
@@ -43,7 +43,7 @@ export default function TimerWidget() {
   const cfg = SIZE_CONFIG[widgetSize];
   const shapeClass = SHAPE_CLASS[widgetShape];
 
-  // Tick interval
+  // Tick interval — timestamp-based, so even if browser throttles to 1/min it catches up
   useEffect(() => {
     if (isRunning) {
       if (tickRef.current) clearInterval(tickRef.current);
@@ -56,6 +56,17 @@ export default function TimerWidget() {
       if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
     };
   }, [isRunning]);
+
+  // When tab becomes visible again, immediately recalculate from timestamps
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        tickFnRef.current();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
 
   // Play selected alarm when finished
   useEffect(() => {
