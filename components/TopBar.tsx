@@ -4,10 +4,11 @@ import { Plus, Search, Sun, Moon } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 
 interface TopBarProps {
-  onAddTask: () => void;
+  onAddTask?: () => void;
+  hideAdd?: boolean;
 }
 
-export default function TopBar({ onAddTask }: TopBarProps) {
+export default function TopBar({ onAddTask, hideAdd }: TopBarProps) {
   const { theme, toggleTheme } = useTheme();
 
   return (
@@ -23,11 +24,13 @@ export default function TopBar({ onAddTask }: TopBarProps) {
           title={theme === "dark" ? "Light mode" : "Dark mode"}>
           {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
         </button>
-        <button onClick={onAddTask}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse font-medium text-sm transition-colors">
-          <Plus size={16} />
-          <span className="hidden sm:inline">New Task</span>
-        </button>
+        {!hideAdd && (
+          <button onClick={onAddTask}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-text-inverse font-medium text-sm transition-colors">
+            <Plus size={16} />
+            <span className="hidden sm:inline">New Task</span>
+          </button>
+        )}
       </div>
     </header>
   );
