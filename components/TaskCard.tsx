@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, Pencil, Trash2, Play, ChevronDown, ChevronUp, Link2 } from "lucide-react";
+import { Clock, Pencil, Trash2, Play, ChevronDown, ChevronUp } from "lucide-react";
 import { Task, CATEGORIES, PRIORITY_CONFIG } from "@/lib/types";
 import { formatTime } from "@/lib/scoring";
 
@@ -25,10 +25,9 @@ interface TaskCardProps {
   onDelete: (id: string) => void;
   onFocus: (task: Task) => void;
   onEdit: (task: Task) => void;
-  onClick?: () => void;
 }
 
-export default function TaskCard({ task, onComplete, onDelete, onFocus, onEdit, onClick }: TaskCardProps) {
+export default function TaskCard({ task, onComplete, onDelete, onFocus, onEdit }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [xpAnimation, setXpAnimation] = useState(false);
 
@@ -52,7 +51,7 @@ export default function TaskCard({ task, onComplete, onDelete, onFocus, onEdit, 
         </div>
       )}
 
-      <div className="px-3 py-2">
+      <div className="px-3 py-2.5">
         <div className="flex items-center gap-3">
           <button onClick={handleComplete} disabled={isDone}
             className={`w-[18px] h-[18px] rounded-full border-[1.5px] flex-shrink-0 transition-all duration-200 flex items-center justify-center ${
@@ -65,7 +64,7 @@ export default function TaskCard({ task, onComplete, onDelete, onFocus, onEdit, 
             )}
           </button>
 
-          <button onClick={() => onClick ? onClick() : setExpanded(!expanded)} className="flex-1 min-w-0 text-left">
+          <button onClick={() => setExpanded(!expanded)} className="flex-1 min-w-0 text-left">
             <span className={`text-[13px] leading-tight ${isDone ? "line-through text-text-muted" : "text-text-primary"}`}>
               {task.title}
             </span>
@@ -74,11 +73,6 @@ export default function TaskCard({ task, onComplete, onDelete, onFocus, onEdit, 
           <div className="flex items-center gap-2 flex-shrink-0">
             {task.timeSpent > 0 && (
               <span className="font-mono text-[11px] text-text-muted">{formatTime(task.timeSpent)}</span>
-            )}
-            {task.sourceUrl && (
-              <a href={task.sourceUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-accent hover:text-accent-hover transition-colors" title={task.sourceUrl}>
-                <Link2 size={13} />
-              </a>
             )}
             <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${catClass.bg} ${catClass.text}`}>
               # {task.subcategory}

@@ -16,6 +16,8 @@ import {
   Check,
   GripVertical,
   Tags,
+  ArrowUpToLine,
+  ArrowDownToLine,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -36,6 +38,18 @@ function SubcategoriesManager() {
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [addToBeginning, setAddToBeginning] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("subcategory_add_position") === "beginning";
+    }
+    return false;
+  });
+
+  const toggleAddPosition = () => {
+    const next = !addToBeginning;
+    setAddToBeginning(next);
+    localStorage.setItem("subcategory_add_position", next ? "beginning" : "end");
+  };
 
   const showFeedback = (msg: string) => {
     setFeedback(msg);
@@ -107,7 +121,8 @@ function SubcategoriesManager() {
     if (subs.includes(val)) return;
     setSaving(true);
     try {
-      await updateSubcategories(cat, [...subs, val]);
+      const updated = addToBeginning ? [val, ...subs] : [...subs, val];
+      await updateSubcategories(cat, updated);
       setNewSub("");
       setAddingTo(null);
       showFeedback(`"${val}" agregada a ${CATEGORIES[cat].label}`);
@@ -183,11 +198,29 @@ function SubcategoriesManager() {
               </p>
             </div>
           </div>
-          {feedback && (
-            <span className="text-xs text-success font-medium animate-pulse max-w-[200px] text-right">
-              {feedback}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {feedback && (
+              <span className="text-xs text-success font-medium animate-pulse max-w-[200px] text-right">
+                {feedback}
+              </span>
+            )}
+            <button
+              onClick={toggleAddPosition}
+              title={addToBeginning ? "Nuevos proyectos al inicio" : "Nuevos proyectos al final"}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                addToBeginning
+                  ? "bg-accent/15 text-accent border-accent/30 hover:bg-accent/25"
+                  : "bg-bg-tertiary text-text-muted border-border hover:bg-bg-secondary hover:text-text-secondary"
+              }`}
+            >
+              {addToBeginning ? (
+                <ArrowUpToLine size={12} />
+              ) : (
+                <ArrowDownToLine size={12} />
+              )}
+              {addToBeginning ? "Al inicio" : "Al final"}
+            </button>
+          </div>
         </div>
       </div>
 

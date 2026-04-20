@@ -2,10 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import ThemeProvider from "@/components/ThemeProvider";
 import PWARegister from "@/components/PWARegister";
-import GlobalTimerProvider from "@/components/GlobalTimerProvider";
-import PulseProvider from "@/components/PulseProvider";
-import AuthProvider from "@/components/AuthProvider";
-import { LanguageProvider } from "@/lib/LanguageContext";
 import "./globals.css";
 
 const inter = Inter({
@@ -33,17 +29,17 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Tayrona AI",
-  description: "Organiza tu Día, Diseña tu Imperio",
+  title: "RICKY FLOW",
+  description: "Tu Sistema Operativo Personal de Productividad",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Tayrona AI",
+    title: "RICKY FLOW",
   },
   icons: {
-    icon: "/tayrona-icon.png",
-    apple: "/tayrona-icon.png",
+    icon: "/icons/icon-192.png",
+    apple: "/icons/apple-touch-icon.png",
   },
 };
 
@@ -59,18 +55,10 @@ export default function RootLayout({
       className={`${inter.variable} ${jakarta.variable} ${jetbrains.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-bg-primary text-text-primary font-sans">
-        <AuthProvider>
-          <LanguageProvider>
-            <ThemeProvider>
-              <PWARegister />
-              <GlobalTimerProvider>
-                <PulseProvider>
-                  {children}
-                </PulseProvider>
-              </GlobalTimerProvider>
-            </ThemeProvider>
-          </LanguageProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <PWARegister />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
