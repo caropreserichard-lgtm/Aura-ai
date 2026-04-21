@@ -403,114 +403,248 @@ function TaskCard({ task, onSelect, onComplete, isDragging, dateKey }: {
   );
 }
 
+// ─── Schedule Slot Popup ─────────────────────────────────────
+function ScheduleSlotPopup({ dateKey, hour, minute, onAdd, onClose }: {
+  dateKey: string; hour: number; minute: number;
+  onAdd: (title: string, duration: number) => void; onClose: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [duration, setDuration] = useState(60);
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, [onClose]);
+  const fmtSlot = (h: number, m: number) =>
+    `${h > 12 ? h - 12 : h === 0 ? 12 : h}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+  const dateLabel = new Date(dateKey + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return (
+    <div className="bg-bg-tertiary border border-border rounded-xl shadow-2xl p-3.5 w-60">
+      <p className="text-[10px] font-semibold text-accent mb-2">{dateLabel} · {fmtSlot(hour, minute)}</p>
+      <input autoFocus type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && title.trim()) onAdd(title.trim(), duration); }}
+        placeholder="Task name..."
+        className="w-full bg-bg-secondary border border-border rounded-lg px-2.5 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent mb-2" />
+      <div className="flex items-center gap-1.5 mb-2.5">
+        {[30, 60, 90, 120].map((m) => (
+          <button key={m} onClick={() => setDuration(m)}
+            className={`flex-1 py-1 rounded-lg text-[10px] font-medium transition-colors ${duration === m ? "bg-accent text-white" : "bg-bg-secondary text-text-muted hover:bg-bg-hover"}`}>
+            {m < 60 ? `${m}m` : `${m / 60}h`}
+          </button>
+        ))}
+      </div>
+      <div className="flex justify-end gap-1.5">
+        <button onClick={onClose} className="px-2.5 py-1 rounded-lg text-[11px] text-text-muted hover:bg-bg-hover transition-colors">Cancel</button>
+        <button onClick={() => { if (title.trim()) onAdd(title.trim(), duration); }} disabled={!title.trim()}
+          className="px-3 py-1 rounded-lg text-[11px] bg-accent text-white disabled:opacity-30 hover:bg-accent-hover transition-colors font-medium">
+          Add task
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Schedule View ───────────────────────────────────────────
-function ScheduleView({ weekDates, tasksByDay, onSelect, onComplete }: {
+function ScheduleView({ weekDates, tasksByDay, onSelect, onAddAtSlot }: {
   weekDates: Date[];
   tasksByDay: Record<string, Task[]>;
   onSelect: (t: Task) => void;
-  onComplete: (id: string, dateKey?: string) => void;
+  onAddAtSlot: (dateKey: string, hour: number, minute: number, title: string, durationMins: number) => void;
 }) {
   const HOURS = Array.from({ length: 17 }, (_, i) => i + 6); // 6am–10pm
+  const ROW_H = 64;
   const now = new Date();
-  const currentHour = now.getHours();
-  const currentMin = now.getMinutes();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [slotPopup, setSlotPopup] = useState<{ dateKey: string; hour: number; minute: number; x: number; y: number; duration: number } | null>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      const scrollTo = Math.max(0, (now.getHours() - 6 - 1.5) * ROW_H);
+      scrollRef.current.scrollTop = scrollTo;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fmtHour = (h: number) =>
-    h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`;
+    h < 12 ? `${h === 0 ? 12 : h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`;
+
+  const getTaskPos = (task: Task) => {
+    if (!task.startDate) return null;
+    const d = new Date(task.startDate);
+    const h = d.getHours(); const m = d.getMinutes();
+    if (h < 6 || h > 22) return null;
+    const est = (task as unknown as Record<string, unknown>).estimatedTime as number | undefined;
+    const durationMins = est || 60;
+    return {
+      top: (h - 6) * ROW_H + (m / 60) * ROW_H,
+      height: Math.max((durationMins / 60) * ROW_H - 2, 24),
+    };
+  };
+
+  const handleColumnClick = (e: React.MouseEvent<HTMLDivElement>, dateKey: string) => {
+    if ((e.target as HTMLElement).closest("[data-task-block]")) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relY = e.clientY - rect.top + (scrollRef.current?.scrollTop || 0);
+    const hourF = relY / ROW_H;
+    const hour = Math.min(22, Math.floor(hourF) + 6);
+    const minute = (hourF % 1) >= 0.5 ? 30 : 0;
+    setSlotPopup({ dateKey, hour, minute, x: e.clientX, y: e.clientY, duration: 60 });
+  };
 
   return (
-    <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-      <div className="min-w-[640px]">
-        {/* Day header */}
-        <div className="grid gap-0 border-b border-border pb-2 mb-0" style={{ gridTemplateColumns: "52px repeat(7, 1fr)" }}>
-          <div />
-          {weekDates.map((date) => {
-            const todayDay = isToday(date);
-            return (
-              <div key={toDateKey(date)} className="text-center px-1">
-                <p className={`text-[10px] font-semibold uppercase tracking-wide ${todayDay ? "text-accent" : "text-text-muted"}`}>
-                  {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][date.getDay()]}
-                </p>
-                <p className={`text-lg font-bold leading-none mt-0.5 ${todayDay ? "text-accent" : "text-text-primary"}`}>
-                  {date.getDate()}
-                </p>
-              </div>
-            );
-          })}
-        </div>
+    <div className="relative -mx-4 md:mx-0 rounded-xl border border-border overflow-hidden bg-bg-primary">
+      <div className="overflow-x-auto">
+        <div className="min-w-[600px]">
 
-        {/* All-day strip */}
-        <div className="grid gap-0 border-b border-border/40 min-h-[28px]" style={{ gridTemplateColumns: "52px repeat(7, 1fr)" }}>
-          <div className="text-[9px] text-text-muted pt-1.5 text-right pr-2 whitespace-nowrap">all day</div>
-          {weekDates.map((date) => {
-            const key = toDateKey(date);
-            const allDay = (tasksByDay[key] || []).filter((t) => !t.startDate);
-            return (
-              <div key={key} className="border-l border-border/20 px-0.5 py-0.5 space-y-0.5">
-                {allDay.slice(0, 2).map((task) => {
-                  const color = CAT_COLORS[task.category] || "#666";
-                  const isDone = task.recurring ? (task.completions?.includes(key) ?? false) : task.status === "done";
-                  return (
-                    <div key={task._id} onClick={() => onSelect(task)}
-                      className={`text-[9px] px-1 py-0.5 rounded cursor-pointer truncate leading-tight ${isDone ? "opacity-40" : ""}`}
-                      style={{ background: color + "28", color }}>
-                      {task.title}
+          {/* ── Sticky day header ── */}
+          <div className="sticky top-0 z-20 bg-bg-primary border-b border-border"
+            style={{ display: "grid", gridTemplateColumns: "52px repeat(7, 1fr)" }}>
+            <div className="border-r border-border/30" />
+            {weekDates.map((date) => {
+              const key = toDateKey(date);
+              const todayDay = isToday(date);
+              const allDay = (tasksByDay[key] || []).filter((t) => !t.startDate);
+              return (
+                <div key={key} className={`border-r border-border/30 ${todayDay ? "bg-accent/5" : ""}`}>
+                  <div className="flex flex-col items-center py-2">
+                    <span className={`text-[9px] font-bold tracking-widest uppercase mb-1 ${todayDay ? "text-accent" : "text-text-muted"}`}>
+                      {["SUN","MON","TUE","WED","THU","FRI","SAT"][date.getDay()]}
+                    </span>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${todayDay ? "bg-accent" : ""}`}>
+                      <span className={`text-base font-bold ${todayDay ? "text-white" : "text-text-primary"}`}>
+                        {date.getDate()}
+                      </span>
                     </div>
-                  );
-                })}
-                {allDay.length > 2 && (
-                  <span className="text-[8px] text-text-muted pl-1">+{allDay.length - 2}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Hour rows */}
-        <div className="relative">
-          {HOURS.map((hour) => {
-            const showCurrentTime = isToday(new Date()) && hour === currentHour;
-            return (
-              <div key={hour} className="relative grid gap-0" style={{ gridTemplateColumns: "52px repeat(7, 1fr)", height: "64px" }}>
-                <div className="text-[9px] text-text-muted text-right pr-2 pt-1 leading-none whitespace-nowrap">{fmtHour(hour)}</div>
-                {weekDates.map((date) => {
-                  const key = toDateKey(date);
-                  const todayCol = isToday(date);
-                  const hourTasks = (tasksByDay[key] || []).filter((t) => {
-                    if (!t.startDate) return false;
-                    return new Date(t.startDate).getHours() === hour;
-                  });
-                  return (
-                    <div key={key} className={`border-l border-t border-border/20 px-0.5 py-0.5 overflow-hidden ${todayCol ? "bg-accent/[0.03]" : ""}`}>
-                      {hourTasks.map((task) => {
+                  </div>
+                  {allDay.length > 0 && (
+                    <div className="px-1 pb-1.5 border-t border-border/20 space-y-0.5">
+                      {allDay.slice(0, 3).map((task) => {
                         const color = CAT_COLORS[task.category] || "#666";
                         const isDone = task.recurring ? (task.completions?.includes(key) ?? false) : task.status === "done";
-                        const est = (task as unknown as Record<string, unknown>).estimatedTime as number | undefined;
                         return (
                           <div key={task._id} onClick={() => onSelect(task)}
-                            className={`rounded px-1 py-0.5 cursor-pointer text-[9px] leading-tight mb-0.5 ${isDone ? "opacity-40" : ""}`}
-                            style={{ background: color + "28", borderLeft: `2px solid ${color}`, color }}>
-                            <div className="font-semibold truncate">{task.title}</div>
-                            {est && <div className="opacity-70">{formatMins(est)}</div>}
+                            className={`text-[8px] px-1.5 py-0.5 rounded-full cursor-pointer truncate font-medium ${isDone ? "opacity-40 line-through" : "hover:brightness-110"}`}
+                            style={{ background: color + "28", color }}>
+                            {task.title}
                           </div>
                         );
                       })}
+                      {allDay.length > 3 && (
+                        <p className="text-[8px] text-text-muted px-1">+{allDay.length - 3} more</p>
+                      )}
                     </div>
-                  );
-                })}
-                {showCurrentTime && (
-                  <div className="absolute pointer-events-none" style={{ left: 52, right: 0, top: `${(currentMin / 60) * 100}%` }}>
-                    <div className="relative flex items-center">
-                      <div className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 -ml-1" />
-                      <div className="flex-1 h-[1.5px] bg-red-400" />
-                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Scrollable hourly grid ── */}
+          <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 340px)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "52px repeat(7, 1fr)" }}>
+
+              {/* Time labels */}
+              <div className="border-r border-border/30">
+                {HOURS.map((hour) => (
+                  <div key={hour} style={{ height: ROW_H }}
+                    className="flex items-start justify-end pr-2 pt-1 border-t border-border/15 first:border-t-0">
+                    <span className="text-[9px] text-text-muted leading-none -mt-2">{fmtHour(hour)}</span>
                   </div>
-                )}
+                ))}
               </div>
-            );
-          })}
+
+              {/* Day columns — absolute positioning inside each */}
+              {weekDates.map((date) => {
+                const key = toDateKey(date);
+                const todayCol = isToday(date);
+                const scheduled = (tasksByDay[key] || []).filter((t) => !!t.startDate);
+                const totalH = HOURS.length * ROW_H;
+
+                return (
+                  <div key={key}
+                    className={`relative border-r border-border/30 ${todayCol ? "bg-accent/[0.025]" : ""}`}
+                    style={{ height: totalH }}
+                    onClick={(e) => handleColumnClick(e, key)}>
+
+                    {/* Hour + half-hour lines */}
+                    {HOURS.map((_, i) => (
+                      <div key={i} className="absolute left-0 right-0 pointer-events-none">
+                        <div className="absolute left-0 right-0 border-t border-border/15" style={{ top: i * ROW_H }} />
+                        <div className="absolute left-6 right-0 border-t border-border/8" style={{ top: i * ROW_H + ROW_H / 2 }} />
+                      </div>
+                    ))}
+
+                    {/* Current time indicator */}
+                    {todayCol && (() => {
+                      const h = now.getHours(); const m = now.getMinutes();
+                      if (h < 6 || h > 22) return null;
+                      const top = (h - 6) * ROW_H + (m / 60) * ROW_H;
+                      return (
+                        <div className="absolute left-0 right-0 z-10 pointer-events-none flex items-center" style={{ top }}>
+                          <div className="w-2.5 h-2.5 rounded-full bg-red-400 -ml-1.5 shadow flex-shrink-0" />
+                          <div className="flex-1 h-[2px] bg-red-400 shadow-sm" />
+                        </div>
+                      );
+                    })()}
+
+                    {/* Hover hint when empty */}
+                    <div className="absolute inset-0 opacity-0 hover:opacity-100 pointer-events-none flex items-start justify-center pt-2 transition-opacity">
+                      <span className="text-[9px] text-text-muted/40">+ click to schedule</span>
+                    </div>
+
+                    {/* Scheduled task blocks */}
+                    {scheduled.map((task) => {
+                      const pos = getTaskPos(task);
+                      if (!pos) return null;
+                      const color = CAT_COLORS[task.category] || "#666";
+                      const isDone = task.recurring ? (task.completions?.includes(key) ?? false) : task.status === "done";
+                      const est = (task as unknown as Record<string, unknown>).estimatedTime as number | undefined;
+                      return (
+                        <div key={task._id} data-task-block="1"
+                          onClick={(e) => { e.stopPropagation(); onSelect(task); }}
+                          className={`absolute left-0.5 right-0.5 rounded-lg overflow-hidden cursor-pointer z-[5] transition-all hover:z-[8] hover:shadow-lg ${isDone ? "opacity-40" : "hover:scale-[1.01]"}`}
+                          style={{ top: pos.top + 1, height: pos.height, background: color + "30", borderLeft: `3px solid ${color}` }}>
+                          <div className="px-2 py-1 h-full flex flex-col justify-center">
+                            <p className="text-[10px] font-semibold leading-snug line-clamp-2" style={{ color }}>
+                              {task.title}
+                            </p>
+                            {pos.height > 34 && (
+                              <p className="text-[8px] leading-tight mt-0.5" style={{ color: color + "aa" }}>
+                                {new Date(task.startDate!).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase()}
+                                {est ? ` · ${formatMins(est)}` : ""}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Slot creation popup */}
+      {slotPopup && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setSlotPopup(null)} />
+          <div className="fixed z-50 drop-shadow-2xl"
+            style={{
+              left: Math.min(slotPopup.x + 8, (typeof window !== "undefined" ? window.innerWidth : 800) - 256),
+              top: Math.min(slotPopup.y - 20, (typeof window !== "undefined" ? window.innerHeight : 800) - 200),
+            }}>
+            <ScheduleSlotPopup
+              dateKey={slotPopup.dateKey} hour={slotPopup.hour} minute={slotPopup.minute}
+              onAdd={(title, duration) => {
+                onAddAtSlot(slotPopup.dateKey, slotPopup.hour, slotPopup.minute, title, duration);
+                setSlotPopup(null);
+              }}
+              onClose={() => setSlotPopup(null)} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -606,6 +740,27 @@ export default function HomePage() {
   const handleInlineAdd = async (data: Record<string, unknown>) => {
     try {
       await fetch("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      fetchTasks();
+    } catch (e) { console.error(e); }
+  };
+
+  const handleAddAtSlot = async (dateKey: string, hour: number, minute: number, title: string, durationMins: number) => {
+    const startDate = new Date(dateKey + "T00:00:00");
+    startDate.setHours(hour, minute, 0, 0);
+    try {
+      await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          category: "trabajo",
+          subcategory: CATEGORIES.trabajo.subcategories[0] || "general",
+          priority: 3, roi: 5, joy: 5,
+          dueDate: dateKey,
+          startDate: startDate.toISOString(),
+          estimatedTime: durationMins,
+        }),
+      });
       fetchTasks();
     } catch (e) { console.error(e); }
   };
@@ -806,7 +961,7 @@ export default function HomePage() {
 
           {/* ── View: Weekly or Schedule ──────────────── */}
           {viewMode === "schedule" ? (
-            <ScheduleView weekDates={weekDates} tasksByDay={tasksByDay} onSelect={setSelectedTask} onComplete={handleComplete} />
+            <ScheduleView weekDates={weekDates} tasksByDay={tasksByDay} onSelect={setSelectedTask} onAddAtSlot={handleAddAtSlot} />
           ) : null}
 
           {/* ── Weekly Columns ─────────────────────────── */}
