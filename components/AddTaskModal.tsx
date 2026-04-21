@@ -24,7 +24,7 @@ interface AddTaskModalProps {
     priority: Priority;
     roi: number;
     joy: number;
-    recurring: { type: "daily" | "weekly" | "custom"; days?: number[] } | null;
+    recurring: { type: "daily" | "weekdays" | "weekends" | "weekly" | "custom"; days?: number[] } | null;
     tags: string[];
   }) => void;
   editTask?: {
@@ -36,7 +36,7 @@ interface AddTaskModalProps {
     priority: Priority;
     roi: number;
     joy: number;
-    recurring?: { type: "daily" | "weekly" | "custom"; days?: number[] } | null;
+    recurring?: { type: "daily" | "weekdays" | "weekends" | "weekly" | "custom"; days?: number[] } | null;
     tags?: string[];
   } | null;
 }
@@ -50,7 +50,8 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddT
   const [roi, setRoi] = useState(5);
   const [joy, setJoy] = useState(5);
   const [isRecurring, setIsRecurring] = useState(false);
-  const [recurringType, setRecurringType] = useState<"daily" | "weekly" | "custom">("daily");
+  const [recurringType, setRecurringType] = useState<"daily" | "weekdays" | "weekends" | "custom">("daily");
+  const [customDays, setCustomDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const { subcategories: dynamicSubs } = useSubcategories();
 
   useEffect(() => {
@@ -63,7 +64,11 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddT
       setRoi(editTask.roi);
       setJoy(editTask.joy);
       setIsRecurring(!!editTask.recurring);
-      if (editTask.recurring) setRecurringType(editTask.recurring.type);
+      if (editTask.recurring) {
+        const t = editTask.recurring.type as "daily" | "weekdays" | "weekends" | "custom";
+        setRecurringType(t);
+        if (editTask.recurring.days) setCustomDays(editTask.recurring.days);
+      }
     } else {
       setTitle("");
       setDescription("");
@@ -87,7 +92,10 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddT
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onSave({ title: title.trim(), description: description.trim(), category, subcategory, priority, roi, joy, recurring: isRecurring ? { type: recurringType } : null, tags: [] });
+    const recurringData = isRecurring
+      ? { type: recurringType, ...(recurringType === "custom" ? { days: customDays } : {}) }
+      : null;
+    onSave({ title: title.trim(), description: description.trim(), category, subcategory, priority, roi, joy, recurring: recurringData, tags: [] });
     onClose();
   };
 
@@ -186,21 +194,51 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddT
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <label className="text-sm text-text-secondary">Recurring</label>
-            <div className="flex items-center gap-2">
-              {isRecurring && (
-                <select value={recurringType} onChange={(e) => setRecurringType(e.target.value as "daily" | "weekly")}
-                  className="px-2 py-1 rounded-md bg-bg-tertiary border border-border text-xs text-text-primary">
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                </select>
-              )}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-text-secondary">Recurring</label>
               <button type="button" onClick={() => setIsRecurring(!isRecurring)}
                 className={`w-9 h-5 rounded-full transition-colors ${isRecurring ? "bg-accent" : "bg-bg-tertiary"}`}>
                 <div className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${isRecurring ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
               </button>
             </div>
+
+            {isRecurring && (
+              <div className="space-y-2 pl-0">
+                <div className="grid grid-cols-4 gap-1.5">
+                  {(["daily", "weekdays", "weekends", "custom"] as const).map((opt) => {
+                    const labels: Record<string, string> = { daily: "Every Day", weekdays: "Mon–Fri", weekends: "Weekends", custom: "Custom" };
+                    return (
+                      <button key={opt} type="button" onClick={() => setRecurringType(opt)}
+                        className={`px-2 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                          recurringType === opt
+                            ? "border-accent bg-accent/10 text-accent-text"
+                            : "border-border hover:border-border-strong text-text-secondary"
+                        }`}>
+                        {labels[opt]}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {recurringType === "custom" && (
+                  <div className="flex gap-1 justify-between">
+                    {["S", "M", "T", "W", "T", "F", "S"].map((label, i) => {
+                      const active = customDays.includes(i);
+                      return (
+                        <button key={i} type="button"
+                          onClick={() => setCustomDays(active ? customDays.filter(d => d !== i) : [...customDays, i].sort())}
+                          className={`flex-1 py-1.5 rounded-md text-xs font-bold border transition-all ${
+                            active ? "border-accent bg-accent/15 text-accent-text" : "border-border text-text-muted hover:border-border-strong"
+                          }`}>
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <button type="submit" disabled={!title.trim()}

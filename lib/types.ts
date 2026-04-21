@@ -18,9 +18,11 @@ export interface Task {
   startDate?: string;
   dueDate?: string;
   recurring?: {
-    type: "daily" | "weekly" | "custom";
-    days?: number[];
+    type: "daily" | "weekdays" | "weekends" | "weekly" | "custom";
+    days?: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
   };
+  completions?: string[]; // "YYYY-MM-DD" dates when done
+  skips?: string[];       // "YYYY-MM-DD" dates when skipped
   subtasks?: { text: string; done: boolean }[];
   tags: string[];
   sourceUrl?: string;

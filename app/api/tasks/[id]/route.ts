@@ -21,6 +21,42 @@ export async function PATCH(
       return NextResponse.json({ error: "ID inv\u00E1lido" }, { status: 400 });
     }
 
+    // Handle addCompletion: log a recurring task as done for a specific date
+    if (body.addCompletion) {
+      const date = body.addCompletion as string;
+      const task = await db.collection("tasks").findOne({ _id: new ObjectId(id), userId });
+      if (task) {
+        await db.collection("tasks").updateOne(
+          { _id: new ObjectId(id), userId },
+          { $addToSet: { completions: date } }
+        );
+        await db.collection("stats").updateOne(
+          { date, userId },
+          {
+            $inc: {
+              totalXP: task.xp,
+              tasksCompleted: 1,
+              [`tasksByCategory.${task.category}`]: 1,
+            },
+            $setOnInsert: { date, userId },
+          },
+          { upsert: true }
+        );
+      }
+      const updated = await db.collection("tasks").findOne({ _id: new ObjectId(id), userId });
+      return NextResponse.json(updated);
+    }
+
+    // Handle addSkipDate: skip a recurring task for a specific date
+    if (body.addSkipDate) {
+      await db.collection("tasks").updateOne(
+        { _id: new ObjectId(id), userId },
+        { $addToSet: { skips: body.addSkipDate } }
+      );
+      const updated = await db.collection("tasks").findOne({ _id: new ObjectId(id), userId });
+      return NextResponse.json(updated);
+    }
+
     const updates: Record<string, unknown> = {};
 
     // Handle field updates
@@ -42,6 +78,8 @@ export async function PATCH(
       "estimatedTime",
       "attachments",
       "comments",
+      "completions",
+      "skips",
     ];
 
     for (const field of allowedFields) {
