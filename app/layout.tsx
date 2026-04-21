@@ -4,6 +4,7 @@ import ThemeProvider from "@/components/ThemeProvider";
 import NextAuthProvider from "@/components/NextAuthProvider";
 import PWARegister from "@/components/PWARegister";
 import GlobalChatbox from "@/components/GlobalChatbox";
+import GlobalTimerProvider from "@/components/GlobalTimerProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -60,7 +61,9 @@ export default function RootLayout({
         <NextAuthProvider>
           <ThemeProvider>
             <PWARegister />
-            {children}
+            <GlobalTimerProvider>
+              {children}
+            </GlobalTimerProvider>
             <GlobalChatbox />
           </ThemeProvider>
         </NextAuthProvider>

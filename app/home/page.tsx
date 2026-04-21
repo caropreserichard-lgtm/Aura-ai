@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   ChevronLeft, ChevronRight, Plus, Check, Calendar, SlidersHorizontal,
   ArrowUpDown, Hash, Clock, Target, ArrowUp, Link2, X, Search, Undo2,
+  CalendarDays, LayoutGrid,
 } from "lucide-react";
 import {
   DndContext, rectIntersection, DragEndEvent, DragStartEvent, DragOverEvent, DragOverlay,
@@ -58,6 +59,19 @@ function toDateKey(d: Date) {
   return `${y}-${m}-${day}`;
 }
 function formatMins(m: number) { return m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}` : `0:${String(m).padStart(2, "0")}`; }
+
+function isRecurringOnDate(task: Task, date: Date): boolean {
+  if (!task.recurring || task.status === "done") return false;
+  const dow = date.getDay();
+  switch (task.recurring.type) {
+    case "daily": return true;
+    case "weekdays": return dow >= 1 && dow <= 5;
+    case "weekends": return dow === 0 || dow === 6;
+    case "weekly": return task.recurring.days?.includes(dow) ?? false;
+    case "custom": return task.recurring.days?.includes(dow) ?? false;
+    default: return false;
+  }
+}
 
 // ─── Filter Popover ─────────────────────────────────────────────
 function FilterPopover({ selected, onSelect, onClose }: {
@@ -322,12 +336,14 @@ function DayColumn({ id, isHighlighted, children }: { id: string; isHighlighted:
 }
 
 // ─── Draggable Task Card ──────────────────────────────────────
-function TaskCard({ task, onSelect, onComplete, isDragging }: {
-  task: Task; onSelect: (t: Task) => void; onComplete: (id: string) => void; isDragging: boolean;
+function TaskCard({ task, onSelect, onComplete, isDragging, dateKey }: {
+  task: Task; onSelect: (t: Task) => void; onComplete: (id: string, dateKey?: string) => void; isDragging: boolean; dateKey?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task._id! });
   const color = CAT_COLORS[task.category] || "#666";
-  const isDone = task.status === "done";
+  const isDone = task.recurring && dateKey
+    ? (task.completions?.includes(dateKey) ?? false)
+    : task.status === "done";
   const est = (task as unknown as Record<string, unknown>).estimatedTime as number | undefined;
   const spent = task.timeSpent || 0;
 
@@ -369,7 +385,7 @@ function TaskCard({ task, onSelect, onComplete, isDragging }: {
         )}
         <div className="flex items-center justify-between mt-1">
           <div className="flex items-center gap-1.5">
-            <button onClick={(e) => { e.stopPropagation(); onComplete(task._id!); }}
+            <button onClick={(e) => { e.stopPropagation(); onComplete(task._id!, dateKey); }}
               className={`w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center transition-all ${
                 isDone ? "bg-emerald-500 border-[1.5px] border-emerald-500" : "border-[1.5px] border-text-muted/30 hover:border-accent"
               }`}>
@@ -381,6 +397,118 @@ function TaskCard({ task, onSelect, onComplete, isDragging }: {
           <span className="text-[8px] font-medium truncate max-w-[60%] text-right" style={{ color }}>
             # {task.subcategory.length > 14 ? task.subcategory.slice(0, 14) + "..." : task.subcategory}
           </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Schedule View ───────────────────────────────────────────
+function ScheduleView({ weekDates, tasksByDay, onSelect, onComplete }: {
+  weekDates: Date[];
+  tasksByDay: Record<string, Task[]>;
+  onSelect: (t: Task) => void;
+  onComplete: (id: string, dateKey?: string) => void;
+}) {
+  const HOURS = Array.from({ length: 17 }, (_, i) => i + 6); // 6am–10pm
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMin = now.getMinutes();
+
+  const fmtHour = (h: number) =>
+    h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`;
+
+  return (
+    <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+      <div className="min-w-[640px]">
+        {/* Day header */}
+        <div className="grid gap-0 border-b border-border pb-2 mb-0" style={{ gridTemplateColumns: "52px repeat(7, 1fr)" }}>
+          <div />
+          {weekDates.map((date) => {
+            const todayDay = isToday(date);
+            return (
+              <div key={toDateKey(date)} className="text-center px-1">
+                <p className={`text-[10px] font-semibold uppercase tracking-wide ${todayDay ? "text-accent" : "text-text-muted"}`}>
+                  {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][date.getDay()]}
+                </p>
+                <p className={`text-lg font-bold leading-none mt-0.5 ${todayDay ? "text-accent" : "text-text-primary"}`}>
+                  {date.getDate()}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* All-day strip */}
+        <div className="grid gap-0 border-b border-border/40 min-h-[28px]" style={{ gridTemplateColumns: "52px repeat(7, 1fr)" }}>
+          <div className="text-[9px] text-text-muted pt-1.5 text-right pr-2 whitespace-nowrap">all day</div>
+          {weekDates.map((date) => {
+            const key = toDateKey(date);
+            const allDay = (tasksByDay[key] || []).filter((t) => !t.startDate);
+            return (
+              <div key={key} className="border-l border-border/20 px-0.5 py-0.5 space-y-0.5">
+                {allDay.slice(0, 2).map((task) => {
+                  const color = CAT_COLORS[task.category] || "#666";
+                  const isDone = task.recurring ? (task.completions?.includes(key) ?? false) : task.status === "done";
+                  return (
+                    <div key={task._id} onClick={() => onSelect(task)}
+                      className={`text-[9px] px-1 py-0.5 rounded cursor-pointer truncate leading-tight ${isDone ? "opacity-40" : ""}`}
+                      style={{ background: color + "28", color }}>
+                      {task.title}
+                    </div>
+                  );
+                })}
+                {allDay.length > 2 && (
+                  <span className="text-[8px] text-text-muted pl-1">+{allDay.length - 2}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Hour rows */}
+        <div className="relative">
+          {HOURS.map((hour) => {
+            const showCurrentTime = isToday(new Date()) && hour === currentHour;
+            return (
+              <div key={hour} className="relative grid gap-0" style={{ gridTemplateColumns: "52px repeat(7, 1fr)", height: "64px" }}>
+                <div className="text-[9px] text-text-muted text-right pr-2 pt-1 leading-none whitespace-nowrap">{fmtHour(hour)}</div>
+                {weekDates.map((date) => {
+                  const key = toDateKey(date);
+                  const todayCol = isToday(date);
+                  const hourTasks = (tasksByDay[key] || []).filter((t) => {
+                    if (!t.startDate) return false;
+                    return new Date(t.startDate).getHours() === hour;
+                  });
+                  return (
+                    <div key={key} className={`border-l border-t border-border/20 px-0.5 py-0.5 overflow-hidden ${todayCol ? "bg-accent/[0.03]" : ""}`}>
+                      {hourTasks.map((task) => {
+                        const color = CAT_COLORS[task.category] || "#666";
+                        const isDone = task.recurring ? (task.completions?.includes(key) ?? false) : task.status === "done";
+                        const est = (task as unknown as Record<string, unknown>).estimatedTime as number | undefined;
+                        return (
+                          <div key={task._id} onClick={() => onSelect(task)}
+                            className={`rounded px-1 py-0.5 cursor-pointer text-[9px] leading-tight mb-0.5 ${isDone ? "opacity-40" : ""}`}
+                            style={{ background: color + "28", borderLeft: `2px solid ${color}`, color }}>
+                            <div className="font-semibold truncate">{task.title}</div>
+                            {est && <div className="opacity-70">{formatMins(est)}</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+                {showCurrentTime && (
+                  <div className="absolute pointer-events-none" style={{ left: 52, right: 0, top: `${(currentMin / 60) * 100}%` }}>
+                    <div className="relative flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 -ml-1" />
+                      <div className="flex-1 h-[1.5px] bg-red-400" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -401,6 +529,14 @@ export default function HomePage() {
   const [addTaskDay, setAddTaskDay] = useState<string | null>(null);
   const [undoAction, setUndoAction] = useState<{ taskId: string; prevDueDate: string; label: string } | null>(null);
   const undoTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [viewMode, setViewMode] = useState<"weekly" | "schedule">(() =>
+    typeof window !== "undefined" ? (localStorage.getItem("home-view-mode") as "weekly" | "schedule") || "weekly" : "weekly"
+  );
+  const toggleViewMode = () => {
+    const next = viewMode === "weekly" ? "schedule" : "weekly";
+    setViewMode(next);
+    localStorage.setItem("home-view-mode", next);
+  };
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -414,22 +550,44 @@ export default function HomePage() {
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
   const weekDates = getWeekDates(weekOffset);
-  // Tasks by day (with filter)
+  // Tasks by day (with filter) — includes recurring tasks
   const tasksByDay: Record<string, Task[]> = {};
   weekDates.forEach((d) => {
     const key = toDateKey(d);
-    let dayTasks = tasks.filter((t) => t.dueDate && t.dueDate.startsWith(key));
+    // Regular tasks with dueDate on this day
+    let dayTasks = tasks.filter((t) => !t.recurring && t.dueDate && t.dueDate.startsWith(key));
+    // Recurring tasks that apply to this day
+    const recurringForDay = tasks.filter((t) => isRecurringOnDate(t, d));
+    const seen = new Set(dayTasks.map((t) => t._id));
+    recurringForDay.forEach((t) => { if (!seen.has(t._id)) dayTasks.push(t); });
     if (filterCat !== "all") dayTasks = dayTasks.filter((t) => t.category === filterCat);
     dayTasks.sort((a, b) => {
-      if (a.status === "done" && b.status !== "done") return 1;
-      if (a.status !== "done" && b.status === "done") return -1;
+      const aDone = a.recurring ? (a.completions?.includes(key) ?? false) : a.status === "done";
+      const bDone = b.recurring ? (b.completions?.includes(key) ?? false) : b.status === "done";
+      if (aDone && !bDone) return 1;
+      if (!aDone && bDone) return -1;
       return (a.sortOrder ?? 999) - (b.sortOrder ?? 999);
     });
     tasksByDay[key] = dayTasks;
   });
 
-  const handleComplete = async (id: string) => {
+  const handleComplete = async (id: string, dateKey?: string) => {
     const task = tasks.find((t) => t._id === id);
+    // Recurring task: toggle completion for the specific date
+    if (task?.recurring && dateKey) {
+      const already = task.completions?.includes(dateKey);
+      if (already) {
+        const next = (task.completions || []).filter((d) => d !== dateKey);
+        setTasks((prev) => prev.map((t) => t._id === id ? { ...t, completions: next } : t));
+        await fetch(`/api/tasks/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ completions: next }) });
+      } else {
+        setTasks((prev) => prev.map((t) => t._id === id ? { ...t, completions: [...(t.completions || []), dateKey] } : t));
+        await fetch(`/api/tasks/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ addCompletion: dateKey }) });
+      }
+      fetchTasks();
+      return;
+    }
+    // Regular task: toggle done/pending
     const newStatus = task?.status === "done" ? "pending" : "done";
     setTasks((prev) => prev.map((t) => t._id === id ? { ...t, status: newStatus, completedAt: newStatus === "done" ? new Date().toISOString() : undefined } : t));
     try {
@@ -625,6 +783,10 @@ export default function HomePage() {
               </button>
             </div>
             <div className="flex items-center gap-1">
+              <button onClick={toggleViewMode} title={viewMode === "weekly" ? "Switch to schedule view" : "Switch to weekly view"}
+                className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors border border-border/50 mr-1">
+                {viewMode === "weekly" ? <CalendarDays size={16} /> : <LayoutGrid size={16} />}
+              </button>
               <button onClick={() => setWeekOffset((w) => w - 1)} className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors"><ChevronLeft size={18} /></button>
               <button onClick={() => setWeekOffset(0)} className="px-3 py-1 rounded-lg text-[12px] font-medium hover:bg-bg-hover text-text-secondary transition-colors whitespace-nowrap">
                 {(() => {
@@ -642,15 +804,20 @@ export default function HomePage() {
             </div>
           </div>
 
+          {/* ── View: Weekly or Schedule ──────────────── */}
+          {viewMode === "schedule" ? (
+            <ScheduleView weekDates={weekDates} tasksByDay={tasksByDay} onSelect={setSelectedTask} onComplete={handleComplete} />
+          ) : null}
+
           {/* ── Weekly Columns ─────────────────────────── */}
-          <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+          {viewMode === "weekly" && <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
             <div className="relative">
               <div className="flex md:grid md:grid-cols-7 gap-4 mb-8 overflow-x-auto pb-4 md:pb-0 snap-x snap-mandatory md:snap-none -mx-4 px-4 md:mx-0 md:px-0">
                 {weekDates.map((date) => {
                   const key = toDateKey(date);
                   const dayTasks = tasksByDay[key] || [];
                   const todayDay = isToday(date);
-                  const doneCount = dayTasks.filter((t) => t.status === "done").length;
+                  const doneCount = dayTasks.filter((t) => t.recurring ? (t.completions?.includes(key) ?? false) : t.status === "done").length;
                   const totalCount = dayTasks.length;
                   const progress = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
 
@@ -690,7 +857,7 @@ export default function HomePage() {
                         <div className="min-h-[120px] space-y-2">
                           {dayTasks.map((task) => (
                             <TaskCard key={task._id} task={task} onSelect={setSelectedTask} onComplete={handleComplete}
-                              isDragging={activeDragId === task._id} />
+                              isDragging={activeDragId === task._id} dateKey={key} />
                           ))}
                         </div>
                       </SortableContext>
@@ -727,7 +894,7 @@ export default function HomePage() {
                 );
               })() : null}
             </DragOverlay>
-          </DndContext>
+          </DndContext>}
         </div>
 
         <AddTaskModal
