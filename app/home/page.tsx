@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   ChevronLeft, ChevronRight, Plus, Check, Calendar, SlidersHorizontal,
   ArrowUpDown, Hash, Clock, Target, ArrowUp, Link2, X, Search, Undo2,
-  RotateCcw, SkipForward, Trash2,
 } from "lucide-react";
 import {
   DndContext, rectIntersection, DragEndEvent, DragStartEvent, DragOverEvent, DragOverlay,
@@ -402,14 +401,6 @@ export default function HomePage() {
   const [addTaskDay, setAddTaskDay] = useState<string | null>(null);
   const [undoAction, setUndoAction] = useState<{ taskId: string; prevDueDate: string; label: string } | null>(null);
   const undoTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [openRecurringMenu, setOpenRecurringMenu] = useState<string | null>(null);
-  const recurringMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (recurringMenuRef.current && !recurringMenuRef.current.contains(e.target as Node)) setOpenRecurringMenu(null); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -423,8 +414,6 @@ export default function HomePage() {
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
   const weekDates = getWeekDates(weekOffset);
-  const todayStr = new Date().toISOString().split("T")[0];
-
   // Tasks by day (with filter)
   const tasksByDay: Record<string, Task[]> = {};
   weekDates.forEach((d) => {
@@ -439,32 +428,6 @@ export default function HomePage() {
     tasksByDay[key] = dayTasks;
   });
 
-  // Recurring helpers
-  const isRecurringToday = (task: Task): boolean => {
-    if (!task.recurring) return false;
-    const dow = new Date().getDay();
-    switch (task.recurring.type) {
-      case "daily": return true;
-      case "weekdays": return dow >= 1 && dow <= 5;
-      case "weekends": return dow === 0 || dow === 6;
-      case "weekly": return task.recurring.days?.includes(dow) ?? true;
-      case "custom": return task.recurring.days?.includes(dow) ?? false;
-      default: return false;
-    }
-  };
-
-  const getRecurringLabel = (task: Task): string => {
-    if (!task.recurring) return "";
-    const labels: Record<string, string> = { daily: "Every day", weekdays: "Mon–Fri", weekends: "Weekends", weekly: "Weekly", custom: "Custom" };
-    if (task.recurring.type === "custom" && task.recurring.days?.length) {
-      const names = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-      return task.recurring.days.map((d) => names[d]).join(" · ");
-    }
-    return labels[task.recurring.type] || "";
-  };
-
-  const recurringToday = tasks.filter((t) => t.recurring && t.status !== "done" && isRecurringToday(t));
-
   const handleComplete = async (id: string) => {
     const task = tasks.find((t) => t._id === id);
     const newStatus = task?.status === "done" ? "pending" : "done";
@@ -473,24 +436,6 @@ export default function HomePage() {
       await fetch(`/api/tasks/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: newStatus }) });
       fetchTasks();
     } catch (e) { console.error(e); fetchTasks(); }
-  };
-
-  const handleRecurringDoneToday = async (id: string) => {
-    setOpenRecurringMenu(null);
-    await fetch(`/api/tasks/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ addCompletion: todayStr }) });
-    fetchTasks();
-  };
-
-  const handleRecurringSkip = async (id: string) => {
-    setOpenRecurringMenu(null);
-    await fetch(`/api/tasks/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ addSkipDate: todayStr }) });
-    fetchTasks();
-  };
-
-  const handleRecurringDelete = async (id: string) => {
-    setOpenRecurringMenu(null);
-    await fetch(`/api/tasks/${id}`, { method: "DELETE" });
-    fetchTasks();
   };
 
   const handleAddTask = async (taskData: Record<string, unknown>) => {
@@ -644,12 +589,7 @@ export default function HomePage() {
     setWeekOffset(diffWeeks);
   };
 
-  // Suppress unused var warning (kept for potential future use)
-  void (handleUpdateDueDate);
-  void (loading);
-  void (Target);
-  void (Link2);
-  void (X);
+  void (handleUpdateDueDate); void (loading); void (Target); void (Link2); void (X);
 
   return (
     <div className="flex min-h-screen">
@@ -701,72 +641,6 @@ export default function HomePage() {
               <button onClick={() => setWeekOffset((w) => w + 1)} className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors"><ChevronRight size={18} /></button>
             </div>
           </div>
-
-          {/* ── Daily Routines (Recurring Tasks) ──────── */}
-          {recurringToday.length > 0 && (
-            <div ref={recurringMenuRef} className="mb-6">
-              <div className="flex items-center gap-2 mb-2.5">
-                <RotateCcw size={13} className="text-accent" />
-                <h2 className="font-heading font-semibold text-sm text-text-secondary">Daily Routines</h2>
-                <span className="text-[10px] text-text-muted font-mono bg-bg-hover px-1.5 py-0.5 rounded-full">
-                  {recurringToday.filter((t) => t.completions?.includes(todayStr)).length}/{recurringToday.length}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                {recurringToday.map((task) => {
-                  const color = CAT_COLORS[task.category] || "#666";
-                  const doneToday = task.completions?.includes(todayStr) ?? false;
-                  const skippedToday = task.skips?.includes(todayStr) ?? false;
-                  const menuOpen = openRecurringMenu === task._id;
-
-                  return (
-                    <div key={task._id}
-                      className={`relative flex items-center gap-2.5 p-2.5 rounded-xl border transition-all ${
-                        doneToday ? "border-accent/30 bg-accent/5 opacity-70" : skippedToday ? "border-border bg-bg-secondary opacity-50" : "border-border bg-bg-secondary hover:border-border-strong"
-                      }`}>
-                      <div className="relative flex-shrink-0">
-                        <button
-                          onClick={() => !doneToday && !skippedToday && setOpenRecurringMenu(menuOpen ? null : task._id!)}
-                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                            doneToday ? "border-accent bg-accent text-white" : skippedToday ? "border-text-muted bg-bg-tertiary" : "border-text-muted hover:border-accent"
-                          }`}>
-                          {doneToday && <Check size={12} />}
-                          {skippedToday && <SkipForward size={10} className="text-text-muted" />}
-                        </button>
-                        {menuOpen && (
-                          <div className="absolute left-0 top-8 z-30 w-44 bg-bg-primary border border-border rounded-lg shadow-xl overflow-hidden">
-                            <button onClick={() => handleRecurringDoneToday(task._id!)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors">
-                              <Check size={13} className="text-accent" /> Done for today
-                            </button>
-                            <button onClick={() => handleRecurringSkip(task._id!)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-secondary hover:bg-bg-hover transition-colors">
-                              <SkipForward size={13} className="text-text-muted" /> Skip today
-                            </button>
-                            <div className="border-t border-border" />
-                            <button onClick={() => handleRecurringDelete(task._id!)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-danger hover:bg-bg-hover transition-colors">
-                              <Trash2 size={13} /> Remove task
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-[12px] font-medium leading-tight truncate ${doneToday || skippedToday ? "line-through text-text-muted" : "text-text-primary"}`}>
-                          {task.title}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[9px] font-medium" style={{ color }}>#{task.subcategory}</span>
-                          <span className="text-[9px] text-text-muted">·</span>
-                          <span className="text-[9px] text-text-muted">{getRecurringLabel(task)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* ── Weekly Columns ─────────────────────────── */}
           <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>

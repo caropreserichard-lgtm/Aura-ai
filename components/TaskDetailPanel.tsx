@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   X, Play, Pause, Trash2, Plus, Check, Calendar, Link2, ExternalLink,
   Maximize2, MoreHorizontal, Paperclip, Download, FileText, Image as ImageIcon,
-  Pencil, CheckCircle2,
+  Pencil, CheckCircle2, RotateCcw,
 } from "lucide-react";
 import { Task, PRIORITY_CONFIG } from "@/lib/types";
 import { formatTime } from "@/lib/scoring";
@@ -57,6 +57,11 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [editingSubtaskIndex, setEditingSubtaskIndex] = useState<number | null>(null);
   const [editingSubtaskText, setEditingSubtaskText] = useState("");
+  const [isRecurring, setIsRecurring] = useState(!!task.recurring);
+  const [recurringType, setRecurringType] = useState<"daily" | "weekdays" | "weekends" | "custom">(
+    (task.recurring?.type as "daily" | "weekdays" | "weekends" | "custom") || "daily"
+  );
+  const [customDays, setCustomDays] = useState<number[]>(task.recurring?.days || [1, 2, 3, 4, 5]);
   const overlayRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const subtaskInputRef = useRef<HTMLInputElement>(null);
@@ -224,6 +229,13 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
   const handleDueDate = (val: string) => {
     setDueDate(val);
     onUpdate({ dueDate: val || null });
+  };
+
+  const handleRecurringChange = (enabled: boolean, type?: typeof recurringType, days?: number[]) => {
+    const t = type ?? recurringType;
+    const d = days ?? customDays;
+    const recurring = enabled ? { type: t, ...(t === "custom" ? { days: d } : {}) } : null;
+    onUpdate({ recurring });
   };
 
   const handleEstimatedTime = (mins: number) => {
@@ -505,6 +517,70 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
                   <ExternalLink size={11} className="text-accent flex-shrink-0" />
                   <button onClick={() => setEditingUrl(true)}
                     className="opacity-0 group-hover:opacity-100 text-[10px] text-text-muted hover:text-text-secondary transition-all">Edit</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Recurring ────────────────────────────── */}
+        <div className="border-t border-border px-5 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <RotateCcw size={13} className={isRecurring ? "text-accent" : "text-text-muted"} />
+              <span className="text-sm text-text-secondary">Recurring</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const next = !isRecurring;
+                setIsRecurring(next);
+                handleRecurringChange(next);
+              }}
+              className={`w-9 h-5 rounded-full transition-colors flex-shrink-0 ${isRecurring ? "bg-accent" : "bg-bg-tertiary"}`}>
+              <div className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${isRecurring ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
+            </button>
+          </div>
+
+          {isRecurring && (
+            <div className="mt-2.5 space-y-2">
+              <div className="grid grid-cols-4 gap-1.5">
+                {(["daily", "weekdays", "weekends", "custom"] as const).map((opt) => {
+                  const labels = { daily: "Every Day", weekdays: "Mon–Fri", weekends: "Weekends", custom: "Custom" };
+                  const active = recurringType === opt;
+                  return (
+                    <button key={opt} type="button"
+                      onClick={() => {
+                        setRecurringType(opt);
+                        handleRecurringChange(true, opt, customDays);
+                      }}
+                      className={`px-2 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                        active ? "border-accent bg-accent/10 text-accent-text" : "border-border hover:border-border-strong text-text-secondary"
+                      }`}>
+                      {labels[opt]}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {recurringType === "custom" && (
+                <div className="flex gap-1 justify-between">
+                  {["S", "M", "T", "W", "T", "F", "S"].map((label, i) => {
+                    const active = customDays.includes(i);
+                    return (
+                      <button key={i} type="button"
+                        onClick={() => {
+                          const next = active ? customDays.filter(d => d !== i) : [...customDays, i].sort();
+                          setCustomDays(next);
+                          handleRecurringChange(true, "custom", next);
+                        }}
+                        className={`flex-1 py-1.5 rounded-md text-xs font-bold border transition-all ${
+                          active ? "border-accent bg-accent/15 text-accent-text" : "border-border text-text-muted hover:border-border-strong"
+                        }`}>
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
