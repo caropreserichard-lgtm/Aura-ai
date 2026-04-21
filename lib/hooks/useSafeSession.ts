@@ -1,12 +1,8 @@
 "use client";
 
-import { useSession as useNextSession } from "next-auth/react";
-
-// Wraps next-auth useSession so it doesn't throw when SessionProvider is absent
+// SessionProvider is not configured in this app's layout.
+// useSession from next-auth returns undefined without it, crashing the build.
+// This stub returns an empty session so profile page renders safely.
 export function useSession() {
-  try {
-    return useNextSession();
-  } catch {
-    return { data: null, status: "unauthenticated" as const, update: async () => null };
-  }
+  return { data: null as null, status: "unauthenticated" as const, update: async () => null };
 }
