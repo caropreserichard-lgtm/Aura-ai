@@ -69,6 +69,7 @@ function ProfileContent() {
   const [empireName,      setEmpireName]      = useState("");
   const [avatarUrl,       setAvatarUrl]       = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadError,     setUploadError]     = useState<string | null>(null);
   const [profileSaving,   setProfileSaving]   = useState(false);
   const [profileSaved,    setProfileSaved]    = useState(false);
 
@@ -147,20 +148,33 @@ function ProfileContent() {
   // ── Handlers ──
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Por favor selecciona un archivo de imagen válido.");
+      return;
+    }
     setUploadingAvatar(true);
+    setUploadError(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
       const res  = await fetch("/api/upload", { method: "POST", body: formData });
       const data = await res.json();
+      if (!res.ok) {
+        setUploadError(data.error || "Error al subir la imagen.");
+        return;
+      }
       if (data.url) {
         setAvatarUrl(data.url);
         await fetch("/api/auth/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ avatarUrl: data.url }) });
         await update({ image: data.url });
       }
-    } catch { /* silent */ }
-    finally { setUploadingAvatar(false); }
+    } catch {
+      setUploadError("Error de conexión al subir la imagen.");
+    } finally {
+      setUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -326,13 +340,26 @@ function ProfileContent() {
                   <div>
                     <p className="text-lg font-semibold text-text-primary">{displayName}</p>
                     <p className="text-xs text-text-muted mb-3">{sessionUser?.email}</p>
-                    <button onClick={() => fileInputRef.current?.click()} disabled={uploadingAvatar}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border"
-                      style={{ borderColor: "rgba(231,202,121,0.4)", color: "#e7ca79" }}>
+                    <label
+                      htmlFor="avatar-upload"
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${uploadingAvatar ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                      style={{ borderColor: "rgba(231,202,121,0.4)", color: "#e7ca79" }}
+                    >
                       <Camera size={14} />
-                      {uploadingAvatar ? "Uploading..." : "Upload a new picture"}
-                    </button>
-                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+                      {uploadingAvatar ? "Subiendo..." : "Subir foto de perfil"}
+                    </label>
+                    {uploadError && (
+                      <p className="text-xs mt-1.5" style={{ color: "#f87171" }}>{uploadError}</p>
+                    )}
+                    <input
+                      id="avatar-upload"
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      disabled={uploadingAvatar}
+                      className="hidden"
+                      onChange={handleAvatarUpload}
+                    />
                   </div>
                 </div>
               </div>

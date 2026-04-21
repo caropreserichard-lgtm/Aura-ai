@@ -3,6 +3,7 @@ import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import ThemeProvider from "@/components/ThemeProvider";
 import NextAuthProvider from "@/components/NextAuthProvider";
 import PWARegister from "@/components/PWARegister";
+import GlobalChatbox from "@/components/GlobalChatbox";
 import "./globals.css";
 
 const inter = Inter({
@@ -30,13 +31,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "RICKY FLOW",
+  title: "Tayrona AI",
   description: "Tu Sistema Operativo Personal de Productividad",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "RICKY FLOW",
+    title: "Tayrona AI",
   },
   icons: {
     icon: "/icons/icon-192.png",
@@ -60,6 +61,7 @@ export default function RootLayout({
           <ThemeProvider>
             <PWARegister />
             {children}
+            <GlobalChatbox />
           </ThemeProvider>
         </NextAuthProvider>
       </body>

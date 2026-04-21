@@ -6,21 +6,22 @@ import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import {
   Home, CalendarDays, Inbox, ListTodo, BarChart3, Timer, Focus,
-  Settings2, FolderKanban, Wrench, Archive, LogOut, User, Shield,
+  Settings2, FolderKanban, Wrench, Archive, LogOut, User, Shield, Library,
 } from "lucide-react";
 import TayronaLogo from "@/components/TayronaLogo";
 
 const MAIN_NAV = [
-  { href: "/home", label: "Home", icon: Home },
-  { href: "/", label: "Today", icon: CalendarDays },
-  { href: "/inbox", label: "Inbox", icon: Inbox },
-  { href: "/tasks", label: "Tasks", icon: ListTodo },
-  { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/tools", label: "Tools", icon: Wrench },
-  { href: "/deepwork", label: "Focus", icon: Focus },
-  { href: "/stats", label: "Stats", icon: BarChart3 },
-  { href: "/timer", label: "Timer", icon: Timer },
-  { href: "/backlog", label: "Backlog", icon: Archive },
+  { href: "/home",     label: "Home",      icon: Home },
+  { href: "/",         label: "Today",     icon: CalendarDays },
+  { href: "/inbox",    label: "Inbox",     icon: Inbox },
+  { href: "/tasks",    label: "Tasks",     icon: ListTodo },
+  { href: "/projects", label: "Projects",  icon: FolderKanban },
+  { href: "/tools",    label: "Tools",     icon: Wrench },
+  { href: "/vault",    label: "La Bóveda", icon: Library },
+  { href: "/deepwork", label: "Focus",     icon: Focus },
+  { href: "/stats",    label: "Stats",     icon: BarChart3 },
+  { href: "/timer",    label: "Timer",     icon: Timer },
+  { href: "/backlog",  label: "Backlog",   icon: Archive },
 ];
 
 export default function Sidebar() {
@@ -61,7 +62,7 @@ export default function Sidebar() {
         </div>
 
         {/* Nav links */}
-        <nav className="flex-1 px-3 space-y-0.5">
+        <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
           {MAIN_NAV.map((item) => {
             const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
             const Icon = item.icon;

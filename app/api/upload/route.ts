@@ -16,6 +16,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
+    if (!file.type.startsWith("image/")) {
+      return NextResponse.json({ error: "Solo se permiten archivos de imagen." }, { status: 400 });
+    }
+
     // Max 10MB
     if (file.size > 10 * 1024 * 1024) {
       return NextResponse.json({ error: "File too large (max 10MB)" }, { status: 400 });

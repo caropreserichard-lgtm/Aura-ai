@@ -163,6 +163,39 @@ async function parseBatch(
   }
 }
 
+export async function classifyVaultUrl(url: string, title: string, description: string): Promise<{ category: string; insight: string }> {
+  const message = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 300,
+    messages: [{
+      role: "user",
+      content: `Eres un asistente para un emprendedor colombiano: dueño de gastro bar, crypto trader, dev de apps con Next.js, creador de contenido.
+
+Analiza este contenido web y clasifícalo.
+URL: ${url}
+Título: ${title}
+Descripción: ${description}
+
+Responde SOLO con JSON válido (sin markdown):
+{"category":"una de: Marketing, Crypto, Negocios, Desarrollo, Aprendizaje, Lifestyle, Otro","insight":"máximo 12 palabras explicando por qué este link es valioso para sus negocios"}`,
+    }],
+  });
+
+  const content = message.content[0];
+  if (content.type !== "text") return { category: "Otro", insight: "" };
+
+  try {
+    const cleaned = content.text.replace(/```(?:json)?\n?|\n?```/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+    return {
+      category: parsed.category || "Otro",
+      insight: parsed.insight || "",
+    };
+  } catch {
+    return { category: "Otro", insight: "" };
+  }
+}
+
 export async function parseInboxText(rawText: string) {
   // Load dynamic subcategories from DB
   const subcategories = await getSubcategories();
