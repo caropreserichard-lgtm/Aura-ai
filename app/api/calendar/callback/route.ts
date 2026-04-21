@@ -11,14 +11,14 @@ export async function GET(request: NextRequest) {
     const code = request.nextUrl.searchParams.get("code");
 
     if (!code) {
-      return NextResponse.redirect(new URL("/settings?error=no_code", request.url));
+      return NextResponse.redirect(new URL("/profile?tab=general&error=no_code", request.url));
     }
 
     const tokens = await getTokensFromCode(code);
 
     if (!tokens.access_token || !tokens.refresh_token) {
       return NextResponse.redirect(
-        new URL("/settings?error=no_tokens", request.url)
+        new URL("/profile?tab=general&error=no_tokens", request.url)
       );
     }
 
@@ -38,12 +38,12 @@ export async function GET(request: NextRequest) {
     );
 
     return NextResponse.redirect(
-      new URL("/settings?success=connected", request.url)
+      new URL("/profile?tab=general&success=connected", request.url)
     );
   } catch (error) {
     console.error("Calendar callback error:", error);
     return NextResponse.redirect(
-      new URL("/settings?error=auth_failed", request.url)
+      new URL("/profile?tab=general&error=auth_failed", request.url)
     );
   }
 }

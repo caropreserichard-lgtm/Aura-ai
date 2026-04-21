@@ -496,6 +496,16 @@ export default function ProjectsPage() {
   const [searchFocused, setSearchFocused] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  // ─── Project position preference (from localStorage) ──
+  const [addProjectToBeginning, setAddProjectToBeginning] = useState(false);
+  useEffect(() => {
+    setAddProjectToBeginning(localStorage.getItem("project_add_position") === "beginning");
+    // Listen for changes made in profile settings
+    const handler = () => setAddProjectToBeginning(localStorage.getItem("project_add_position") === "beginning");
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
+
   const fetchProjects = useCallback(async () => {
     try {
       const [activeRes, archivedRes] = await Promise.all([
@@ -541,12 +551,27 @@ export default function ProjectsPage() {
 
   const createProject = async () => {
     if (!newName.trim()) return;
+    const prevIds = new Set(projects.map((p) => p._id));
     await fetch("/api/projects", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newName.trim(), description: newDesc.trim(), color: newColor, labels: newLabels }),
     });
     setNewName(""); setNewDesc(""); setNewColor(PROJECT_COLORS[0]); setNewLabels([]); setShowNewProject(false);
-    fetchProjects();
+
+    // Fetch fresh list, then reorder if preference is "beginning"
+    const res  = await fetch("/api/projects");
+    const data = await res.json();
+    const list: Project[] = Array.isArray(data) ? data : [];
+
+    if (addProjectToBeginning && list.length > 1) {
+      const newProject = list.find((p) => !prevIds.has(p._id));
+      if (newProject) {
+        const reordered = [newProject, ...list.filter((p) => p._id !== newProject._id)];
+        reorderProjects(reordered); // sets state + persists order
+        return;
+      }
+    }
+    setProjects(list);
   };
 
   const archiveProject = async (id: string) => {
