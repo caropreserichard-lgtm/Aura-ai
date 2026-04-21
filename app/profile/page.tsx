@@ -298,8 +298,9 @@ export default function ProfilePage() {
 
   const { setLang } = useLanguage();
 
-  const displayName = [firstName, lastName].filter(Boolean).join(" ") || session?.user?.name || "User";
-  const initial = firstName?.[0]?.toUpperCase() || session?.user?.name?.[0]?.toUpperCase() || "T";
+  const sessionUser = session?.user ?? null;
+  const displayName = [firstName, lastName].filter(Boolean).join(" ") || sessionUser?.name || "User";
+  const initial = firstName?.[0]?.toUpperCase() || sessionUser?.name?.[0]?.toUpperCase() || "T";
 
   if (loading) {
     return (
@@ -385,7 +386,7 @@ export default function ProfilePage() {
                   </div>
                   <div>
                     <p className="text-lg font-semibold text-text-primary">{displayName}</p>
-                    <p className="text-xs text-text-muted mb-3">{session?.user?.email}</p>
+                    <p className="text-xs text-text-muted mb-3">{sessionUser?.email}</p>
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingAvatar}
@@ -439,7 +440,7 @@ export default function ProfilePage() {
                     <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
                     <input
                       type="email"
-                      value={session?.user?.email || ""}
+                      value={sessionUser?.email || ""}
                       disabled
                       className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-bg-tertiary border border-border text-sm text-text-muted cursor-not-allowed"
                     />
@@ -559,7 +560,7 @@ export default function ProfilePage() {
                 </div>
 
                 <p className="text-xs text-text-muted">
-                  Current email: <span className="text-text-secondary">{session?.user?.email}</span>
+                  Current email: <span className="text-text-secondary">{sessionUser?.email}</span>
                 </p>
 
                 <div>
