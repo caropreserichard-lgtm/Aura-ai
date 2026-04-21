@@ -587,9 +587,9 @@ function ScheduleView({ weekDates, tasksByDay, onSelect, onAddAtSlot }: {
                       );
                     })()}
 
-                    {/* Hover hint when empty */}
-                    <div className="absolute inset-0 opacity-0 hover:opacity-100 pointer-events-none flex items-start justify-center pt-2 transition-opacity">
-                      <span className="text-[9px] text-text-muted/40">+ click to schedule</span>
+                    {/* Click hint */}
+                    <div className="absolute inset-0 opacity-0 hover:opacity-100 pointer-events-none flex items-center justify-center transition-opacity">
+                      <span className="text-[9px] text-accent/40 font-medium">+ click to add</span>
                     </div>
 
                     {/* Scheduled task blocks */}
@@ -663,14 +663,11 @@ export default function HomePage() {
   const [addTaskDay, setAddTaskDay] = useState<string | null>(null);
   const [undoAction, setUndoAction] = useState<{ taskId: string; prevDueDate: string; label: string } | null>(null);
   const undoTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [viewMode, setViewMode] = useState<"weekly" | "schedule">(() =>
-    typeof window !== "undefined" ? (localStorage.getItem("home-view-mode") as "weekly" | "schedule") || "weekly" : "weekly"
-  );
-  const toggleViewMode = () => {
-    const next = viewMode === "weekly" ? "schedule" : "weekly";
-    setViewMode(next);
-    localStorage.setItem("home-view-mode", next);
-  };
+  const [viewMode, setViewMode] = useState<"weekly" | "schedule">("weekly");
+  useEffect(() => {
+    const saved = localStorage.getItem("home-view-mode") as "weekly" | "schedule" | null;
+    if (saved === "schedule") setViewMode("schedule");
+  }, []);
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -937,11 +934,18 @@ export default function HomePage() {
                 <Undo2 size={13} /> Undo
               </button>
             </div>
-            <div className="flex items-center gap-1">
-              <button onClick={toggleViewMode} title={viewMode === "weekly" ? "Switch to schedule view" : "Switch to weekly view"}
-                className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors border border-border/50 mr-1">
-                {viewMode === "weekly" ? <CalendarDays size={16} /> : <LayoutGrid size={16} />}
-              </button>
+            <div className="flex items-center gap-2">
+              {/* View mode toggle */}
+              <div className="flex items-center rounded-lg border border-border bg-bg-secondary overflow-hidden">
+                <button onClick={() => { setViewMode("weekly"); localStorage.setItem("home-view-mode","weekly"); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === "weekly" ? "bg-accent text-white" : "text-text-muted hover:bg-bg-hover"}`}>
+                  <LayoutGrid size={13} /> Week
+                </button>
+                <button onClick={() => { setViewMode("schedule"); localStorage.setItem("home-view-mode","schedule"); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === "schedule" ? "bg-accent text-white" : "text-text-muted hover:bg-bg-hover"}`}>
+                  <CalendarDays size={13} /> Schedule
+                </button>
+              </div>
               <button onClick={() => setWeekOffset((w) => w - 1)} className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted transition-colors"><ChevronLeft size={18} /></button>
               <button onClick={() => setWeekOffset(0)} className="px-3 py-1 rounded-lg text-[12px] font-medium hover:bg-bg-hover text-text-secondary transition-colors whitespace-nowrap">
                 {(() => {
@@ -960,9 +964,9 @@ export default function HomePage() {
           </div>
 
           {/* ── View: Weekly or Schedule ──────────────── */}
-          {viewMode === "schedule" ? (
+          {viewMode === "schedule" && (
             <ScheduleView weekDates={weekDates} tasksByDay={tasksByDay} onSelect={setSelectedTask} onAddAtSlot={handleAddAtSlot} />
-          ) : null}
+          )}
 
           {/* ── Weekly Columns ─────────────────────────── */}
           {viewMode === "weekly" && <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
