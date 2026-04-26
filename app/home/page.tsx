@@ -444,18 +444,85 @@ function ScheduleSlotPopup({ dateKey, hour, minute, onAdd, onClose }: {
   );
 }
 
+// ─── Task Time Picker Popup ───────────────────────────────────
+function TaskTimePickerPopup({ task, dateKey, onSchedule, onClose }: {
+  task: Task; dateKey: string;
+  onSchedule: (taskId: string, dateKey: string, hour: number, minute: number, duration: number) => void;
+  onClose: () => void;
+}) {
+  const QUICK_HOURS = [6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21];
+  const [hour, setHour] = useState(9);
+  const [minute, setMinute] = useState(0);
+  const [duration, setDuration] = useState(60);
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, [onClose]);
+  const fmtH = (h: number) => h === 0 ? "12am" : h < 12 ? `${h}am` : h === 12 ? "12pm" : `${h-12}pm`;
+  const color = CAT_COLORS[task.category] || "#666";
+  return (
+    <div className="bg-bg-tertiary border border-border rounded-xl shadow-2xl p-4 w-72">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+        <p className="text-xs font-semibold text-text-primary truncate flex-1">{task.title}</p>
+        <button onClick={onClose} className="text-text-muted hover:text-text-primary"><X size={14} /></button>
+      </div>
+      {/* Quick hour grid */}
+      <p className="text-[9px] text-text-muted uppercase tracking-wide mb-1.5">Select time</p>
+      <div className="grid grid-cols-8 gap-1 mb-3">
+        {QUICK_HOURS.map((h) => (
+          <button key={h} onClick={() => setHour(h)}
+            className={`py-1 rounded text-[9px] font-medium transition-colors ${hour === h ? "text-white" : "bg-bg-secondary text-text-muted hover:bg-bg-hover"}`}
+            style={hour === h ? { background: color } : {}}>
+            {fmtH(h)}
+          </button>
+        ))}
+      </div>
+      {/* Minute */}
+      <div className="flex gap-1.5 mb-3">
+        {[0, 15, 30, 45].map((m) => (
+          <button key={m} onClick={() => setMinute(m)}
+            className={`flex-1 py-1 rounded text-[10px] font-medium transition-colors ${minute === m ? "text-white" : "bg-bg-secondary text-text-muted hover:bg-bg-hover"}`}
+            style={minute === m ? { background: color } : {}}>
+            :{String(m).padStart(2,"0")}
+          </button>
+        ))}
+      </div>
+      {/* Duration */}
+      <p className="text-[9px] text-text-muted uppercase tracking-wide mb-1.5">Duration</p>
+      <div className="flex gap-1.5 mb-4">
+        {[30,60,90,120].map((d) => (
+          <button key={d} onClick={() => setDuration(d)}
+            className={`flex-1 py-1 rounded text-[10px] font-medium transition-colors ${duration === d ? "text-white" : "bg-bg-secondary text-text-muted hover:bg-bg-hover"}`}
+            style={duration === d ? { background: color } : {}}>
+            {d < 60 ? `${d}m` : `${d/60}h`}
+          </button>
+        ))}
+      </div>
+      <button onClick={() => onSchedule(task._id!, dateKey, hour, minute, duration)}
+        className="w-full py-2 rounded-lg text-sm font-semibold text-white transition-colors hover:brightness-110"
+        style={{ background: color }}>
+        Schedule at {fmtH(hour)}:{String(minute).padStart(2,"0")}
+      </button>
+    </div>
+  );
+}
+
 // ─── Schedule View ───────────────────────────────────────────
-function ScheduleView({ weekDates, tasksByDay, onSelect, onAddAtSlot }: {
+function ScheduleView({ weekDates, tasksByDay, onSelect, onAddAtSlot, onScheduleTask }: {
   weekDates: Date[];
   tasksByDay: Record<string, Task[]>;
   onSelect: (t: Task) => void;
   onAddAtSlot: (dateKey: string, hour: number, minute: number, title: string, durationMins: number) => void;
+  onScheduleTask: (taskId: string, dateKey: string, hour: number, minute: number, duration: number) => void;
 }) {
   const HOURS = Array.from({ length: 17 }, (_, i) => i + 6); // 6am–10pm
   const ROW_H = 64;
   const now = new Date();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [slotPopup, setSlotPopup] = useState<{ dateKey: string; hour: number; minute: number; x: number; y: number; duration: number } | null>(null);
+  const [taskTimePicker, setTaskTimePicker] = useState<{ task: Task; dateKey: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -522,10 +589,16 @@ function ScheduleView({ weekDates, tasksByDay, onSelect, onAddAtSlot }: {
                         const color = CAT_COLORS[task.category] || "#666";
                         const isDone = task.recurring ? (task.completions?.includes(key) ?? false) : task.status === "done";
                         return (
-                          <div key={task._id} onClick={() => onSelect(task)}
-                            className={`text-[8px] px-1.5 py-0.5 rounded-full cursor-pointer truncate font-medium ${isDone ? "opacity-40 line-through" : "hover:brightness-110"}`}
+                          <div key={task._id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTaskTimePicker({ task, dateKey: key, x: e.clientX, y: e.clientY });
+                            }}
+                            title="Click to schedule at a specific time"
+                            className={`group text-[8px] px-1.5 py-0.5 rounded-full cursor-pointer font-medium flex items-center gap-1 ${isDone ? "opacity-40 line-through" : "hover:brightness-110"}`}
                             style={{ background: color + "28", color }}>
-                            {task.title}
+                            <span className="truncate flex-1">{task.title}</span>
+                            <Clock size={7} className="flex-shrink-0 opacity-0 group-hover:opacity-70 transition-opacity" />
                           </div>
                         );
                       })}
@@ -645,6 +718,27 @@ function ScheduleView({ weekDates, tasksByDay, onSelect, onAddAtSlot }: {
           </div>
         </>
       )}
+
+      {/* Task time picker popup — schedule existing task to a time slot */}
+      {taskTimePicker && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setTaskTimePicker(null)} />
+          <div className="fixed z-50 drop-shadow-2xl"
+            style={{
+              left: Math.min(taskTimePicker.x + 8, (typeof window !== "undefined" ? window.innerWidth : 800) - 300),
+              top: Math.min(taskTimePicker.y - 20, (typeof window !== "undefined" ? window.innerHeight : 800) - 320),
+            }}>
+            <TaskTimePickerPopup
+              task={taskTimePicker.task}
+              dateKey={taskTimePicker.dateKey}
+              onSchedule={(taskId, dateKey, hour, minute, duration) => {
+                onScheduleTask(taskId, dateKey, hour, minute, duration);
+                setTaskTimePicker(null);
+              }}
+              onClose={() => setTaskTimePicker(null)} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -739,6 +833,19 @@ export default function HomePage() {
       await fetch("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
       fetchTasks();
     } catch (e) { console.error(e); }
+  };
+
+  const handleScheduleTask = async (taskId: string, dateKey: string, hour: number, minute: number, durationMins: number) => {
+    const startDate = new Date(dateKey + "T00:00:00");
+    startDate.setHours(hour, minute, 0, 0);
+    setTasks((prev) => prev.map((t) => t._id === taskId ? { ...t, startDate: startDate.toISOString(), dueDate: dateKey } : t));
+    try {
+      await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startDate: startDate.toISOString(), dueDate: dateKey, estimatedTime: durationMins }),
+      });
+      fetchTasks();
+    } catch (e) { console.error(e); fetchTasks(); }
   };
 
   const handleAddAtSlot = async (dateKey: string, hour: number, minute: number, title: string, durationMins: number) => {
@@ -965,7 +1072,7 @@ export default function HomePage() {
 
           {/* ── View: Weekly or Schedule ──────────────── */}
           {viewMode === "schedule" && (
-            <ScheduleView weekDates={weekDates} tasksByDay={tasksByDay} onSelect={setSelectedTask} onAddAtSlot={handleAddAtSlot} />
+            <ScheduleView weekDates={weekDates} tasksByDay={tasksByDay} onSelect={setSelectedTask} onAddAtSlot={handleAddAtSlot} onScheduleTask={handleScheduleTask} />
           )}
 
           {/* ── Weekly Columns ─────────────────────────── */}

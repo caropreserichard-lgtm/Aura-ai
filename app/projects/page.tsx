@@ -558,20 +558,17 @@ export default function ProjectsPage() {
     });
     setNewName(""); setNewDesc(""); setNewColor(PROJECT_COLORS[0]); setNewLabels([]); setShowNewProject(false);
 
-    // Fetch fresh list, then reorder if preference is "beginning"
-    const res  = await fetch("/api/projects");
+    // Always put new project at the beginning
+    const res = await fetch("/api/projects");
     const data = await res.json();
     const list: Project[] = Array.isArray(data) ? data : [];
-
-    if (addProjectToBeginning && list.length > 1) {
-      const newProject = list.find((p) => !prevIds.has(p._id));
-      if (newProject) {
-        const reordered = [newProject, ...list.filter((p) => p._id !== newProject._id)];
-        reorderProjects(reordered); // sets state + persists order
-        return;
-      }
+    const newProject = list.find((p) => !prevIds.has(p._id));
+    if (newProject && list.length > 1) {
+      const reordered = [newProject, ...list.filter((p) => p._id !== newProject._id)];
+      reorderProjects(reordered);
+    } else {
+      setProjects(list);
     }
-    setProjects(list);
   };
 
   const archiveProject = async (id: string) => {
