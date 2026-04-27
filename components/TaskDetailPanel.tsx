@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   X, Play, Pause, Trash2, Plus, Check, Calendar, Link2, ExternalLink,
   Maximize2, MoreHorizontal, Paperclip, Download, FileText, Image as ImageIcon,
-  Pencil, CheckCircle2, RotateCcw,
+  Pencil, CheckCircle2, RotateCcw, Clock,
 } from "lucide-react";
 import { Task, PRIORITY_CONFIG } from "@/lib/types";
 import { formatTime } from "@/lib/scoring";
@@ -62,6 +62,18 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
     (task.recurring?.type as "daily" | "weekdays" | "weekends" | "custom") || "daily"
   );
   const [customDays, setCustomDays] = useState<number[]>(task.recurring?.days || [1, 2, 3, 4, 5]);
+
+  // Schedule time state — extracted from startDate if it's a full datetime
+  const parseScheduledTime = (sd: string) => {
+    if (!sd || !sd.includes("T")) return null;
+    const d = new Date(sd);
+    if (isNaN(d.getTime())) return null;
+    return { hour: d.getHours(), minute: d.getMinutes() };
+  };
+  const initialTime = parseScheduledTime(task.startDate || "");
+  const [schedHour, setSchedHour] = useState<number | null>(initialTime?.hour ?? null);
+  const [schedMinute, setSchedMinute] = useState<number>(initialTime?.minute ?? 0);
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const subtaskInputRef = useRef<HTMLInputElement>(null);
@@ -242,6 +254,27 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
     setEstimatedTime(mins);
     onUpdate({ estimatedTime: mins });
     setShowTimePicker(false);
+  };
+
+  const handleScheduleTime = (hour: number, minute: number) => {
+    setSchedHour(hour);
+    setSchedMinute(minute);
+    setShowSchedulePicker(false);
+    // Use existing dueDate or startDate as the date, fallback to today
+    const baseDateStr = (dueDate || startDate || "").split("T")[0] || new Date().toISOString().split("T")[0];
+    const d = new Date(baseDateStr + "T00:00:00");
+    d.setHours(hour, minute, 0, 0);
+    const iso = d.toISOString();
+    setStartDate(iso);
+    onUpdate({ startDate: iso, dueDate: baseDateStr });
+  };
+
+  const clearScheduleTime = () => {
+    setSchedHour(null);
+    setSchedMinute(0);
+    const baseDateStr = (dueDate || startDate || "").split("T")[0] || "";
+    setStartDate(baseDateStr);
+    onUpdate({ startDate: baseDateStr || null });
   };
 
   const formatDateShort = (d: string) => {
@@ -585,6 +618,76 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
               )}
             </div>
           )}
+        </div>
+
+        {/* ── Schedule Time ────────────────────────── */}
+        <div className="border-t border-border px-5 py-3">
+          <div className="flex items-center gap-2.5">
+            <Clock size={13} className={schedHour !== null ? "text-accent" : "text-text-muted"} />
+            <span className="text-sm text-text-secondary flex-1">Schedule time</span>
+            {schedHour !== null ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-accent">
+                  {schedHour > 12 ? schedHour - 12 : schedHour === 0 ? 12 : schedHour}:{String(schedMinute).padStart(2, "0")} {schedHour < 12 ? "AM" : "PM"}
+                </span>
+                <button onClick={() => setShowSchedulePicker(!showSchedulePicker)}
+                  className="text-[10px] text-text-muted hover:text-accent transition-colors px-1.5 py-0.5 rounded border border-border hover:border-accent">
+                  Edit
+                </button>
+                <button onClick={clearScheduleTime}
+                  className="text-text-muted hover:text-danger transition-colors" title="Remove time">
+                  <X size={12} />
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setShowSchedulePicker(!showSchedulePicker)}
+                className="text-xs text-text-muted hover:text-accent transition-colors flex items-center gap-1">
+                <Plus size={11} /> Set time
+              </button>
+            )}
+          </div>
+
+          {showSchedulePicker && (() => {
+            const HOURS = [6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22];
+            const fmtH = (h: number) => h === 0 ? "12am" : h < 12 ? `${h}am` : h === 12 ? "12pm" : `${h - 12}pm`;
+            const catColor = CAT_COLORS[task.category] || "#4a9e7e";
+            return (
+              <div className="mt-3 p-3.5 rounded-xl bg-bg-tertiary border border-border">
+                <p className="text-[9px] text-text-muted uppercase tracking-widest mb-2">Hour</p>
+                <div className="grid grid-cols-6 gap-1 mb-3">
+                  {HOURS.map((h) => (
+                    <button key={h} type="button" onClick={() => setSchedHour(h)}
+                      className="py-1.5 rounded-lg text-[10px] font-semibold transition-all"
+                      style={schedHour === h
+                        ? { background: catColor, color: "#fff" }
+                        : { background: "var(--bg-secondary)", color: "var(--text-muted)" }}>
+                      {fmtH(h)}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[9px] text-text-muted uppercase tracking-widest mb-2">Minute</p>
+                <div className="grid grid-cols-4 gap-1 mb-3">
+                  {[0, 15, 30, 45].map((m) => (
+                    <button key={m} type="button" onClick={() => setSchedMinute(m)}
+                      className="py-1.5 rounded-lg text-[10px] font-semibold transition-all"
+                      style={schedMinute === m
+                        ? { background: catColor, color: "#fff" }
+                        : { background: "var(--bg-secondary)", color: "var(--text-muted)" }}>
+                      :{String(m).padStart(2, "0")}
+                    </button>
+                  ))}
+                </div>
+                <button type="button"
+                  onClick={() => { if (schedHour !== null) handleScheduleTime(schedHour, schedMinute); else handleScheduleTime(9, 0); }}
+                  className="w-full py-2 rounded-xl text-sm font-bold text-white transition-colors hover:brightness-110"
+                  style={{ background: catColor }}>
+                  {schedHour !== null
+                    ? `Save — ${schedHour > 12 ? schedHour - 12 : schedHour === 0 ? 12 : schedHour}:${String(schedMinute).padStart(2, "0")} ${schedHour < 12 ? "AM" : "PM"}`
+                    : "Set to 9:00 AM"}
+                </button>
+              </div>
+            );
+          })()}
         </div>
 
         {/* ── Notes ─────────────────────────────────── */}
