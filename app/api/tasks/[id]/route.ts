@@ -57,6 +57,29 @@ export async function PATCH(
       return NextResponse.json(updated);
     }
 
+    // Handle setOverride: save a per-day override for a recurring task instance
+    if (body.setOverride) {
+      const { date, ...overrideData } = body.setOverride as { date: string; [key: string]: unknown };
+      const setFields: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(overrideData)) {
+        setFields[`overrides.${date}.${k}`] = v;
+      }
+      await db.collection("tasks").updateOne({ _id: new ObjectId(id), userId }, { $set: setFields });
+      const updated = await db.collection("tasks").findOne({ _id: new ObjectId(id), userId });
+      return NextResponse.json(updated);
+    }
+
+    // Handle removeOverride: clear a per-day override for a recurring task
+    if (body.removeOverride) {
+      const date = body.removeOverride as string;
+      await db.collection("tasks").updateOne(
+        { _id: new ObjectId(id), userId },
+        { $unset: { [`overrides.${date}`]: "" } }
+      );
+      const updated = await db.collection("tasks").findOne({ _id: new ObjectId(id), userId });
+      return NextResponse.json(updated);
+    }
+
     const updates: Record<string, unknown> = {};
 
     // Handle field updates

@@ -26,6 +26,7 @@ const TIME_PRESETS = [
 
 interface TaskDetailPanelProps {
   task: Task;
+  dateKey?: string; // for recurring tasks: which day's instance is being viewed
   onClose: () => void;
   onUpdate: (updates: Record<string, unknown>) => void;
   onComplete: () => void;
@@ -34,7 +35,7 @@ interface TaskDetailPanelProps {
   onStartTimer: () => void;
 }
 
-export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, onDelete, deleteLabel, onStartTimer }: TaskDetailPanelProps) {
+export default function TaskDetailPanel({ task, dateKey, onClose, onUpdate, onComplete, onDelete, deleteLabel, onStartTimer }: TaskDetailPanelProps) {
   const [description, setDescription] = useState(task.description || "");
   const [startDate, setStartDate] = useState(task.startDate || task.dueDate || "");
   const [dueDate, setDueDate] = useState(task.dueDate || "");
@@ -70,10 +71,18 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
     if (isNaN(d.getTime())) return null;
     return { hour: d.getHours(), minute: d.getMinutes() };
   };
-  const initialTime = parseScheduledTime(task.startDate || "");
+  // For recurring tasks opened from a specific day, resolve override > base
+  const schedSource = (() => {
+    if (task.recurring && dateKey) {
+      const ov = task.overrides?.[dateKey];
+      if (ov) return { startDate: ov.startDate || task.startDate, estimatedTime: ov.estimatedTime ?? task.estimatedTime };
+    }
+    return { startDate: task.startDate, estimatedTime: task.estimatedTime };
+  })();
+  const initialTime = parseScheduledTime(schedSource.startDate || "");
   const [schedHour, setSchedHour] = useState<number | null>(initialTime?.hour ?? null);
   const [schedMinute, setSchedMinute] = useState<number>(initialTime?.minute ?? 0);
-  const [schedDuration, setSchedDuration] = useState<number>(task.estimatedTime || 60);
+  const [schedDuration, setSchedDuration] = useState<number>(schedSource.estimatedTime || 60);
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -263,21 +272,35 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
     setSchedDuration(duration);
     setEstimatedTime(duration);
     setShowSchedulePicker(false);
-    // Use existing dueDate or startDate as the date, fallback to today
-    const baseDateStr = (dueDate || startDate || "").split("T")[0] || new Date().toISOString().split("T")[0];
-    const d = new Date(baseDateStr + "T00:00:00");
-    d.setHours(hour, minute, 0, 0);
-    const iso = d.toISOString();
-    setStartDate(iso);
-    onUpdate({ startDate: iso, dueDate: baseDateStr, estimatedTime: duration });
+
+    if (task.recurring && dateKey) {
+      // Per-day override — only affects this specific date's instance
+      const d = new Date(dateKey + "T00:00:00");
+      d.setHours(hour, minute, 0, 0);
+      const iso = d.toISOString();
+      onUpdate({ setOverride: { date: dateKey, startDate: iso, estimatedTime: duration } });
+    } else {
+      // Regular task — update startDate globally
+      const baseDateStr = (dueDate || startDate || "").split("T")[0] || new Date().toISOString().split("T")[0];
+      const d = new Date(baseDateStr + "T00:00:00");
+      d.setHours(hour, minute, 0, 0);
+      const iso = d.toISOString();
+      setStartDate(iso);
+      onUpdate({ startDate: iso, dueDate: baseDateStr, estimatedTime: duration });
+    }
   };
 
   const clearScheduleTime = () => {
     setSchedHour(null);
     setSchedMinute(0);
-    const baseDateStr = (dueDate || startDate || "").split("T")[0] || "";
-    setStartDate(baseDateStr);
-    onUpdate({ startDate: baseDateStr || null });
+    if (task.recurring && dateKey) {
+      // Remove the per-day override for this date
+      onUpdate({ removeOverride: dateKey });
+    } else {
+      const baseDateStr = (dueDate || startDate || "").split("T")[0] || "";
+      setStartDate(baseDateStr);
+      onUpdate({ startDate: baseDateStr || null });
+    }
   };
 
   const formatDateShort = (d: string) => {
@@ -627,7 +650,14 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
         <div className="border-t border-border px-5 py-3">
           <div className="flex items-center gap-2.5">
             <Clock size={13} className={schedHour !== null ? "text-accent" : "text-text-muted"} />
-            <span className="text-sm text-text-secondary flex-1">Schedule time</span>
+            <span className="text-sm text-text-secondary flex-1">
+              Schedule time
+              {task.recurring && dateKey && (
+                <span className="ml-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-accent/15 text-accent uppercase tracking-wide">
+                  {new Date(dateKey + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} only
+                </span>
+              )}
+            </span>
             {schedHour !== null ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-accent">

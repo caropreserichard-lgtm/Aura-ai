@@ -513,7 +513,7 @@ function TaskTimePickerPopup({ task, dateKey, onSchedule, onClose }: {
 function ScheduleView({ weekDates, tasksByDay, onSelect, onAddAtSlot, onScheduleTask }: {
   weekDates: Date[];
   tasksByDay: Record<string, Task[]>;
-  onSelect: (t: Task) => void;
+  onSelect: (t: Task, dateKey: string) => void;
   onAddAtSlot: (dateKey: string, hour: number, minute: number, title: string, durationMins: number) => void;
   onScheduleTask: (taskId: string, dateKey: string, hour: number, minute: number, duration: number) => void;
 }) {
@@ -535,13 +535,22 @@ function ScheduleView({ weekDates, tasksByDay, onSelect, onAddAtSlot, onSchedule
   const fmtHour = (h: number) =>
     h < 12 ? `${h === 0 ? 12 : h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`;
 
-  const getTaskPos = (task: Task) => {
-    if (!task.startDate) return null;
-    const d = new Date(task.startDate);
+  // Helper: get effective startDate/estimatedTime for a task on a specific day (respects overrides)
+  const getEffective = (task: Task, dateKey: string) => {
+    const ov = task.overrides?.[dateKey];
+    return {
+      startDate: ov?.startDate || task.startDate,
+      estimatedTime: ov?.estimatedTime ?? task.estimatedTime,
+    };
+  };
+
+  const getTaskPos = (task: Task, dateKey: string) => {
+    const { startDate, estimatedTime } = getEffective(task, dateKey);
+    if (!startDate) return null;
+    const d = new Date(startDate);
     const h = d.getHours(); const m = d.getMinutes();
     if (h < 6 || h > 22) return null;
-    const est = (task as unknown as Record<string, unknown>).estimatedTime as number | undefined;
-    const durationMins = est || 60;
+    const durationMins = estimatedTime || 60;
     return {
       top: (h - 6) * ROW_H + (m / 60) * ROW_H,
       height: Math.max((durationMins / 60) * ROW_H - 2, 24),
@@ -570,7 +579,7 @@ function ScheduleView({ weekDates, tasksByDay, onSelect, onAddAtSlot, onSchedule
             {weekDates.map((date) => {
               const key = toDateKey(date);
               const todayDay = isToday(date);
-              const allDay = (tasksByDay[key] || []).filter((t) => !t.startDate);
+              const allDay = (tasksByDay[key] || []).filter((t) => !getEffective(t, key).startDate);
               return (
                 <div key={key} className={`border-r border-border/30 ${todayDay ? "bg-accent/5" : ""}`}>
                   <div className="flex flex-col items-center py-2">
@@ -630,7 +639,7 @@ function ScheduleView({ weekDates, tasksByDay, onSelect, onAddAtSlot, onSchedule
               {weekDates.map((date) => {
                 const key = toDateKey(date);
                 const todayCol = isToday(date);
-                const scheduled = (tasksByDay[key] || []).filter((t) => !!t.startDate);
+                const scheduled = (tasksByDay[key] || []).filter((t) => !!getEffective(t, key).startDate);
                 const totalH = HOURS.length * ROW_H;
 
                 return (
@@ -667,14 +676,15 @@ function ScheduleView({ weekDates, tasksByDay, onSelect, onAddAtSlot, onSchedule
 
                     {/* Scheduled task blocks */}
                     {scheduled.map((task) => {
-                      const pos = getTaskPos(task);
+                      const pos = getTaskPos(task, key);
                       if (!pos) return null;
+                      const { startDate: effSD, estimatedTime: effEst } = getEffective(task, key);
+                      const hasOverride = !!task.overrides?.[key];
                       const color = CAT_COLORS[task.category] || "#666";
                       const isDone = task.recurring ? (task.completions?.includes(key) ?? false) : task.status === "done";
-                      const est = (task as unknown as Record<string, unknown>).estimatedTime as number | undefined;
                       return (
                         <div key={task._id} data-task-block="1"
-                          onClick={(e) => { e.stopPropagation(); onSelect(task); }}
+                          onClick={(e) => { e.stopPropagation(); onSelect(task, key); }}
                           className={`absolute left-0.5 right-0.5 rounded-lg overflow-hidden cursor-pointer z-[5] transition-all hover:z-[8] hover:shadow-lg ${isDone ? "opacity-40" : "hover:scale-[1.01]"}`}
                           style={{ top: pos.top + 1, height: pos.height, background: color + "30", borderLeft: `3px solid ${color}` }}>
                           <div className="px-2 py-1 h-full flex flex-col justify-center">
@@ -683,8 +693,9 @@ function ScheduleView({ weekDates, tasksByDay, onSelect, onAddAtSlot, onSchedule
                             </p>
                             {pos.height > 34 && (
                               <p className="text-[8px] leading-tight mt-0.5" style={{ color: color + "aa" }}>
-                                {new Date(task.startDate!).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase()}
-                                {est ? ` · ${formatMins(est)}` : ""}
+                                {new Date(effSD!).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase()}
+                                {effEst ? ` · ${formatMins(effEst)}` : ""}
+                                {hasOverride && <span className="ml-1 opacity-60">✦</span>}
                               </p>
                             )}
                           </div>
@@ -750,6 +761,7 @@ export default function HomePage() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedTaskDate, setSelectedTaskDate] = useState<string | null>(null);
   const [filterCat, setFilterCat] = useState("all");
   const [showFilter, setShowFilter] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -836,16 +848,27 @@ export default function HomePage() {
   };
 
   const handleScheduleTask = async (taskId: string, dateKey: string, hour: number, minute: number, durationMins: number) => {
-    const startDate = new Date(dateKey + "T00:00:00");
-    startDate.setHours(hour, minute, 0, 0);
-    setTasks((prev) => prev.map((t) => t._id === taskId ? { ...t, startDate: startDate.toISOString(), dueDate: dateKey } : t));
-    try {
+    const task = tasks.find((t) => t._id === taskId);
+    const sd = new Date(dateKey + "T00:00:00");
+    sd.setHours(hour, minute, 0, 0);
+    const iso = sd.toISOString();
+    if (task?.recurring) {
+      // Per-day override: only affects this specific date
+      setTasks((prev) => prev.map((t) => t._id === taskId ? {
+        ...t, overrides: { ...(t.overrides || {}), [dateKey]: { startDate: iso, estimatedTime: durationMins } }
+      } : t));
       await fetch(`/api/tasks/${taskId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ startDate: startDate.toISOString(), dueDate: dateKey, estimatedTime: durationMins }),
+        body: JSON.stringify({ setOverride: { date: dateKey, startDate: iso, estimatedTime: durationMins } }),
       });
-      fetchTasks();
-    } catch (e) { console.error(e); fetchTasks(); }
+    } else {
+      setTasks((prev) => prev.map((t) => t._id === taskId ? { ...t, startDate: iso, dueDate: dateKey } : t));
+      await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startDate: iso, dueDate: dateKey, estimatedTime: durationMins }),
+      });
+    }
+    fetchTasks();
   };
 
   const handleAddAtSlot = async (dateKey: string, hour: number, minute: number, title: string, durationMins: number) => {
@@ -1072,7 +1095,9 @@ export default function HomePage() {
 
           {/* ── View: Weekly or Schedule ──────────────── */}
           {viewMode === "schedule" && (
-            <ScheduleView weekDates={weekDates} tasksByDay={tasksByDay} onSelect={setSelectedTask} onAddAtSlot={handleAddAtSlot} onScheduleTask={handleScheduleTask} />
+            <ScheduleView weekDates={weekDates} tasksByDay={tasksByDay}
+              onSelect={(t, dk) => { setSelectedTask(t); setSelectedTaskDate(dk); }}
+              onAddAtSlot={handleAddAtSlot} onScheduleTask={handleScheduleTask} />
           )}
 
           {/* ── Weekly Columns ─────────────────────────── */}
@@ -1122,7 +1147,9 @@ export default function HomePage() {
                       <SortableContext items={dayTasks.map((t) => t._id!)} strategy={verticalListSortingStrategy}>
                         <div className="min-h-[120px] space-y-2">
                           {dayTasks.map((task) => (
-                            <TaskCard key={task._id} task={task} onSelect={setSelectedTask} onComplete={handleComplete}
+                            <TaskCard key={task._id} task={task}
+                              onSelect={(t) => { setSelectedTask(t); setSelectedTaskDate(key); }}
+                              onComplete={handleComplete}
                               isDragging={activeDragId === task._id} dateKey={key} />
                           ))}
                         </div>
@@ -1172,10 +1199,11 @@ export default function HomePage() {
         {selectedTask && (
           <TaskDetailPanel
             task={selectedTask}
-            onClose={() => setSelectedTask(null)}
+            dateKey={selectedTaskDate || undefined}
+            onClose={() => { setSelectedTask(null); setSelectedTaskDate(null); }}
             onUpdate={(updates) => handleTaskUpdate(selectedTask._id!, updates)}
-            onComplete={() => { handleComplete(selectedTask._id!); setSelectedTask(null); }}
-            onDelete={() => handleDeleteTask(selectedTask._id!)}
+            onComplete={() => { handleComplete(selectedTask._id!); setSelectedTask(null); setSelectedTaskDate(null); }}
+            onDelete={() => { handleDeleteTask(selectedTask._id!); setSelectedTaskDate(null); }}
             onStartTimer={() => {}}
           />
         )}

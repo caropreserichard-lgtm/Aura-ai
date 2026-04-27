@@ -23,6 +23,10 @@ export interface Task {
   };
   completions?: string[]; // "YYYY-MM-DD" dates when done
   skips?: string[];       // "YYYY-MM-DD" dates when skipped
+  overrides?: Record<string, { // per-day overrides for recurring tasks
+    startDate?: string;
+    estimatedTime?: number;
+  }>;
   subtasks?: { text: string; done: boolean }[];
   tags: string[];
   sourceUrl?: string;
