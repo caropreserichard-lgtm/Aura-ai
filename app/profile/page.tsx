@@ -97,6 +97,16 @@ function ProfileContent() {
   const [generalSaving,         setGeneralSaving]         = useState(false);
   const [generalSaved,          setGeneralSaved]          = useState(false);
 
+  // ── Ancestral Connections feature flag (localStorage only) ──
+  const [ancestralConnections, setAncestralConnections] = useState(true);
+  useEffect(() => {
+    setAncestralConnections(localStorage.getItem("ancestral-connections-enabled") !== "false");
+  }, []);
+  const toggleAncestralConnections = (enabled: boolean) => {
+    setAncestralConnections(enabled);
+    localStorage.setItem("ancestral-connections-enabled", enabled ? "true" : "false");
+  };
+
   // ── New project position (localStorage only) ──
   const [newProjectToBeginning, setNewProjectToBeginning] = useState(false);
   useEffect(() => {
@@ -606,6 +616,23 @@ function ProfileContent() {
                   <button onClick={() => setCountPlannedAsActual(!countPlannedAsActual)}
                     className={`relative w-11 h-6 rounded-full transition-colors ${countPlannedAsActual ? "bg-[#e7ca79]" : "bg-bg-tertiary border border-border"}`}>
                     <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${countPlannedAsActual ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                <div className="border-t border-border" />
+
+                {/* Ancestral Connections */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-base">🎂</span>
+                    <div>
+                      <p className="text-sm text-text-primary font-medium">Ancestral Connections</p>
+                      <p className="text-xs text-text-muted">Módulo de recordatorios de cumpleaños y ciclos de vida</p>
+                    </div>
+                  </div>
+                  <button onClick={() => toggleAncestralConnections(!ancestralConnections)}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${ancestralConnections ? "bg-[#e7ca79]" : "bg-bg-tertiary border border-border"}`}>
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${ancestralConnections ? "translate-x-5" : "translate-x-0"}`} />
                   </button>
                 </div>
 

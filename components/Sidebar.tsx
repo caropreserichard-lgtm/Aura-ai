@@ -6,22 +6,24 @@ import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import {
   Home, CalendarDays, Inbox, ListTodo, BarChart3, Timer, Focus,
-  Settings2, FolderKanban, Wrench, Archive, LogOut, User, Shield, Library,
+  Settings2, FolderKanban, Wrench, Archive, LogOut, User, Shield, Library, Cake, X,
 } from "lucide-react";
 import TayronaLogo from "@/components/TayronaLogo";
 
+const GOLD = "#e7ca79";
+
 const MAIN_NAV = [
-  { href: "/home",     label: "Home",      icon: Home },
-  { href: "/",         label: "Today",     icon: CalendarDays },
-  { href: "/inbox",    label: "Inbox",     icon: Inbox },
-  { href: "/tasks",    label: "Tasks",     icon: ListTodo },
-  { href: "/projects", label: "Projects",  icon: FolderKanban },
-  { href: "/tools",    label: "Tools",     icon: Wrench },
-  { href: "/vault",    label: "La Bóveda", icon: Library },
-  { href: "/deepwork", label: "Focus",     icon: Focus },
-  { href: "/stats",    label: "Stats",     icon: BarChart3 },
-  { href: "/timer",    label: "Timer",     icon: Timer },
-  { href: "/backlog",  label: "Backlog",   icon: Archive },
+  { href: "/home",       label: "Home",               icon: Home },
+  { href: "/",           label: "Today",               icon: CalendarDays },
+  { href: "/inbox",      label: "Inbox",               icon: Inbox },
+  { href: "/tasks",      label: "Tasks",               icon: ListTodo },
+  { href: "/projects",   label: "Projects",             icon: FolderKanban },
+  { href: "/tools",      label: "Tools",               icon: Wrench },
+  { href: "/vault",      label: "La Bóveda",            icon: Library },
+  { href: "/deepwork",   label: "Focus",               icon: Focus },
+  { href: "/stats",      label: "Stats",               icon: BarChart3 },
+  { href: "/timer",      label: "Timer",               icon: Timer },
+  { href: "/backlog",    label: "Backlog",              icon: Archive },
 ];
 
 export default function Sidebar() {
@@ -29,6 +31,38 @@ export default function Sidebar() {
   const { data: session } = useSession();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const [ancestralEnabled, setAncestralEnabled] = useState(true);
+  const [todayBirthdays, setTodayBirthdays] = useState<string[]>([]);
+  const [bannerVisible, setBannerVisible] = useState(false);
+
+  useEffect(() => {
+    const enabled = localStorage.getItem("ancestral-connections-enabled") !== "false";
+    setAncestralEnabled(enabled);
+    if (!enabled) return;
+    const today = new Date();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    const todayKey = `${mm}-${dd}`;
+    const dismissKey = `birthday-banner-dismissed-${today.getFullYear()}-${todayKey}`;
+    if (localStorage.getItem(dismissKey)) return;
+    fetch("/api/birthdays")
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const names = data.filter((b: { date: string; name: string }) => b.date === todayKey).map((b: { name: string }) => b.name);
+          if (names.length > 0) { setTodayBirthdays(names); setBannerVisible(true); }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const dismissBanner = () => {
+    setBannerVisible(false);
+    const today = new Date();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    localStorage.setItem(`birthday-banner-dismissed-${today.getFullYear()}-${mm}-${dd}`, "1");
+  };
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -47,7 +81,40 @@ export default function Sidebar() {
           from { opacity: 0; transform: translateY(4px) scale(0.97); }
           to   { opacity: 1; transform: translateY(0)  scale(1);    }
         }
+        @keyframes bannerSlideDown {
+          from { opacity: 0; transform: translateY(-8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
       `}</style>
+
+      {/* ── Birthday banner (fixed, full-width) ── */}
+      {bannerVisible && todayBirthdays.length > 0 && (
+        <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-between gap-4 px-5 py-2.5"
+          style={{
+            background: `linear-gradient(135deg,rgba(231,202,121,0.18),rgba(196,169,79,0.12))`,
+            borderBottom: `1px solid ${GOLD}30`,
+            backdropFilter: "blur(12px)",
+            animation: "bannerSlideDown 300ms ease-out",
+          }}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-lg flex-shrink-0">🎂</span>
+            <p className="text-sm font-semibold truncate" style={{ color: GOLD }}>
+              Hoy celebramos el ciclo de {todayBirthdays.join(" y ")}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Link href="/birthdays" onClick={dismissBanner}
+              className="text-xs px-2.5 py-1 rounded-lg font-medium transition-colors hover:opacity-80"
+              style={{ background: `${GOLD}20`, color: GOLD }}>
+              Ver →
+            </Link>
+            <button onClick={dismissBanner}
+              className="p-1 rounded-lg hover:bg-black/20 text-yellow-300/70 transition-colors">
+              <X size={13} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Desktop Sidebar ── */}
       <aside className="hidden md:flex flex-col w-60 bg-bg-sidebar border-r border-border min-h-screen fixed left-0 top-0 z-40">
@@ -76,6 +143,23 @@ export default function Sidebar() {
               </Link>
             );
           })}
+
+          {/* Ancestral Connections — shown only when enabled */}
+          {ancestralEnabled && (() => {
+            const isActive = pathname.startsWith("/birthdays");
+            return (
+              <Link href="/birthdays"
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-[13px] font-medium ${
+                  isActive ? "bg-accent-subtle text-accent-text" : "text-text-secondary hover:bg-bg-hover hover:text-text-primary"
+                }`}>
+                <Cake size={18} strokeWidth={isActive ? 2 : 1.5} style={isActive ? {} : { color: GOLD, opacity: 0.8 }} />
+                <span>Birthdays</span>
+                {todayBirthdays.length > 0 && (
+                  <span className="ml-auto w-2 h-2 rounded-full flex-shrink-0" style={{ background: GOLD }} />
+                )}
+              </Link>
+            );
+          })()}
         </nav>
 
         {/* Bottom: profile */}
