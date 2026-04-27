@@ -503,7 +503,7 @@ function TaskTimePickerPopup({ task, dateKey, onSchedule, onClose }: {
       <button onClick={() => onSchedule(task._id!, dateKey, hour, minute, duration)}
         className="w-full py-2 rounded-lg text-sm font-semibold text-white transition-colors hover:brightness-110"
         style={{ background: color }}>
-        Schedule at {fmtH(hour)}:{String(minute).padStart(2,"0")}
+        Schedule at {hour > 12 ? hour - 12 : hour === 0 ? 12 : hour}:{String(minute).padStart(2,"0")}{hour < 12 ? "am" : "pm"}
       </button>
     </div>
   );

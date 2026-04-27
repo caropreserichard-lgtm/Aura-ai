@@ -73,6 +73,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
   const initialTime = parseScheduledTime(task.startDate || "");
   const [schedHour, setSchedHour] = useState<number | null>(initialTime?.hour ?? null);
   const [schedMinute, setSchedMinute] = useState<number>(initialTime?.minute ?? 0);
+  const [schedDuration, setSchedDuration] = useState<number>(task.estimatedTime || 60);
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -256,9 +257,11 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
     setShowTimePicker(false);
   };
 
-  const handleScheduleTime = (hour: number, minute: number) => {
+  const handleScheduleTime = (hour: number, minute: number, duration: number) => {
     setSchedHour(hour);
     setSchedMinute(minute);
+    setSchedDuration(duration);
+    setEstimatedTime(duration);
     setShowSchedulePicker(false);
     // Use existing dueDate or startDate as the date, fallback to today
     const baseDateStr = (dueDate || startDate || "").split("T")[0] || new Date().toISOString().split("T")[0];
@@ -266,7 +269,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
     d.setHours(hour, minute, 0, 0);
     const iso = d.toISOString();
     setStartDate(iso);
-    onUpdate({ startDate: iso, dueDate: baseDateStr });
+    onUpdate({ startDate: iso, dueDate: baseDateStr, estimatedTime: duration });
   };
 
   const clearScheduleTime = () => {
@@ -629,6 +632,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-accent">
                   {schedHour > 12 ? schedHour - 12 : schedHour === 0 ? 12 : schedHour}:{String(schedMinute).padStart(2, "0")} {schedHour < 12 ? "AM" : "PM"}
+                  {schedDuration > 0 && <span className="text-text-muted font-normal ml-1">· {schedDuration < 60 ? `${schedDuration}m` : schedDuration === 90 ? "1.5h" : `${schedDuration / 60}h`}</span>}
                 </span>
                 <button onClick={() => setShowSchedulePicker(!showSchedulePicker)}
                   className="text-[10px] text-text-muted hover:text-accent transition-colors px-1.5 py-0.5 rounded border border-border hover:border-accent">
@@ -677,13 +681,32 @@ export default function TaskDetailPanel({ task, onClose, onUpdate, onComplete, o
                     </button>
                   ))}
                 </div>
+                <p className="text-[9px] text-text-muted uppercase tracking-widest mb-2">Duration</p>
+                <div className="grid grid-cols-4 gap-1 mb-3">
+                  {[30, 60, 90, 120].map((d) => (
+                    <button key={d} type="button" onClick={() => setSchedDuration(d)}
+                      className="py-1.5 rounded-lg text-[10px] font-semibold transition-all"
+                      style={schedDuration === d
+                        ? { background: catColor, color: "#fff" }
+                        : { background: "var(--bg-secondary)", color: "var(--text-muted)" }}>
+                      {d < 60 ? `${d}m` : d === 90 ? "1.5h" : `${d / 60}h`}
+                    </button>
+                  ))}
+                </div>
                 <button type="button"
-                  onClick={() => { if (schedHour !== null) handleScheduleTime(schedHour, schedMinute); else handleScheduleTime(9, 0); }}
+                  onClick={() => {
+                    const h = schedHour ?? 9;
+                    handleScheduleTime(h, schedMinute, schedDuration);
+                  }}
                   className="w-full py-2 rounded-xl text-sm font-bold text-white transition-colors hover:brightness-110"
                   style={{ background: catColor }}>
-                  {schedHour !== null
-                    ? `Save — ${schedHour > 12 ? schedHour - 12 : schedHour === 0 ? 12 : schedHour}:${String(schedMinute).padStart(2, "0")} ${schedHour < 12 ? "AM" : "PM"}`
-                    : "Set to 9:00 AM"}
+                  {(() => {
+                    const h = schedHour ?? 9;
+                    const hDisplay = h > 12 ? h - 12 : h === 0 ? 12 : h;
+                    const ampm = h < 12 ? "AM" : "PM";
+                    const dur = schedDuration < 60 ? `${schedDuration}m` : schedDuration === 90 ? "1.5h" : `${schedDuration / 60}h`;
+                    return `Save — ${hDisplay}:${String(schedMinute).padStart(2, "0")} ${ampm} · ${dur}`;
+                  })()}
                 </button>
               </div>
             );
