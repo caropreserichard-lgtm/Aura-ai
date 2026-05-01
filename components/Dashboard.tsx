@@ -39,30 +39,44 @@ export default function Dashboard() {
   const [levelUpLevel, setLevelUpLevel] = useState<number | null>(null);
   const [dbError, setDbError] = useState<string | null>(null);
 
+  // Safe JSON parser — returns null if response is HTML/empty (e.g. Vercel 502)
+  const safeJson = async (res: Response) => {
+    try { return await res.json(); } catch { return null; }
+  };
+
   const fetchData = useCallback(async () => {
     try {
       const [tasksRes, statsRes] = await Promise.all([
         fetch("/api/tasks"),
         fetch("/api/stats"),
       ]);
-      const tasksData = await tasksRes.json();
-      const statsData = await statsRes.json();
+
+      // Handle auth redirect — middleware returns 307 to /login
+      if (tasksRes.status === 401 || tasksRes.redirected) {
+        window.location.href = "/login";
+        return;
+      }
+
+      const tasksData = await safeJson(tasksRes);
+      const statsData = await safeJson(statsRes);
 
       if (tasksRes.ok && Array.isArray(tasksData)) {
         setTasks(tasksData);
         setDbError(null);
       } else {
         setTasks([]);
-        setDbError(tasksData?.error || "Error connecting to database");
+        setDbError(tasksData?.error || "Error conectando a la base de datos");
       }
 
-      if (statsRes.ok && !statsData?.error) {
+      if (statsRes.ok && statsData && !statsData?.error) {
         setStats(statsData);
       }
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Dashboard fetch error:", error);
       setTasks([]);
-      setDbError("Could not connect to server");
+      setDbError("No se pudo conectar al servidor. Reintentando...");
+      // Auto-retry after 5s
+      setTimeout(() => fetchData(), 5000);
     } finally {
       setLoading(false);
     }
