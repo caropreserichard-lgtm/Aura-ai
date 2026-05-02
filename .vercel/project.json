@@ -1,0 +1,16 @@
+{
+  "projectId": "prj_ZJuvlAWnx9Yx9Yx4nqNx9BwaYzYS",
+  "orgId": "team_02F5tQvGcFWj4QqTVG8RacSb",
+  "projectName": "aura-ai",
+  "settings": {
+    "createdAt": 1774472062842,
+    "framework": "nextjs",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "24.x"
+  }
+}
