@@ -163,36 +163,124 @@ async function parseBatch(
   }
 }
 
-export async function classifyVaultUrl(url: string, title: string, description: string): Promise<{ category: string; insight: string }> {
+// ─── Vault classification ────────────────────────────────────────────────────
+// Categorías sugeridas (no obligatorias — el modelo puede inferir nuevas
+// dinámicamente, p.ej. "Crypto Strategy", "AI Creative Tools",
+// "Business Growth", "Personal Brand", etc.).
+const VAULT_SUGGESTED_CATEGORIES = [
+  "Crypto Strategy",
+  "AI Creative Tools",
+  "Business Growth",
+  "Personal Brand",
+  "Marketing",
+  "Desarrollo",
+  "Aprendizaje",
+  "Lifestyle",
+  "Otro",
+];
+
+const VAULT_USER_CONTEXT = `Eres un asistente para un emprendedor colombiano de Bucaramanga: dueño de gastro bar/nightclub, crypto trader (memecoins, estrategias DeFi), dev de apps con Next.js usando AI, creador de contenido (marca personal), estudiante autodidacta de historia y ciencia.`;
+
+export async function classifyVaultUrl(
+  url: string,
+  title: string,
+  description: string,
+  existingCategories: string[] = []
+): Promise<{ category: string; summary: string }> {
+  const categoryGuide = existingCategories.length > 0
+    ? `Categorías que ya existen en su bóveda (PREFIERE reutilizar una de estas si encaja): ${existingCategories.join(", ")}`
+    : `Categorías sugeridas (puedes inferir una distinta si encaja mejor): ${VAULT_SUGGESTED_CATEGORIES.join(", ")}`;
+
   const message = await anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 300,
+    max_tokens: 250,
     messages: [{
       role: "user",
-      content: `Eres un asistente para un emprendedor colombiano: dueño de gastro bar, crypto trader, dev de apps con Next.js, creador de contenido.
+      content: `${VAULT_USER_CONTEXT}
 
-Analiza este contenido web y clasifícalo.
+Analiza este link y clasifícalo.
 URL: ${url}
 Título: ${title}
 Descripción: ${description}
 
-Responde SOLO con JSON válido (sin markdown):
-{"category":"una de: Marketing, Crypto, Negocios, Desarrollo, Aprendizaje, Lifestyle, Otro","insight":"máximo 12 palabras explicando por qué este link es valioso para sus negocios"}`,
+${categoryGuide}
+
+Reglas:
+- "category": 1-3 palabras, en español o inglés, capitalizada (p.ej. "Crypto Strategy", "AI Creative Tools"). REUTILIZA una categoría existente si encaja.
+- "summary": una sola frase (máx 14 palabras) en español, accionable, explicando POR QUÉ este link es valioso para él.
+
+Responde SOLO con JSON válido (sin markdown, sin backticks):
+{"category":"...","summary":"..."}`,
     }],
   });
 
   const content = message.content[0];
-  if (content.type !== "text") return { category: "Otro", insight: "" };
+  if (content.type !== "text") return { category: "Otro", summary: "" };
 
   try {
     const cleaned = content.text.replace(/```(?:json)?\n?|\n?```/g, "").trim();
     const parsed = JSON.parse(cleaned);
     return {
-      category: parsed.category || "Otro",
-      insight: parsed.insight || "",
+      category: (parsed.category || "Otro").trim(),
+      summary: (parsed.summary || parsed.insight || "").trim(),
     };
   } catch {
-    return { category: "Otro", insight: "" };
+    return { category: "Otro", summary: "" };
+  }
+}
+
+// Bulk classification — N URLs in a single Haiku call. Returns aligned array.
+export async function classifyVaultUrlsBulk(
+  items: { url: string; title?: string; description?: string }[],
+  existingCategories: string[] = []
+): Promise<{ category: string; summary: string; title: string }[]> {
+  if (items.length === 0) return [];
+
+  const categoryGuide = existingCategories.length > 0
+    ? `Categorías existentes (PREFIERE reutilizarlas): ${existingCategories.join(", ")}`
+    : `Categorías sugeridas: ${VAULT_SUGGESTED_CATEGORIES.join(", ")}`;
+
+  const list = items
+    .map((it, i) => `${i + 1}. URL: ${it.url}${it.title ? `\n   Título: ${it.title}` : ""}${it.description ? `\n   Desc: ${it.description.slice(0, 200)}` : ""}`)
+    .join("\n\n");
+
+  const message = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 2500,
+    messages: [{
+      role: "user",
+      content: `${VAULT_USER_CONTEXT}
+
+Analiza estos ${items.length} links y clasifica cada uno.
+
+${list}
+
+${categoryGuide}
+
+Reglas para CADA item:
+- "title": el título limpio (máx 90 caracteres). Si no se provee, infiere uno corto desde la URL.
+- "category": 1-3 palabras capitalizada. REUTILIZA una existente si encaja. Agrupa links similares en la misma categoría.
+- "summary": una frase (máx 14 palabras) en español, explicando POR QUÉ es valioso para él.
+
+Responde SOLO con un JSON array válido (sin markdown). El array debe tener exactamente ${items.length} elementos en el MISMO orden:
+[{"title":"...","category":"...","summary":"..."}]`,
+    }],
+  });
+
+  const content = message.content[0];
+  if (content.type !== "text") return items.map(() => ({ category: "Otro", summary: "", title: "" }));
+
+  try {
+    const cleaned = content.text.replace(/```(?:json)?\n?|\n?```/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+    if (!Array.isArray(parsed)) throw new Error("not array");
+    return items.map((_, i) => ({
+      category: (parsed[i]?.category || "Otro").trim(),
+      summary: (parsed[i]?.summary || "").trim(),
+      title: (parsed[i]?.title || "").trim(),
+    }));
+  } catch {
+    return items.map(() => ({ category: "Otro", summary: "", title: "" }));
   }
 }
 

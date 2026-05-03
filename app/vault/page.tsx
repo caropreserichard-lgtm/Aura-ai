@@ -2,27 +2,17 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Search, Plus, Sparkles, Trash2, ExternalLink, ChevronRight,
+  CheckSquare, Square, X, Lightbulb, Loader2, Check, Edit3,
+  Globe, AlertCircle,
+} from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
-import {
-  ExternalLink,
-  Lightbulb,
-  Trash2,
-  ChevronDown,
-  Filter,
-  TrendingUp,
-  Zap,
-  BookOpen,
-  ShoppingBag,
-  Bitcoin,
-  Briefcase,
-  Leaf,
-  HelpCircle,
-  Check,
-  X,
-} from "lucide-react";
+import { detectPlatform, normalizeUrlForDedupe, PLATFORM_THEME, VaultPlatform } from "@/lib/vault-helpers";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,320 +24,783 @@ interface VaultItem {
   title: string;
   category: string;
   status: VaultStatus;
-  insight: string;
+  summary?: string;
+  insight?: string; // legacy
   idea: string;
+  platform?: VaultPlatform;
   created_at: string;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const VAULT_CATEGORIES = [
-  "Marketing",
-  "Crypto",
-  "Negocios",
-  "Desarrollo",
-  "Aprendizaje",
-  "Lifestyle",
-  "Otro",
-] as const;
-
-const CATEGORY_CONFIG: Record<string, { icon: React.ComponentType<{ size?: number; strokeWidth?: number; color?: string }>; color: string; glow: string }> = {
-  Marketing:   { icon: TrendingUp, color: "#e7ca79", glow: "rgba(231,202,121,0.15)" },
-  Crypto:      { icon: Bitcoin,    color: "#f97316", glow: "rgba(249,115,22,0.15)"  },
-  Negocios:    { icon: Briefcase,  color: "#3b82f6", glow: "rgba(59,130,246,0.15)" },
-  Desarrollo:  { icon: Zap,        color: "#a855f7", glow: "rgba(168,85,247,0.15)" },
-  Aprendizaje: { icon: BookOpen,   color: "#10b981", glow: "rgba(16,185,129,0.15)" },
-  Lifestyle:   { icon: Leaf,       color: "#ec4899", glow: "rgba(236,72,153,0.15)" },
-  Otro:        { icon: HelpCircle, color: "#6b7280", glow: "rgba(107,114,128,0.15)" },
+const STATUS_THEME: Record<VaultStatus, { label: string; dot: string; ring: string }> = {
+  unread:      { label: "No leído",   dot: "#9ca3af", ring: "rgba(156,163,175,0.35)" },
+  in_progress: { label: "En proceso", dot: "#60a5fa", ring: "rgba(96,165,250,0.35)" },
+  completed:   { label: "Completado", dot: "#e7ca79", ring: "rgba(231,202,121,0.4)" },
 };
 
-const STATUS_CONFIG: Record<VaultStatus, { label: string; bg: string; text: string; border: string }> = {
-  unread:      { label: "No leído",   bg: "rgba(107,114,128,0.15)", text: "#9ca3af", border: "rgba(107,114,128,0.3)" },
-  in_progress: { label: "En proceso", bg: "rgba(59,130,246,0.15)",  text: "#60a5fa", border: "rgba(59,130,246,0.3)"  },
-  completed:   { label: "Completado", bg: "rgba(231,202,121,0.15)", text: "#e7ca79", border: "rgba(231,202,121,0.3)" },
+const STATUS_CYCLE: Record<VaultStatus, VaultStatus> = {
+  unread: "in_progress",
+  in_progress: "completed",
+  completed: "unread",
 };
-
-const STATUS_ORDER: VaultStatus[] = ["unread", "in_progress", "completed"];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatDate(iso: string) {
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-}
 
 function getDomain(url: string) {
   try { return new URL(url).hostname.replace("www.", ""); } catch { return url; }
 }
 
-// ─── Card Component ───────────────────────────────────────────────────────────
+function getSummary(item: VaultItem): string {
+  return item.summary || item.insight || "";
+}
 
-function VaultCard({
-  item,
-  onStatusChange,
-  onIdeaChange,
-  onDelete,
+/** Hash a string into a hue (0-360) so each category gets a stable color. */
+function hueFromString(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 360;
+  return h;
+}
+
+function categoryTheme(name: string) {
+  const hue = hueFromString(name);
+  return {
+    color: `hsl(${hue}, 65%, 65%)`,
+    bg: `hsla(${hue}, 65%, 60%, 0.10)`,
+    border: `hsla(${hue}, 65%, 60%, 0.28)`,
+  };
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+
+interface ToastState { id: number; type: "success" | "error" | "info"; message: string; }
+
+function useToast() {
+  const [toasts, setToasts] = useState<ToastState[]>([]);
+  const push = useCallback((type: ToastState["type"], message: string) => {
+    const id = Date.now() + Math.random();
+    setToasts((t) => [...t, { id, type, message }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
+  }, []);
+  return { toasts, push };
+}
+
+function Toaster({ toasts }: { toasts: ToastState[] }) {
+  return (
+    <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[200] space-y-2 pointer-events-none">
+      <AnimatePresence>
+        {toasts.map((t) => (
+          <motion.div
+            key={t.id}
+            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.96 }}
+            transition={{ type: "spring", stiffness: 320, damping: 28 }}
+            className="px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 pointer-events-auto"
+            style={{
+              background: t.type === "error"
+                ? "rgba(239,68,68,0.14)"
+                : t.type === "success"
+                ? "rgba(231,202,121,0.14)"
+                : "rgba(255,255,255,0.08)",
+              border: `1px solid ${t.type === "error" ? "rgba(239,68,68,0.35)" : t.type === "success" ? "rgba(231,202,121,0.35)" : "rgba(255,255,255,0.18)"}`,
+              backdropFilter: "blur(20px)",
+              color: t.type === "error" ? "#fca5a5" : t.type === "success" ? "#e7ca79" : "#e5e5e5",
+              boxShadow: "0 12px 32px rgba(0,0,0,0.45)",
+            }}
+          >
+            {t.type === "error" && <AlertCircle size={14} />}
+            {t.type === "success" && <Check size={14} />}
+            <span className="font-medium">{t.message}</span>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── Add Link Modal (manual / OG) ────────────────────────────────────────────
+
+function AddLinkModal({
+  open, onClose, onCreated, existingCategories,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (item: VaultItem) => void;
+  existingCategories: string[];
+}) {
+  const [url, setUrl] = useState("");
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("");
+  const [summary, setSummary] = useState("");
+  const [platform, setPlatform] = useState<VaultPlatform>("Web");
+  const [scraping, setScraping] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [scraped, setScraped] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const reset = useCallback(() => {
+    setUrl(""); setTitle(""); setCategory(""); setSummary("");
+    setPlatform("Web"); setScraped(false); setErr(null);
+  }, []);
+
+  useEffect(() => { if (!open) reset(); }, [open, reset]);
+
+  const handleScrape = async () => {
+    const u = url.trim();
+    if (!/^https?:\/\//.test(u)) { setErr("URL debe empezar con http:// o https://"); return; }
+    setErr(null); setScraping(true);
+    try {
+      const res = await fetch("/api/vault/classify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: u, mode: "og" }),
+      });
+      if (!res.ok) throw new Error("scrape failed");
+      const data = await res.json();
+      setTitle(data.title || u);
+      setPlatform(data.platform || detectPlatform(u));
+      setScraped(true);
+    } catch {
+      setTitle(u);
+      setPlatform(detectPlatform(u));
+      setScraped(true);
+      setErr("No se pudo leer el preview, pero puedes guardar igual.");
+    } finally {
+      setScraping(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!url.trim() || !title.trim()) { setErr("URL y título son requeridos"); return; }
+    setSaving(true); setErr(null);
+    try {
+      const res = await fetch("/api/vault", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: url.trim(),
+          title: title.trim(),
+          category: (category.trim() || "Otro"),
+          summary: summary.trim(),
+          platform,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.error === "duplicate") { setErr("Este link ya está en tu bóveda"); setSaving(false); return; }
+        throw new Error(data.error || "save failed");
+      }
+      onCreated(data);
+      onClose();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[150] flex items-center justify-center p-4"
+        style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.96, y: 16, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          exit={{ scale: 0.96, y: 8, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="w-full max-w-md rounded-2xl border overflow-hidden"
+          style={{
+            background: "rgba(24,24,24,0.92)",
+            backdropFilter: "blur(20px)",
+            borderColor: "rgba(231,202,121,0.18)",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-5 py-4 flex items-center justify-between border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+            <div>
+              <h3 className="text-sm font-semibold text-text-primary">Agregar link</h3>
+              <p className="text-[11px] text-text-muted mt-0.5">OG scraping — sin créditos de IA</p>
+            </div>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 text-text-muted">
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="p-5 space-y-3">
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-text-muted font-medium">URL</label>
+              <div className="flex gap-2 mt-1">
+                <input
+                  type="url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="flex-1 text-sm rounded-lg px-3 py-2 outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#e8e8e8" }}
+                  onKeyDown={(e) => e.key === "Enter" && !scraped && handleScrape()}
+                />
+                {!scraped && (
+                  <button
+                    onClick={handleScrape}
+                    disabled={scraping || !url.trim()}
+                    className="px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                    style={{ background: "rgba(231,202,121,0.15)", color: "#e7ca79", border: "1px solid rgba(231,202,121,0.25)" }}
+                  >
+                    {scraping ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />}
+                    Preview
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {scraped && (
+              <>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-text-muted font-medium">Título</label>
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full text-sm rounded-lg px-3 py-2 outline-none mt-1"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#e8e8e8" }}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-text-muted font-medium">Categoría</label>
+                  <input
+                    list="vault-categories"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    placeholder="Otro"
+                    className="w-full text-sm rounded-lg px-3 py-2 outline-none mt-1"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#e8e8e8" }}
+                  />
+                  <datalist id="vault-categories">
+                    {existingCategories.map((c) => <option key={c} value={c} />)}
+                  </datalist>
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-text-muted font-medium">Resumen (opcional)</label>
+                  <textarea
+                    value={summary}
+                    onChange={(e) => setSummary(e.target.value)}
+                    placeholder="Una frase explicando por qué guardas este link..."
+                    rows={2}
+                    className="w-full text-sm rounded-lg px-3 py-2 outline-none mt-1 resize-none"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#e8e8e8" }}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className="text-text-muted">Plataforma detectada:</span>
+                  <span
+                    className="px-2 py-0.5 rounded-full font-medium border"
+                    style={{
+                      background: PLATFORM_THEME[platform].bg,
+                      color: PLATFORM_THEME[platform].color,
+                      borderColor: PLATFORM_THEME[platform].border,
+                    }}
+                  >
+                    {platform}
+                  </span>
+                </div>
+              </>
+            )}
+
+            {err && (
+              <div className="text-[11px] flex items-center gap-1.5 p-2 rounded-lg" style={{ background: "rgba(239,68,68,0.08)", color: "#fca5a5" }}>
+                <AlertCircle size={11} /> {err}
+              </div>
+            )}
+          </div>
+
+          <div className="px-5 pb-4 flex justify-end gap-2">
+            <button onClick={onClose} className="px-3 py-2 rounded-lg text-xs text-text-muted hover:bg-white/5">Cancelar</button>
+            {scraped && (
+              <button
+                onClick={handleSave}
+                disabled={saving || !url.trim() || !title.trim()}
+                className="px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+                style={{ background: "linear-gradient(135deg, #e7ca79, #c4a94f)", color: "#1a1a1a" }}
+              >
+                {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                Guardar
+              </button>
+            )}
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// ─── Bulk Add Modal (AI Pro) ─────────────────────────────────────────────────
+
+function BulkAddModal({
+  open, onClose, onCompleted,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCompleted: (created: VaultItem[], skipped: number) => void;
+}) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => { if (!open) { setText(""); setErr(null); } }, [open]);
+
+  const urlCount = useMemo(() => (text.match(/https?:\/\/[^\s<>"')]+/gi) || []).length, [text]);
+
+  const handleSubmit = async () => {
+    if (urlCount === 0) { setErr("Pega al menos una URL"); return; }
+    setBusy(true); setErr(null);
+    try {
+      const res = await fetch("/api/vault/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "bulk failed");
+      onCompleted(data.created || [], (data.skipped || []).length);
+      onClose();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error en el lote");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[150] flex items-center justify-center p-4"
+        style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.96, y: 16, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          exit={{ scale: 0.96, y: 8, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="w-full max-w-lg rounded-2xl border overflow-hidden"
+          style={{
+            background: "rgba(24,24,24,0.92)",
+            backdropFilter: "blur(20px)",
+            borderColor: "rgba(168,85,247,0.25)",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-5 py-4 flex items-center justify-between border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.3)" }}>
+                <Sparkles size={15} color="#c084fc" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary">Bulk con IA</h3>
+                <p className="text-[11px] text-text-muted mt-0.5">Pega varias URLs — clasificación automática</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 text-text-muted">
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="p-5 space-y-3">
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={"Pega aquí varias URLs (una por línea o mezcladas en texto):\n\nhttps://...\nhttps://..."}
+              rows={8}
+              className="w-full text-sm rounded-lg px-3 py-2.5 outline-none resize-none font-mono"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#e8e8e8" }}
+            />
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-text-muted">
+                {urlCount === 0 ? "Aún no detecto URLs" : `${urlCount} URL${urlCount === 1 ? "" : "s"} detectada${urlCount === 1 ? "" : "s"}`}
+              </span>
+              <span className="text-text-muted opacity-60">Máx 60 por lote · 1 crédito IA total</span>
+            </div>
+
+            {err && (
+              <div className="text-[11px] flex items-center gap-1.5 p-2 rounded-lg" style={{ background: "rgba(239,68,68,0.08)", color: "#fca5a5" }}>
+                <AlertCircle size={11} /> {err}
+              </div>
+            )}
+          </div>
+
+          <div className="px-5 pb-4 flex justify-end gap-2">
+            <button onClick={onClose} className="px-3 py-2 rounded-lg text-xs text-text-muted hover:bg-white/5">Cancelar</button>
+            <button
+              onClick={handleSubmit}
+              disabled={busy || urlCount === 0}
+              className="px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+              style={{ background: "linear-gradient(135deg, #a855f7, #7c3aed)", color: "#fff" }}
+            >
+              {busy ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+              {busy ? "Procesando..." : `Procesar ${urlCount} link${urlCount === 1 ? "" : "s"}`}
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// ─── Item Row ─────────────────────────────────────────────────────────────────
+
+function ItemRow({
+  item, selected, onToggleSelect, onCycleStatus, onDelete, onEditCategory, query,
 }: {
   item: VaultItem;
-  onStatusChange: (id: string, status: VaultStatus) => void;
-  onIdeaChange: (id: string, idea: string) => void;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
+  onCycleStatus: (item: VaultItem) => void;
   onDelete: (id: string) => void;
+  onEditCategory: (item: VaultItem) => void;
+  query: string;
 }) {
-  const [statusOpen, setStatusOpen] = useState(false);
-  const [ideaOpen, setIdeaOpen] = useState(false);
+  const [editIdea, setEditIdea] = useState(false);
   const [ideaText, setIdeaText] = useState(item.idea || "");
-  const [savingIdea, setSavingIdea] = useState(false);
   const ideaRef = useRef<HTMLTextAreaElement>(null);
-  const statusCfg = STATUS_CONFIG[item.status];
+  const status = STATUS_THEME[item.status];
+  const platform = item.platform || detectPlatform(item.url);
+  const platformTheme = PLATFORM_THEME[platform];
+  const summary = getSummary(item);
+
+  useEffect(() => { if (editIdea) ideaRef.current?.focus(); }, [editIdea]);
 
   const saveIdea = async () => {
-    if (ideaText === item.idea) { setIdeaOpen(false); return; }
-    setSavingIdea(true);
+    if (ideaText === (item.idea || "")) { setEditIdea(false); return; }
     await fetch(`/api/vault/${item._id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ idea: ideaText }),
     });
-    onIdeaChange(item._id, ideaText);
-    setSavingIdea(false);
-    setIdeaOpen(false);
+    item.idea = ideaText;
+    setEditIdea(false);
   };
 
-  useEffect(() => {
-    if (ideaOpen) ideaRef.current?.focus();
-  }, [ideaOpen]);
+  // Highlight search matches
+  const renderTitle = () => {
+    if (!query) return item.title;
+    const idx = item.title.toLowerCase().indexOf(query.toLowerCase());
+    if (idx < 0) return item.title;
+    return (
+      <>
+        {item.title.slice(0, idx)}
+        <mark style={{ background: "rgba(231,202,121,0.25)", color: "#e7ca79", padding: 0 }}>
+          {item.title.slice(idx, idx + query.length)}
+        </mark>
+        {item.title.slice(idx + query.length)}
+      </>
+    );
+  };
 
   return (
-    <div
-      className="relative rounded-xl border p-4 transition-all duration-200 group"
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ type: "spring", stiffness: 320, damping: 30 }}
+      className="group relative px-3 py-2.5 rounded-xl border transition-colors"
       style={{
-        background: "rgba(255,255,255,0.03)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        borderColor: "rgba(255,255,255,0.08)",
-        boxShadow: "0 2px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
+        background: selected ? "rgba(231,202,121,0.08)" : "rgba(255,255,255,0.025)",
+        borderColor: selected ? "rgba(231,202,121,0.30)" : "rgba(255,255,255,0.06)",
+        opacity: item.status === "completed" ? 0.65 : 1,
       }}
     >
-      {/* Header row */}
-      <div className="flex items-start gap-3 mb-3">
-        <div className="flex-1 min-w-0">
-          <a
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm font-semibold text-text-primary hover:text-[#e7ca79] transition-colors line-clamp-2 leading-snug"
-          >
-            {item.title}
-          </a>
-          <p className="text-[11px] text-text-muted mt-0.5">{getDomain(item.url)}</p>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex items-center gap-1 shrink-0">
-          {/* Idea bombilla */}
-          <button
-            onClick={() => setIdeaOpen((o) => !o)}
-            title="Agregar idea de negocio"
-            className="p-1.5 rounded-lg transition-colors"
-            style={{
-              color: ideaText ? "#e7ca79" : "#666",
-              background: ideaText ? "rgba(231,202,121,0.1)" : "transparent",
-            }}
-          >
-            <Lightbulb size={14} />
-          </button>
-
-          {/* Open link */}
-          <a
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
-            style={{ color: "#666" }}
-          >
-            <ExternalLink size={14} />
-          </a>
-
-          {/* Delete */}
-          <button
-            onClick={() => onDelete(item._id)}
-            className="p-1.5 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-            style={{ color: "#d4544e" }}
-          >
-            <Trash2 size={13} />
-          </button>
-        </div>
-      </div>
-
-      {/* Insight */}
-      {item.insight && (
-        <p
-          className="text-[11px] italic mb-3 px-2.5 py-1.5 rounded-lg"
-          style={{
-            color: "#9ca3af",
-            background: "rgba(255,255,255,0.04)",
-            borderLeft: "2px solid rgba(231,202,121,0.3)",
-          }}
+      <div className="flex items-start gap-2.5">
+        {/* Selection checkbox */}
+        <button
+          onClick={() => onToggleSelect(item._id)}
+          className="mt-0.5 shrink-0 transition-colors"
+          style={{ color: selected ? "#e7ca79" : "#525252" }}
+          title={selected ? "Deseleccionar" : "Seleccionar"}
         >
-          💡 {item.insight}
-        </p>
-      )}
+          {selected ? <CheckSquare size={15} /> : <Square size={15} />}
+        </button>
 
-      {/* Idea note */}
-      {ideaOpen && (
-        <div className="mb-3">
-          <textarea
-            ref={ideaRef}
-            value={ideaText}
-            onChange={(e) => setIdeaText(e.target.value)}
-            placeholder="Escribe tu idea de negocio rápida..."
-            rows={2}
-            className="w-full text-xs rounded-lg px-3 py-2 resize-none outline-none"
-            style={{
-              background: "rgba(231,202,121,0.06)",
-              border: "1px solid rgba(231,202,121,0.2)",
-              color: "#e8e8e8",
-            }}
-          />
-          <div className="flex gap-1.5 mt-1.5 justify-end">
-            <button
-              onClick={() => setIdeaOpen(false)}
-              className="p-1 rounded"
-              style={{ color: "#666" }}
+        {/* Status dot */}
+        <button
+          onClick={() => onCycleStatus(item)}
+          className="mt-1 shrink-0 w-2.5 h-2.5 rounded-full transition-all"
+          style={{
+            background: status.dot,
+            boxShadow: `0 0 0 3px ${status.ring}`,
+          }}
+          title={status.label}
+        />
+
+        {/* Body */}
+        <div className="flex-1 min-w-0">
+          {/* Top row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-text-primary hover:text-[#e7ca79] transition-colors truncate max-w-full"
+              style={{ textDecoration: item.status === "completed" ? "line-through" : "none" }}
             >
-              <X size={12} />
-            </button>
-            <button
-              onClick={saveIdea}
-              disabled={savingIdea}
-              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium"
-              style={{ background: "rgba(231,202,121,0.15)", color: "#e7ca79" }}
+              {renderTitle()}
+            </a>
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded-md font-medium border shrink-0"
+              style={{ background: platformTheme.bg, color: platformTheme.color, borderColor: platformTheme.border }}
             >
-              <Check size={10} />
-              {savingIdea ? "..." : "Guardar"}
-            </button>
+              {platform}
+            </span>
           </div>
-        </div>
-      )}
 
-      {/* Footer row */}
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] text-text-muted">
-          Agregado el {formatDate(item.created_at)}
-        </span>
+          {/* Summary */}
+          {summary && (
+            <p className="text-[11.5px] text-text-muted mt-0.5 leading-snug line-clamp-2">{summary}</p>
+          )}
 
-        {/* Status badge dropdown */}
-        <div className="relative">
-          <button
-            onClick={() => setStatusOpen((o) => !o)}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium border transition-colors"
-            style={{
-              background: statusCfg.bg,
-              color: statusCfg.text,
-              borderColor: statusCfg.border,
-            }}
-          >
-            {statusCfg.label}
-            <ChevronDown size={10} />
-          </button>
+          {/* Domain */}
+          <p className="text-[10px] text-text-muted opacity-70 mt-1">{getDomain(item.url)}</p>
 
-          {statusOpen && (
-            <div
-              className="absolute bottom-full right-0 mb-1 rounded-lg border overflow-hidden z-20 min-w-[120px]"
-              style={{
-                background: "rgba(30,30,30,0.95)",
-                backdropFilter: "blur(12px)",
-                borderColor: "rgba(255,255,255,0.1)",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
-              }}
-            >
-              {STATUS_ORDER.map((s) => {
-                const cfg = STATUS_CONFIG[s];
-                return (
-                  <button
-                    key={s}
-                    onClick={() => {
-                      onStatusChange(item._id, s);
-                      setStatusOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-[11px] transition-colors hover:bg-white/5"
-                    style={{ color: cfg.text }}
-                  >
-                    {cfg.label}
-                  </button>
-                );
-              })}
+          {/* Idea row */}
+          {(item.idea || editIdea) && (
+            <div className="mt-2">
+              {editIdea ? (
+                <div>
+                  <textarea
+                    ref={ideaRef}
+                    value={ideaText}
+                    onChange={(e) => setIdeaText(e.target.value)}
+                    rows={2}
+                    placeholder="Idea de negocio rápida..."
+                    className="w-full text-[11px] rounded-md px-2 py-1.5 outline-none resize-none"
+                    style={{ background: "rgba(231,202,121,0.06)", border: "1px solid rgba(231,202,121,0.2)", color: "#e8e8e8" }}
+                  />
+                  <div className="flex gap-1 mt-1 justify-end">
+                    <button onClick={() => { setIdeaText(item.idea || ""); setEditIdea(false); }} className="text-[10px] text-text-muted">Cancelar</button>
+                    <button onClick={saveIdea} className="text-[10px] px-2 py-0.5 rounded" style={{ background: "rgba(231,202,121,0.15)", color: "#e7ca79" }}>Guardar</button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setEditIdea(true)} className="text-[11px] italic flex items-start gap-1 hover:opacity-90 text-left" style={{ color: "#e7ca79" }}>
+                  <Lightbulb size={11} className="mt-0.5 shrink-0" />
+                  <span>{item.idea}</span>
+                </button>
+              )}
             </div>
           )}
         </div>
+
+        {/* Right column: actions */}
+        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          {!item.idea && !editIdea && (
+            <button onClick={() => setEditIdea(true)} className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#888" }} title="Agregar idea">
+              <Lightbulb size={13} />
+            </button>
+          )}
+          <button onClick={() => onEditCategory(item)} className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#888" }} title="Cambiar categoría">
+            <Edit3 size={13} />
+          </button>
+          <a href={item.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#888" }}>
+            <ExternalLink size={13} />
+          </a>
+          <button onClick={() => onDelete(item._id)} className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#d4544e" }}>
+            <Trash2 size={12} />
+          </button>
+        </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-// ─── Category Section ──────────────────────────────────────────────────────────
+// ─── Category Section (sticky header + accordion) ────────────────────────────
 
 function CategorySection({
-  category,
-  items,
-  onStatusChange,
-  onIdeaChange,
-  onDelete,
+  category, items, expanded, onToggle, selected, onToggleSelect,
+  onCycleStatus, onDelete, onEditCategory, query,
 }: {
   category: string;
   items: VaultItem[];
-  onStatusChange: (id: string, status: VaultStatus) => void;
-  onIdeaChange: (id: string, idea: string) => void;
+  expanded: boolean;
+  onToggle: () => void;
+  selected: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onCycleStatus: (item: VaultItem) => void;
   onDelete: (id: string) => void;
+  onEditCategory: (item: VaultItem) => void;
+  query: string;
 }) {
-  const cfg = CATEGORY_CONFIG[category] || CATEGORY_CONFIG["Otro"];
-  const Icon = cfg.icon;
+  const theme = categoryTheme(category);
   const completed = items.filter((i) => i.status === "completed").length;
   const total = items.length;
   const progress = total > 0 ? (completed / total) * 100 : 0;
 
   return (
-    <div className="mb-10">
-      {/* Category header */}
-      <div className="flex items-center gap-3 mb-4">
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center"
-          style={{ background: cfg.glow, border: `1px solid ${cfg.color}30` }}
+    <section className="relative">
+      {/* Sticky header */}
+      <button
+        onClick={onToggle}
+        className="sticky top-0 z-10 w-full text-left flex items-center gap-3 px-3 py-2.5 transition-colors"
+        style={{
+          background: "rgba(20,20,20,0.85)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          borderBottom: "1px solid rgba(255,255,255,0.04)",
+        }}
+      >
+        <motion.div
+          animate={{ rotate: expanded ? 90 : 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="shrink-0"
         >
-          <Icon size={16} strokeWidth={1.5} color={cfg.color} />
-        </div>
+          <ChevronRight size={14} color="#888" />
+        </motion.div>
 
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h2 className="text-sm font-semibold text-text-primary">{category}</h2>
-            <span className="text-[11px] text-text-muted">
-              {completed}/{total} completados
-            </span>
+        <div
+          className="w-2 h-2 rounded-full shrink-0"
+          style={{ background: theme.color, boxShadow: `0 0 0 3px ${theme.bg}` }}
+        />
+
+        <span className="text-[13px] font-semibold text-text-primary">{category}</span>
+
+        <span className="text-[11px] text-text-muted">({total})</span>
+
+        {/* Progress mini-bar */}
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-[10px] text-text-muted">{completed}/{total}</span>
+          <div className="w-16 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+            <div className="h-full transition-all duration-500" style={{ width: `${progress}%`, background: theme.color }} />
           </div>
+        </div>
+      </button>
 
-          {/* Progress bar */}
-          <div className="mt-1 h-1 w-32 rounded-full bg-white/5 overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${progress}%`, background: cfg.color }}
+      {/* Expanding body */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key="content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            style={{ overflow: "hidden" }}
+          >
+            <div className="space-y-1.5 px-2 py-2">
+              {items.map((item) => (
+                <ItemRow
+                  key={item._id}
+                  item={item}
+                  selected={selected.has(item._id)}
+                  onToggleSelect={onToggleSelect}
+                  onCycleStatus={onCycleStatus}
+                  onDelete={onDelete}
+                  onEditCategory={onEditCategory}
+                  query={query}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+// ─── Edit Category Modal ─────────────────────────────────────────────────────
+
+function EditCategoryModal({
+  item, existingCategories, onClose, onSaved,
+}: {
+  item: VaultItem | null;
+  existingCategories: string[];
+  onClose: () => void;
+  onSaved: (id: string, category: string) => void;
+}) {
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setValue(item?.category || ""); }, [item]);
+
+  if (!item) return null;
+
+  const handleSave = async () => {
+    const v = value.trim() || "Otro";
+    setSaving(true);
+    await fetch(`/api/vault/${item._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: v }),
+    });
+    onSaved(item._id, v);
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[150] flex items-center justify-center p-4"
+        style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.96, y: 16, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          exit={{ scale: 0.96, y: 8, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="w-full max-w-sm rounded-2xl border overflow-hidden"
+          style={{
+            background: "rgba(24,24,24,0.92)",
+            backdropFilter: "blur(20px)",
+            borderColor: "rgba(255,255,255,0.08)",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+            <h3 className="text-sm font-semibold text-text-primary">Cambiar categoría</h3>
+            <p className="text-[11px] text-text-muted mt-0.5 truncate">{item.title}</p>
+          </div>
+          <div className="p-5">
+            <input
+              autoFocus
+              list="vault-categories-edit"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+              placeholder="Nombre de categoría"
+              className="w-full text-sm rounded-lg px-3 py-2 outline-none"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#e8e8e8" }}
             />
+            <datalist id="vault-categories-edit">
+              {existingCategories.map((c) => <option key={c} value={c} />)}
+            </datalist>
           </div>
-        </div>
-      </div>
-
-      {/* Cards grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {items.map((item) => (
-          <VaultCard
-            key={item._id}
-            item={item}
-            onStatusChange={onStatusChange}
-            onIdeaChange={onIdeaChange}
-            onDelete={onDelete}
-          />
-        ))}
-      </div>
-    </div>
+          <div className="px-5 pb-4 flex justify-end gap-2">
+            <button onClick={onClose} className="px-3 py-2 rounded-lg text-xs text-text-muted hover:bg-white/5">Cancelar</button>
+            <button onClick={handleSave} disabled={saving}
+              className="px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+              style={{ background: "linear-gradient(135deg, #e7ca79, #c4a94f)", color: "#1a1a1a" }}
+            >
+              {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+              Guardar
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 
@@ -357,56 +810,167 @@ export default function VaultPage() {
   const router = useRouter();
   const [items, setItems] = useState<VaultItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
+  const [editCatItem, setEditCatItem] = useState<VaultItem | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [hideCompleted, setHideCompleted] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<VaultStatus | "all">("all");
+  const { toasts, push: toast } = useToast();
 
-  useEffect(() => {
-    fetch("/api/vault")
-      .then((r) => {
-        if (r.status === 401) { router.push("/login"); return null; }
-        return r.json();
-      })
-      .then((data) => {
-        if (data) setItems(data);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  // ── Fetch ────────────────────────────────────────────────────────────────
+  const fetchItems = useCallback(async () => {
+    try {
+      const r = await fetch("/api/vault");
+      if (r.status === 401) { router.push("/login"); return; }
+      const data = await r.json();
+      if (Array.isArray(data)) setItems(data);
+    } catch {/* */} finally { setLoading(false); }
   }, [router]);
 
-  const handleStatusChange = async (id: string, status: VaultStatus) => {
-    setItems((prev) => prev.map((i) => i._id === id ? { ...i, status } : i));
-    await fetch(`/api/vault/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+  useEffect(() => { fetchItems(); }, [fetchItems]);
+
+  // ── Categories (dynamic, derived from data) ──────────────────────────────
+  const existingCategories = useMemo(() => {
+    const s = new Set<string>();
+    items.forEach((i) => i.category && s.add(i.category));
+    return Array.from(s).sort((a, b) => a.localeCompare(b));
+  }, [items]);
+
+  // ── Filter & group ───────────────────────────────────────────────────────
+  const q = query.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    return items.filter((i) => {
+      if (hideCompleted && i.status === "completed") return false;
+      if (statusFilter !== "all" && i.status !== statusFilter) return false;
+      if (!q) return true;
+      const hay = `${i.title} ${i.category} ${getSummary(i)} ${i.url}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [items, q, hideCompleted, statusFilter]);
+
+  const grouped = useMemo(() => {
+    const g = new Map<string, VaultItem[]>();
+    filtered.forEach((i) => {
+      const c = i.category || "Otro";
+      if (!g.has(c)) g.set(c, []);
+      g.get(c)!.push(i);
+    });
+    return Array.from(g.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [filtered]);
+
+  // ── Auto-expand on search ────────────────────────────────────────────────
+  useEffect(() => {
+    if (q) {
+      // Expand all categories that contain matches
+      setExpanded(new Set(grouped.map(([c]) => c)));
+    }
+  }, [q, grouped]);
+
+  // ── Default expansion: all open on first load ────────────────────────────
+  const initRef = useRef(false);
+  useEffect(() => {
+    if (!loading && !initRef.current && existingCategories.length > 0) {
+      setExpanded(new Set(existingCategories));
+      initRef.current = true;
+    }
+  }, [loading, existingCategories]);
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
+  const toggleSection = (cat: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      return next;
     });
   };
 
-  const handleIdeaChange = (id: string, idea: string) => {
-    setItems((prev) => prev.map((i) => i._id === id ? { ...i, idea } : i));
+  const expandAll = () => setExpanded(new Set(grouped.map(([c]) => c)));
+  const collapseAll = () => setExpanded(new Set());
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelected(new Set());
+
+  const handleCycleStatus = async (item: VaultItem) => {
+    const next = STATUS_CYCLE[item.status];
+    setItems((prev) => prev.map((i) => i._id === item._id ? { ...i, status: next } : i));
+    await fetch(`/api/vault/${item._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: next }),
+    });
   };
 
   const handleDelete = async (id: string) => {
     setItems((prev) => prev.filter((i) => i._id !== id));
+    setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
     await fetch(`/api/vault/${id}`, { method: "DELETE" });
   };
 
-  const filteredItems = hideCompleted
-    ? items.filter((i) => i.status !== "completed")
-    : items;
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    if (!confirm(`¿Eliminar ${selected.size} link${selected.size === 1 ? "" : "s"}?`)) return;
+    const ids = Array.from(selected);
+    setItems((prev) => prev.filter((i) => !selected.has(i._id)));
+    clearSelection();
+    await Promise.all(ids.map((id) => fetch(`/api/vault/${id}`, { method: "DELETE" })));
+    toast("success", `${ids.length} link${ids.length === 1 ? "" : "s"} eliminado${ids.length === 1 ? "" : "s"}`);
+  };
 
-  const grouped = VAULT_CATEGORIES.reduce((acc, cat) => {
-    const catItems = filteredItems.filter((i) => i.category === cat);
-    if (catItems.length > 0) acc[cat] = catItems;
-    return acc;
-  }, {} as Record<string, VaultItem[]>);
+  const handleBulkStatus = async (status: VaultStatus) => {
+    if (selected.size === 0) return;
+    const ids = Array.from(selected);
+    setItems((prev) => prev.map((i) => selected.has(i._id) ? { ...i, status } : i));
+    clearSelection();
+    await Promise.all(ids.map((id) => fetch(`/api/vault/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    })));
+    toast("success", `${ids.length} actualizado${ids.length === 1 ? "" : "s"}`);
+  };
 
-  // Items in uncategorized bucket (category not in VAULT_CATEGORIES)
-  const unknownItems = filteredItems.filter(
-    (i) => !VAULT_CATEGORIES.includes(i.category as typeof VAULT_CATEGORIES[number])
-  );
-  if (unknownItems.length > 0) grouped["Otro"] = [...(grouped["Otro"] || []), ...unknownItems];
+  const handleAdded = (item: VaultItem) => {
+    setItems((prev) => [item, ...prev]);
+    setExpanded((prev) => new Set(prev).add(item.category || "Otro"));
+    toast("success", "Link guardado en La Bóveda");
+  };
 
-  const totalItems = items.length;
+  const handleBulkCompleted = (created: VaultItem[], skipped: number) => {
+    setItems((prev) => [...created, ...prev]);
+    if (created.length > 0) {
+      const cats = new Set(created.map((c) => c.category || "Otro"));
+      setExpanded((prev) => new Set([...prev, ...cats]));
+    }
+    if (created.length > 0 && skipped > 0) {
+      toast("success", `${created.length} agregado${created.length === 1 ? "" : "s"}, ${skipped} duplicado${skipped === 1 ? "" : "s"} ignorado${skipped === 1 ? "" : "s"}`);
+    } else if (created.length > 0) {
+      toast("success", `${created.length} link${created.length === 1 ? "" : "s"} agregado${created.length === 1 ? "" : "s"} con IA ✨`);
+    } else if (skipped > 0) {
+      toast("info", `Todos los ${skipped} links ya estaban en tu bóveda`);
+    }
+  };
+
+  const handleSavedCategory = (id: string, category: string) => {
+    setItems((prev) => prev.map((i) => i._id === id ? { ...i, category } : i));
+    setExpanded((prev) => new Set(prev).add(category));
+    toast("success", "Categoría actualizada");
+  };
+
+  // Detect duplicate paste in URL (when typing into add modal closed) — small UX touch
+  // (The modal itself surfaces this, no global handler needed.)
+  void normalizeUrlForDedupe;
+
+  // ── Stats ────────────────────────────────────────────────────────────────
   const totalCompleted = items.filter((i) => i.status === "completed").length;
 
   return (
@@ -416,80 +980,205 @@ export default function VaultPage() {
       <div className="flex-1 md:ml-60 flex flex-col">
         <TopBar hideAdd />
 
-        <main className="flex-1 px-4 md:px-8 py-6 pb-24 md:pb-6 max-w-6xl mx-auto w-full">
+        <main className="flex-1 px-4 md:px-6 py-5 pb-32 md:pb-6 max-w-5xl mx-auto w-full">
 
-          {/* Page header */}
-          <div className="flex items-start justify-between mb-8 gap-4 flex-wrap">
-            <div>
-              <h1 className="text-2xl font-bold text-text-primary mb-1">
-                La Bóveda 🏛️
-              </h1>
-              <p className="text-sm text-text-muted">
-                Tu base de conocimiento personal — {totalCompleted}/{totalItems} completados
-              </p>
+          {/* ── Header ── */}
+          <div className="mb-4">
+            <div className="flex items-end justify-between gap-3 flex-wrap mb-3">
+              <div>
+                <h1 className="text-2xl font-bold text-text-primary leading-tight">La Bóveda 🏛️</h1>
+                <p className="text-[12px] text-text-muted mt-0.5">
+                  {items.length === 0 ? "Tu base de conocimiento" : `${items.length} link${items.length === 1 ? "" : "s"} · ${totalCompleted} completado${totalCompleted === 1 ? "" : "s"} · ${existingCategories.length} categoría${existingCategories.length === 1 ? "" : "s"}`}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setShowAdd(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all"
+                  style={{ background: "rgba(231,202,121,0.10)", borderColor: "rgba(231,202,121,0.28)", color: "#e7ca79" }}
+                >
+                  <Plus size={13} /> Agregar link
+                </button>
+                <button
+                  onClick={() => setShowBulk(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all"
+                  style={{ background: "rgba(168,85,247,0.10)", borderColor: "rgba(168,85,247,0.28)", color: "#c084fc" }}
+                >
+                  <Sparkles size={13} /> Bulk con IA
+                </button>
+              </div>
             </div>
 
-            {/* Filter button */}
-            <button
-              onClick={() => setHideCompleted((v) => !v)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all"
-              style={{
-                background: hideCompleted ? "rgba(231,202,121,0.12)" : "rgba(255,255,255,0.04)",
-                borderColor: hideCompleted ? "rgba(231,202,121,0.4)" : "rgba(255,255,255,0.08)",
-                color: hideCompleted ? "#e7ca79" : "#9ca3af",
-              }}
-            >
-              <Filter size={14} />
-              {hideCompleted ? "Mostrar todo" : "Solo pendientes"}
-            </button>
+            {/* Search */}
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar por título, categoría, resumen, URL..."
+                className="w-full pl-9 pr-9 py-2.5 text-sm rounded-xl outline-none transition-colors"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#e8e8e8" }}
+              />
+              {query && (
+                <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary">
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            {/* Filters */}
+            <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+              {(["all", "unread", "in_progress", "completed"] as const).map((s) => {
+                const labels: Record<typeof s, string> = { all: "Todos", unread: "No leídos", in_progress: "En proceso", completed: "Completados" };
+                const active = statusFilter === s;
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setStatusFilter(s)}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors"
+                    style={{
+                      background: active ? "rgba(231,202,121,0.12)" : "rgba(255,255,255,0.03)",
+                      borderColor: active ? "rgba(231,202,121,0.30)" : "rgba(255,255,255,0.06)",
+                      color: active ? "#e7ca79" : "#9ca3af",
+                    }}
+                  >
+                    {labels[s]}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setHideCompleted((v) => !v)}
+                className="px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors"
+                style={{
+                  background: hideCompleted ? "rgba(231,202,121,0.12)" : "rgba(255,255,255,0.03)",
+                  borderColor: hideCompleted ? "rgba(231,202,121,0.30)" : "rgba(255,255,255,0.06)",
+                  color: hideCompleted ? "#e7ca79" : "#9ca3af",
+                }}
+              >
+                {hideCompleted ? "Mostrando pendientes" : "Ocultar completados"}
+              </button>
+
+              <div className="ml-auto flex items-center gap-1 text-[11px]">
+                <button onClick={expandAll} className="text-text-muted hover:text-text-primary px-2 py-1">Expandir todo</button>
+                <span className="text-text-muted opacity-30">·</span>
+                <button onClick={collapseAll} className="text-text-muted hover:text-text-primary px-2 py-1">Colapsar todo</button>
+              </div>
+            </div>
           </div>
 
-          {/* Empty state */}
-          {!loading && totalItems === 0 && (
+          {/* ── Loading ── */}
+          {loading && (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 size={20} className="animate-spin text-[#e7ca79]" />
+            </div>
+          )}
+
+          {/* ── Empty (no items at all) ── */}
+          {!loading && items.length === 0 && (
             <div
-              className="text-center py-20 rounded-2xl border"
-              style={{
-                background: "rgba(255,255,255,0.02)",
-                borderColor: "rgba(255,255,255,0.06)",
-              }}
+              className="text-center py-16 rounded-2xl border"
+              style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}
             >
               <p className="text-4xl mb-3">🏛️</p>
               <p className="text-text-primary font-semibold mb-1">Tu bóveda está vacía</p>
-              <p className="text-sm text-text-muted">
-                Pega un link en el chatbox de Tayrona para empezar a guardar conocimiento
+              <p className="text-sm text-text-muted mb-4 px-6">
+                Pega un link manualmente o usa <span style={{ color: "#c084fc" }}>Bulk con IA</span> para procesar varios a la vez.
               </p>
+              <div className="flex justify-center gap-2">
+                <button onClick={() => setShowAdd(true)} className="px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+                  style={{ background: "linear-gradient(135deg, #e7ca79, #c4a94f)", color: "#1a1a1a" }}>
+                  <Plus size={12} /> Agregar primero
+                </button>
+                <button onClick={() => setShowBulk(true)} className="px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+                  style={{ background: "linear-gradient(135deg, #a855f7, #7c3aed)", color: "#fff" }}>
+                  <Sparkles size={12} /> Bulk con IA
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Loading */}
-          {loading && (
-            <div className="flex items-center justify-center py-20">
-              <div className="w-6 h-6 border-2 border-white/10 border-t-[#e7ca79] rounded-full animate-spin" />
-            </div>
-          )}
-
-          {/* Content */}
-          {!loading && Object.entries(grouped).map(([cat, catItems]) => (
-            <CategorySection
-              key={cat}
-              category={cat}
-              items={catItems}
-              onStatusChange={handleStatusChange}
-              onIdeaChange={handleIdeaChange}
-              onDelete={handleDelete}
-            />
-          ))}
-
-          {/* Filtered empty */}
-          {!loading && totalItems > 0 && filteredItems.length === 0 && (
+          {/* ── No matches ── */}
+          {!loading && items.length > 0 && filtered.length === 0 && (
             <div className="text-center py-16">
               <p className="text-text-muted text-sm">
-                🎯 Todo completado. Activa &ldquo;Mostrar todo&rdquo; para ver el historial.
+                {query ? `Sin resultados para "${query}"` : "No hay links que coincidan con los filtros"}
               </p>
+            </div>
+          )}
+
+          {/* ── List with sticky headers ── */}
+          {!loading && grouped.length > 0 && (
+            <div className="rounded-2xl overflow-hidden border" style={{ borderColor: "rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.015)" }}>
+              {grouped.map(([cat, catItems]) => (
+                <CategorySection
+                  key={cat}
+                  category={cat}
+                  items={catItems}
+                  expanded={expanded.has(cat) || !!q}
+                  onToggle={() => toggleSection(cat)}
+                  selected={selected}
+                  onToggleSelect={toggleSelect}
+                  onCycleStatus={handleCycleStatus}
+                  onDelete={handleDelete}
+                  onEditCategory={setEditCatItem}
+                  query={q}
+                />
+              ))}
             </div>
           )}
         </main>
       </div>
+
+      {/* ── Selection bar (floating) ── */}
+      <AnimatePresence>
+        {selected.size > 0 && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 28 }}
+            className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[120] px-3 py-2 rounded-2xl border flex items-center gap-2"
+            style={{
+              background: "rgba(24,24,24,0.95)",
+              backdropFilter: "blur(20px)",
+              borderColor: "rgba(231,202,121,0.25)",
+              boxShadow: "0 16px 40px rgba(0,0,0,0.5)",
+            }}
+          >
+            <span className="text-xs font-semibold text-[#e7ca79] px-1.5">{selected.size} seleccionado{selected.size === 1 ? "" : "s"}</span>
+            <div className="w-px h-5 bg-white/10" />
+            <button onClick={() => handleBulkStatus("in_progress")} className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium hover:bg-white/5" style={{ color: "#60a5fa" }}>En proceso</button>
+            <button onClick={() => handleBulkStatus("completed")} className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium hover:bg-white/5" style={{ color: "#e7ca79" }}>Completar</button>
+            <button onClick={handleBulkDelete} className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium hover:bg-white/5" style={{ color: "#fca5a5" }}>Eliminar</button>
+            <div className="w-px h-5 bg-white/10" />
+            <button onClick={clearSelection} className="p-1.5 rounded-lg hover:bg-white/5 text-text-muted" title="Cancelar selección">
+              <X size={13} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Modals ── */}
+      <AddLinkModal
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        onCreated={handleAdded}
+        existingCategories={existingCategories}
+      />
+      <BulkAddModal
+        open={showBulk}
+        onClose={() => setShowBulk(false)}
+        onCompleted={handleBulkCompleted}
+      />
+      <EditCategoryModal
+        item={editCatItem}
+        existingCategories={existingCategories}
+        onClose={() => setEditCatItem(null)}
+        onSaved={handleSavedCategory}
+      />
+
+      <Toaster toasts={toasts} />
     </div>
   );
 }

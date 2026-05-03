@@ -6,13 +6,15 @@ import { MessageCircle, X, Send, Loader2, CheckCircle2, ExternalLink } from "luc
 interface ClassifyResult {
   title: string;
   category: string;
-  insight: string;
+  /** New API returns `summary`. Older deployments return `insight`. Both kept. */
+  summary?: string;
+  insight?: string;
 }
 
 interface SavedItem {
   title: string;
   category: string;
-  insight: string;
+  summary: string;
   url: string;
 }
 
@@ -60,7 +62,7 @@ export default function GlobalChatbox() {
       const classRes = await fetch("/api/vault/classify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, mode: "ai" }),
       });
 
       if (!classRes.ok) {
@@ -69,6 +71,7 @@ export default function GlobalChatbox() {
       }
 
       const classified: ClassifyResult = await classRes.json();
+      const summary = classified.summary || classified.insight || "";
 
       // Step 2: Save
       setStatus("saving");
@@ -79,16 +82,19 @@ export default function GlobalChatbox() {
           url,
           title: classified.title,
           category: classified.category,
-          insight: classified.insight,
+          summary,
         }),
       });
 
       if (!saveRes.ok) {
         const err = await saveRes.json();
+        if (err.error === "duplicate") {
+          throw new Error("Este link ya está en tu Bóveda");
+        }
         throw new Error(err.error || "Error al guardar");
       }
 
-      setResult({ ...classified, url });
+      setResult({ title: classified.title, category: classified.category, summary, url });
       setStatus("done");
       setInput("");
     } catch (err) {
@@ -176,8 +182,8 @@ export default function GlobalChatbox() {
                     Ver Bóveda <ExternalLink size={9} />
                   </a>
                 </div>
-                {result.insight && (
-                  <p className="text-[10px] text-text-muted mt-1.5 italic">💡 {result.insight}</p>
+                {result.summary && (
+                  <p className="text-[10px] text-text-muted mt-1.5 italic">💡 {result.summary}</p>
                 )}
                 <button
                   onClick={reset}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { requireUserId } from "@/lib/auth-helpers";
+import { detectPlatform, normalizeUrlForDedupe } from "@/lib/vault-helpers";
 
 export async function GET() {
   let userId: string;
@@ -27,19 +28,30 @@ export async function POST(req: NextRequest) {
   try {
     const db = await getDb();
     const body = await req.json();
-    const { url, title, category, insight } = body;
+    const { url, title, category, summary, insight, platform } = body;
 
     if (!url || !title) {
       return NextResponse.json({ error: "url y title son requeridos" }, { status: 400 });
     }
 
+    // Duplicate check (per-user, normalized URL)
+    const norm = normalizeUrlForDedupe(url);
+    const existing = await db.collection("knowledge_vault").find({ userId }).project({ url: 1 }).toArray();
+    const dup = existing.find((d) => normalizeUrlForDedupe(d.url) === norm);
+    if (dup) {
+      return NextResponse.json({ error: "duplicate", duplicateId: String(dup._id) }, { status: 409 });
+    }
+
+    const finalSummary = (summary || insight || "").trim();
     const item = {
       userId,
       url,
       title,
       category: category || "Otro",
-      status: "unread",
-      insight: insight || "",
+      summary: finalSummary,
+      insight: finalSummary, // legacy field, keep in sync
+      platform: platform || detectPlatform(url),
+      status: "unread" as const,
       idea: "",
       created_at: new Date().toISOString(),
     };

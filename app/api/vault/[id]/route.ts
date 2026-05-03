@@ -13,9 +13,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const body = await req.json();
     const updates: Record<string, unknown> = {};
 
-    if (body.status !== undefined) updates.status = body.status;
-    if (body.idea !== undefined) updates.idea = body.idea;
-    if (body.category !== undefined) updates.category = body.category;
+    if (body.status !== undefined)   updates.status   = body.status;
+    if (body.idea !== undefined)     updates.idea     = body.idea;
+    if (body.category !== undefined) updates.category = String(body.category).trim() || "Otro";
+    if (body.title !== undefined)    updates.title    = String(body.title).trim();
+    if (body.platform !== undefined) updates.platform = body.platform;
+    if (body.summary !== undefined) {
+      const s = String(body.summary).trim();
+      updates.summary = s;
+      updates.insight = s; // keep legacy field in sync
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "No hay campos para actualizar" }, { status: 400 });
