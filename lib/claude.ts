@@ -244,12 +244,13 @@ export async function classifyVaultUrlsBulk(
     .map((it, i) => `${i + 1}. URL: ${it.url}${it.title ? `\n   Título: ${it.title}` : ""}${it.description ? `\n   Desc: ${it.description.slice(0, 200)}` : ""}`)
     .join("\n\n");
 
-  const message = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 2500,
-    messages: [{
-      role: "user",
-      content: `${VAULT_USER_CONTEXT}
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2500,
+      messages: [{
+        role: "user",
+        content: `${VAULT_USER_CONTEXT}
 
 Analiza estos ${items.length} links y clasifica cada uno.
 
@@ -264,23 +265,28 @@ Reglas para CADA item:
 
 Responde SOLO con un JSON array válido (sin markdown). El array debe tener exactamente ${items.length} elementos en el MISMO orden:
 [{"title":"...","category":"...","summary":"..."}]`,
-    }],
-  });
+      }],
+    });
 
-  const content = message.content[0];
-  if (content.type !== "text") return items.map(() => ({ category: "Otro", summary: "", title: "" }));
+    const content = message.content[0];
+    if (content.type !== "text") return items.map((it) => ({ category: "Otro", summary: "", title: it.title || "" }));
 
-  try {
     const cleaned = content.text.replace(/```(?:json)?\n?|\n?```/g, "").trim();
     const parsed = JSON.parse(cleaned);
     if (!Array.isArray(parsed)) throw new Error("not array");
-    return items.map((_, i) => ({
+    return items.map((it, i) => ({
       category: (parsed[i]?.category || "Otro").trim(),
       summary: (parsed[i]?.summary || "").trim(),
-      title: (parsed[i]?.title || "").trim(),
+      title: (parsed[i]?.title || it.title || "").trim(),
     }));
-  } catch {
-    return items.map(() => ({ category: "Otro", summary: "", title: "" }));
+  } catch (err) {
+    // Graceful fallback: Claude unreachable or parse error — still save items with blank summary
+    console.error("[classifyVaultUrlsBulk] fallback due to error:", err);
+    return items.map((it) => ({
+      category: "Otro",
+      summary: "",
+      title: it.title || "",
+    }));
   }
 }
 

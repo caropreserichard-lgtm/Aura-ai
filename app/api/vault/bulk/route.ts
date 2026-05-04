@@ -4,20 +4,24 @@ import { requireUserId } from "@/lib/auth-helpers";
 import { classifyVaultUrlsBulk } from "@/lib/claude";
 import { detectPlatform, extractUrls, normalizeUrlForDedupe } from "@/lib/vault-helpers";
 
+// ── Increase Vercel serverless timeout: scraping + Claude + Mongo > 10 s ─────
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
 /**
  * POST body: { text: string }
  *
- * Extrae todas las URLs del texto, scrapea OG en paralelo (con timeout corto),
+ * Extrae todas las URLs del texto, scrapea OG en paralelo (timeout 4 s),
  * llama a Claude Haiku UNA sola vez para clasificar el batch, y crea los items
  * en MongoDB. Skipea duplicados (mismo userId + url normalizada).
  *
- * Response: { created: VaultItem[], skipped: { url: string, reason: "duplicate" | "invalid" }[] }
+ * Response: { created: VaultItem[], skipped: { url, reason }[] }
  */
 async function quickScrape(url: string): Promise<{ title: string; description: string }> {
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; TayronaBot/1.0)" },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(4000), // 4 s — faster parallel scrape
     });
     const html = await res.text();
     const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1]

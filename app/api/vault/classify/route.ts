@@ -4,6 +4,9 @@ import { requireUserId } from "@/lib/auth-helpers";
 import { classifyVaultUrl } from "@/lib/claude";
 import { detectPlatform } from "@/lib/vault-helpers";
 
+export const maxDuration = 30;
+export const dynamic = "force-dynamic";
+
 async function scrapeUrlMeta(url: string): Promise<{ title: string; description: string }> {
   try {
     const res = await fetch(url, {
