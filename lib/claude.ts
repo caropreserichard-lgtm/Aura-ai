@@ -181,51 +181,147 @@ const VAULT_SUGGESTED_CATEGORIES = [
 
 const VAULT_USER_CONTEXT = `Eres un asistente para un emprendedor colombiano de Bucaramanga: dueño de gastro bar/nightclub, crypto trader (memecoins, estrategias DeFi), dev de apps con Next.js usando AI, creador de contenido (marca personal), estudiante autodidacta de historia y ciencia.`;
 
+/**
+ * Domain-specific hints + last-resort fallback inference. Returns a
+ * non-Otro category guess and a Spanish one-liner for known URL patterns
+ * (X.com handles with crypto signals, GitHub repos, YouTube, etc.) so we
+ * never fall back to "Otro / empty summary" when at least the URL pattern
+ * gives us a hint. Deterministic — no AI cost.
+ */
+function patternFallback(url: string, title: string, description: string): { category: string; summary: string; hint: string } {
+  let host = "";
+  try { host = new URL(url).hostname.toLowerCase().replace(/^www\./, ""); } catch { /* */ }
+
+  const t = (title || "").toLowerCase();
+  const d = (description || "").toLowerCase();
+  const u = url.toLowerCase();
+  const haystack = `${t} ${d} ${u}`;
+
+  // X.com / Twitter — handle-based inference
+  if (host === "x.com" || host === "twitter.com") {
+    const handle = (u.match(/(?:x|twitter)\.com\/([^/?#]+)/i)?.[1] || "").toLowerCase();
+    const cryptoSignals = /xbt|crypto|btc|eth|sol|sui|degen|memecoin|defi|trader|chart|0x|chain|hyperliquid|hodl/i;
+    const aiSignals = /\bai\b|gpt|llm|prompt|copilot|claude|cursor|midjourney|higgsfield|origami|copyrebel/i;
+    const founderSignals = /founder|biz|growth|saas|startup|mogul|ceo|build|hustle/i;
+    const marketingSignals = /marketing|brand|copy|content|creator|social/i;
+
+    let category = "Crypto Strategy"; // default for X handles in our user's context
+    let summary = `Cuenta de X interesante: @${handle}. Insights útiles para tu estrategia.`;
+
+    if (aiSignals.test(handle) || aiSignals.test(haystack)) {
+      category = "AI Creative Tools";
+      summary = `Herramienta o creator de IA (@${handle}) — útil para apps Next.js con AI.`;
+    } else if (founderSignals.test(handle) || founderSignals.test(haystack)) {
+      category = "Business Growth";
+      summary = `Founder/biz creator (@${handle}) con estrategias de crecimiento accionables.`;
+    } else if (marketingSignals.test(handle) || marketingSignals.test(haystack)) {
+      category = "Marketing";
+      summary = `Creator de marketing/marca (@${handle}) — útil para tu marca personal.`;
+    } else if (cryptoSignals.test(handle) || cryptoSignals.test(haystack)) {
+      category = "Crypto Strategy";
+      summary = `Trader/analista crypto (@${handle}) — alpha de memecoins y estrategias DeFi.`;
+    }
+
+    return { category, summary, hint: `X handle: @${handle}.` };
+  }
+
+  if (host === "github.com" || host === "gist.github.com") {
+    return {
+      category: "Desarrollo",
+      summary: `Repo/proyecto en GitHub: ${title.slice(0, 60)}.`,
+      hint: "GitHub repo o gist — relevante para dev Next.js.",
+    };
+  }
+
+  if (host === "youtube.com" || host === "youtu.be") {
+    return {
+      category: "Aprendizaje",
+      summary: `Video YouTube: ${title.slice(0, 60)}.`,
+      hint: "YouTube — contenido educativo o de creator.",
+    };
+  }
+
+  if (host === "vercel.com" || host.endsWith(".vercel.app")) {
+    return { category: "Desarrollo", summary: `App/demo en Vercel: ${title.slice(0, 60)}.`, hint: "Vercel deploy." };
+  }
+
+  if (host === "producthunt.com") {
+    return { category: "AI Creative Tools", summary: `Producto en Product Hunt: ${title.slice(0, 60)}.`, hint: "Product Hunt launch." };
+  }
+
+  // No known pattern
+  return { category: "Otro", summary: "", hint: "" };
+}
+
 export async function classifyVaultUrl(
   url: string,
   title: string,
   description: string,
   existingCategories: string[] = []
 ): Promise<{ category: string; summary: string }> {
+  // Deterministic pattern-based hint we'll feed to Claude AND use as fallback
+  const fallback = patternFallback(url, title, description);
+
   const categoryGuide = existingCategories.length > 0
-    ? `Categorías que ya existen en su bóveda (PREFIERE reutilizar una de estas si encaja): ${existingCategories.join(", ")}`
-    : `Categorías sugeridas (puedes inferir una distinta si encaja mejor): ${VAULT_SUGGESTED_CATEGORIES.join(", ")}`;
+    ? `Categorías existentes en la bóveda (REUTILIZA una si encaja): ${existingCategories.join(", ")}.`
+    : `Categorías sugeridas: ${VAULT_SUGGESTED_CATEGORIES.join(", ")}.`;
 
-  const message = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 250,
-    messages: [{
-      role: "user",
-      content: `${VAULT_USER_CONTEXT}
+  const prompt = `${VAULT_USER_CONTEXT}
 
-Analiza este link y clasifícalo.
+Tu trabajo: clasificar este link en una categoría útil Y escribir un resumen en español.
+
 URL: ${url}
-Título: ${title}
-Descripción: ${description}
+Título: ${title || "(sin título)"}
+Descripción: ${description || "(no disponible)"}
+${fallback.hint ? `Pista del dominio: ${fallback.hint}` : ""}
+${fallback.category !== "Otro" ? `Sugerencia previa: category="${fallback.category}", summary="${fallback.summary}".` : ""}
 
 ${categoryGuide}
 
-Reglas:
-- "category": 1-3 palabras, en español o inglés, capitalizada (p.ej. "Crypto Strategy", "AI Creative Tools"). REUTILIZA una categoría existente si encaja.
-- "summary": una sola frase (máx 14 palabras) en español, accionable, explicando POR QUÉ este link es valioso para él.
+REGLAS ESTRICTAS:
+1. NUNCA respondas con category="Otro" si el dominio o el título dan CUALQUIER pista. Solo "Otro" si es absolutamente irreconocible.
+2. NUNCA respondas con summary vacío. Si no hay descripción, infiere del título/handle/dominio. Mínimo 6 palabras, máximo 14.
+3. Para handles de X.com (e.g. "@cyrilXBT", "@higgsfield"): infiere por el username. Handles con "XBT", "crypto", "eth" → "Crypto Strategy"; con "AI", "ml", nombres de tools → "AI Creative Tools"; con "founder", "biz", "growth" → "Business Growth".
+4. category: 1-3 palabras, capitalizada, en español o inglés mezclado (p.ej. "Crypto Strategy", "AI Creative Tools", "Business Growth", "Marketing", "Desarrollo", "Aprendizaje").
+5. summary: una frase en español, accionable, explicando POR QUÉ es valioso para un emprendedor crypto/dev/bar.
 
-Responde SOLO con JSON válido (sin markdown, sin backticks):
-{"category":"...","summary":"..."}`,
-    }],
-  });
-
-  const content = message.content[0];
-  if (content.type !== "text") return { category: "Otro", summary: "" };
+Responde SOLO con JSON válido en una línea:
+{"category":"...","summary":"..."}`;
 
   try {
+    const message = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 300,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const content = message.content[0];
+    if (content.type !== "text") {
+      return fallback.category !== "Otro"
+        ? { category: fallback.category, summary: fallback.summary }
+        : { category: "Otro", summary: "" };
+    }
+
     const cleaned = content.text.replace(/```(?:json)?\n?|\n?```/g, "").trim();
     const parsed = JSON.parse(cleaned);
-    return {
-      category: (parsed.category || "Otro").trim(),
-      summary: (parsed.summary || parsed.insight || "").trim(),
-    };
-  } catch {
-    return { category: "Otro", summary: "" };
+    let category = (parsed.category || "").trim();
+    let summary  = (parsed.summary || parsed.insight || "").trim();
+
+    // If Claude still gave up but we have a deterministic guess — use it
+    if ((!category || category === "Otro") && fallback.category !== "Otro") {
+      category = fallback.category;
+    }
+    if (!summary && fallback.summary) {
+      summary = fallback.summary;
+    }
+    if (!category) category = "Otro";
+
+    return { category, summary };
+  } catch (err) {
+    console.error("[classifyVaultUrl] error, using pattern fallback:", String(err));
+    return fallback.category !== "Otro"
+      ? { category: fallback.category, summary: fallback.summary }
+      : { category: "Otro", summary: "" };
   }
 }
 
@@ -247,7 +343,7 @@ export async function classifyVaultUrlsBulk(
 ): Promise<{ category: string; summary: string; title: string }[]> {
   if (items.length === 0) return [];
 
-  const CONCURRENCY = 4;
+  const CONCURRENCY = 2; // lower → safer against any per-IP rate limiting
   const out: { category: string; summary: string; title: string }[] = new Array(items.length);
 
   // Track categories created during the batch so later items reuse them
@@ -272,10 +368,12 @@ export async function classifyVaultUrlsBulk(
       };
     } catch (err) {
       console.error("[classifyVaultUrlsBulk] item", idx, "failed:", String(err));
+      // Even if Claude is unreachable, use deterministic pattern fallback
+      const fb = patternFallback(it.url, cleanTitle, it.description || "");
       out[idx] = {
         title: cleanTitle,
-        category: "Otro",
-        summary: "",
+        category: fb.category,
+        summary: fb.summary,
       };
     }
   }
