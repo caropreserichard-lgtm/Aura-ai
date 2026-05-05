@@ -229,78 +229,72 @@ Responde SOLO con JSON válido (sin markdown, sin backticks):
   }
 }
 
-// Bulk classification — N URLs in a single Haiku call. Returns aligned array.
 export async function classifyVaultUrlsBulk(
   items: { url: string; title?: string; description?: string }[],
   existingCategories: string[] = []
 ): Promise<{ category: string; summary: string; title: string }[]> {
   if (items.length === 0) return [];
 
+  type Row = { category?: string; summary?: string; title?: string };
+
   const catGuide = existingCategories.length > 0
-    ? `Categorías ya existentes en la bóveda (REUTILIZA si encaja): ${existingCategories.join(", ")}.`
+    ? `Categorías existentes (reutiliza si encaja): ${existingCategories.join(", ")}.`
     : `Categorías sugeridas: ${VAULT_SUGGESTED_CATEGORIES.join(", ")}.`;
 
-  // Build concise list — keep context short so Claude doesn't run over token budget
+  // Concise numbered list — keep total prompt small
   const list = items
     .map((it, i) => {
-      const t = it.title?.slice(0, 100) || "";
-      const d = it.description?.slice(0, 150) || "";
-      const u = it.url.slice(0, 80);
-      return `${i + 1}. ${t || u}${d ? ` — ${d}` : ""}`;
+      const t = (it.title || "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").slice(0, 100);
+      const d = (it.description || "").slice(0, 120);
+      const u = it.url.replace(/[?#].*$/, "").slice(0, 70); // strip query params for brevity
+      return `${i + 1}. ${t || u}${d ? ` | ${d}` : ""}`;
     })
     .join("\n");
+
+  const prompt = `${VAULT_USER_CONTEXT}
+
+Clasifica estos ${items.length} links web. ${catGuide}
+
+${list}
+
+Reglas:
+- "title": título limpio, máx 80 chars, sin HTML entities.
+- "category": 1-3 palabras, capitalizada. Infiere por nombre de usuario cuando no hay descripción: "@cyrilXBT" o "@marlowxbt" → "Crypto Strategy"; "@higgsfield" o "origamichat" → "AI Creative Tools"; "@mogulinfluence" → "Business Growth". X.com profiles sin contexto → "Crypto Strategy" si el handle sugiere crypto, "Otro" si no.
+- "summary": UNA frase, máx 12 palabras, en español, explicando el valor para un emprendedor crypto/dev/bar.
+
+Responde ÚNICAMENTE con un JSON array válido. Sin markdown, sin texto antes ni después.
+El array debe tener EXACTAMENTE ${items.length} objetos en el mismo orden.
+Formato:
+[{"title":"...","category":"...","summary":"..."},{"title":"...","category":"...","summary":"..."}]`;
 
   try {
     const message = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 4096,
-      messages: [
-        // Prefill: begin the JSON array so Claude can't add preamble text
-        {
-          role: "user",
-          content: `${VAULT_USER_CONTEXT}
-
-Clasifica estos ${items.length} links. ${catGuide}
-
-${list}
-
-Reglas:
-- "title": título limpio ≤80 chars. Si ya viene bien, úsalo.
-- "category": 1-3 palabras, capitalizada. Infiere del dominio/nombre de usuario si no hay descripción (e.g., cyrilXBT → "Crypto Strategy"; higgsfield → "AI Creative Tools").
-- "summary": frase corta (≤12 palabras) en español explicando el valor para un emprendedor crypto/dev/bar.
-
-Devuelve SOLO JSON (sin texto adicional, sin markdown):
-[{"title":"...","category":"...","summary":"..."}]
-
-El array tiene exactamente ${items.length} objetos en el mismo orden.`,
-        },
-        // Assistant prefill — forces the response to start with "[" so no preamble
-        { role: "assistant", content: "[" },
-      ],
+      messages: [{ role: "user", content: prompt }],
     });
 
     const content = message.content[0];
-    if (content.type !== "text") throw new Error("non-text content");
+    if (content.type !== "text") throw new Error("non-text response from Claude");
 
-    // Reconstruct: we prefilled "[", Claude continues from there
-    const raw = "[" + content.text;
-    // Strip any trailing markdown fence or extra text after the closing "]"
-    const jsonStr = raw.slice(0, raw.lastIndexOf("]") + 1);
-    const parsed = JSON.parse(jsonStr);
-    if (!Array.isArray(parsed)) throw new Error("not array");
+    const raw = content.text;
+    // extractJsonArray throws if it can't parse — caught below
+    const parsed = extractJsonArray(raw);
 
-    return items.map((it, i) => ({
-      category: (String(parsed[i]?.category || "Otro")).trim(),
-      summary:  (String(parsed[i]?.summary  || "")).trim(),
-      title:    (String(parsed[i]?.title    || it.title || "")).trim(),
-    }));
+    return items.map((it, i) => {
+      const row = (parsed[i] || {}) as Row;
+      return {
+        category: (String(row.category || "Otro")).trim(),
+        summary:  (String(row.summary  || "")).trim(),
+        title:    (String(row.title    || it.title || "")).replace(/&amp;/g, "&").trim(),
+      };
+    });
   } catch (err) {
-    console.error("[classifyVaultUrlsBulk] fallback due to error:", err);
-    // Graceful fallback — items still get saved, just without AI classification
+    console.error("[classifyVaultUrlsBulk] error (items will be saved as 'Otro'):", String(err));
     return items.map((it) => ({
       category: "Otro",
       summary:  "",
-      title:    it.title || "",
+      title:    (it.title || "").replace(/&amp;/g, "&").trim(),
     }));
   }
 }
