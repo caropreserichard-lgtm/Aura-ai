@@ -18,6 +18,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (body.category !== undefined) updates.category = String(body.category).trim() || "Otro";
     if (body.title !== undefined)    updates.title    = String(body.title).trim();
     if (body.platform !== undefined) updates.platform = body.platform;
+    if (body.pinned !== undefined)   updates.pinned   = !!body.pinned;
+    if (body.order !== undefined)    updates.order    = Number(body.order) || 0;
     if (body.summary !== undefined) {
       const s = String(body.summary).trim();
       updates.summary = s;

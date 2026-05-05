@@ -111,10 +111,10 @@ export async function POST(req: NextRequest) {
         existingCategories
       );
 
-      // Detect if AI fallback was triggered (all categories "Otro" + no summaries)
-      const allOtro = classified.every((c) => c.category === "Otro" && !c.summary);
-      if (allOtro && classified.length > 1) {
-        aiError = "La IA no pudo clasificar automáticamente. Categoría asignada: 'Otro'.";
+      // Detect partial AI failure (>50% of items got "Otro" with empty summary)
+      const failed = classified.filter((c) => c.category === "Otro" && !c.summary).length;
+      if (failed > Math.ceil(classified.length / 2) && classified.length > 1) {
+        aiError = `${failed}/${classified.length} links no pudieron clasificarse automáticamente.`;
       }
     } else {
       // OG-only mode: no AI, just use scraped data

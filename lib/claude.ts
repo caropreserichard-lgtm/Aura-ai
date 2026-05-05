@@ -229,74 +229,64 @@ Responde SOLO con JSON válido (sin markdown, sin backticks):
   }
 }
 
+/**
+ * Bulk classification — runs N parallel single-URL classify calls (concurrency 4).
+ *
+ * Why parallel singles instead of one big batch call?
+ *   - Single-URL classify is proven to work (we ship it as the chatbox path).
+ *   - One bad URL doesn't poison the whole batch.
+ *   - JSON parsing of a single object is far more reliable than a 60-item array.
+ *   - Latency stays bounded by Promise.all + concurrency cap.
+ *
+ * Cost trade-off: N Haiku calls instead of 1. Acceptable since the single-call
+ * path was failing in production; reliability > token cost.
+ */
 export async function classifyVaultUrlsBulk(
   items: { url: string; title?: string; description?: string }[],
   existingCategories: string[] = []
 ): Promise<{ category: string; summary: string; title: string }[]> {
   if (items.length === 0) return [];
 
-  type Row = { category?: string; summary?: string; title?: string };
+  const CONCURRENCY = 4;
+  const out: { category: string; summary: string; title: string }[] = new Array(items.length);
 
-  const catGuide = existingCategories.length > 0
-    ? `Categorías existentes (reutiliza si encaja): ${existingCategories.join(", ")}.`
-    : `Categorías sugeridas: ${VAULT_SUGGESTED_CATEGORIES.join(", ")}.`;
+  // Track categories created during the batch so later items reuse them
+  const knownCats = new Set<string>(existingCategories);
 
-  // Concise numbered list — keep total prompt small
-  const list = items
-    .map((it, i) => {
-      const t = (it.title || "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").slice(0, 100);
-      const d = (it.description || "").slice(0, 120);
-      const u = it.url.replace(/[?#].*$/, "").slice(0, 70); // strip query params for brevity
-      return `${i + 1}. ${t || u}${d ? ` | ${d}` : ""}`;
-    })
-    .join("\n");
-
-  const prompt = `${VAULT_USER_CONTEXT}
-
-Clasifica estos ${items.length} links web. ${catGuide}
-
-${list}
-
-Reglas:
-- "title": título limpio, máx 80 chars, sin HTML entities.
-- "category": 1-3 palabras, capitalizada. Infiere por nombre de usuario cuando no hay descripción: "@cyrilXBT" o "@marlowxbt" → "Crypto Strategy"; "@higgsfield" o "origamichat" → "AI Creative Tools"; "@mogulinfluence" → "Business Growth". X.com profiles sin contexto → "Crypto Strategy" si el handle sugiere crypto, "Otro" si no.
-- "summary": UNA frase, máx 12 palabras, en español, explicando el valor para un emprendedor crypto/dev/bar.
-
-Responde ÚNICAMENTE con un JSON array válido. Sin markdown, sin texto antes ni después.
-El array debe tener EXACTAMENTE ${items.length} objetos en el mismo orden.
-Formato:
-[{"title":"...","category":"...","summary":"..."},{"title":"...","category":"...","summary":"..."}]`;
-
-  try {
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 4096,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    const content = message.content[0];
-    if (content.type !== "text") throw new Error("non-text response from Claude");
-
-    const raw = content.text;
-    // extractJsonArray throws if it can't parse — caught below
-    const parsed = extractJsonArray(raw);
-
-    return items.map((it, i) => {
-      const row = (parsed[i] || {}) as Row;
-      return {
-        category: (String(row.category || "Otro")).trim(),
-        summary:  (String(row.summary  || "")).trim(),
-        title:    (String(row.title    || it.title || "")).replace(/&amp;/g, "&").trim(),
+  async function classifyOne(idx: number): Promise<void> {
+    const it = items[idx];
+    const cleanTitle = (it.title || "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+    try {
+      const { category, summary } = await classifyVaultUrl(
+        it.url,
+        cleanTitle,
+        it.description || "",
+        Array.from(knownCats)
+      );
+      const cat = (category || "Otro").trim();
+      knownCats.add(cat);
+      out[idx] = {
+        title: cleanTitle,
+        category: cat,
+        summary: (summary || "").trim(),
       };
-    });
-  } catch (err) {
-    console.error("[classifyVaultUrlsBulk] error (items will be saved as 'Otro'):", String(err));
-    return items.map((it) => ({
-      category: "Otro",
-      summary:  "",
-      title:    (it.title || "").replace(/&amp;/g, "&").trim(),
-    }));
+    } catch (err) {
+      console.error("[classifyVaultUrlsBulk] item", idx, "failed:", String(err));
+      out[idx] = {
+        title: cleanTitle,
+        category: "Otro",
+        summary: "",
+      };
+    }
   }
+
+  // Run with bounded concurrency
+  for (let i = 0; i < items.length; i += CONCURRENCY) {
+    const chunk = Array.from({ length: Math.min(CONCURRENCY, items.length - i) }, (_, j) => i + j);
+    await Promise.all(chunk.map((idx) => classifyOne(idx)));
+  }
+
+  return out;
 }
 
 export async function parseInboxText(rawText: string) {

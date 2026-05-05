@@ -5,10 +5,11 @@ export const dynamic = "force-dynamic";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
   Search, Plus, Sparkles, Trash2, ExternalLink, ChevronRight,
   CheckSquare, Square, X, Lightbulb, Loader2, Check, Edit3,
-  Globe, AlertCircle,
+  Globe, AlertCircle, Pin, GripVertical,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
@@ -28,6 +29,8 @@ interface VaultItem {
   insight?: string; // legacy
   idea: string;
   platform?: VaultPlatform;
+  pinned?: boolean;
+  order?: number;
   created_at: string;
 }
 
@@ -503,7 +506,8 @@ function BulkAddModal({
 // ─── Item Row ─────────────────────────────────────────────────────────────────
 
 function ItemRow({
-  item, selected, onToggleSelect, onCycleStatus, onDelete, onEditCategory, query,
+  item, selected, onToggleSelect, onCycleStatus, onDelete, onEditCategory, onTogglePin, query,
+  dragHandleProps, isDragging,
 }: {
   item: VaultItem;
   selected: boolean;
@@ -511,7 +515,10 @@ function ItemRow({
   onCycleStatus: (item: VaultItem) => void;
   onDelete: (id: string) => void;
   onEditCategory: (item: VaultItem) => void;
+  onTogglePin: (item: VaultItem) => void;
   query: string;
+  dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
+  isDragging?: boolean;
 }) {
   const [editIdea, setEditIdea] = useState(false);
   const [ideaText, setIdeaText] = useState(item.idea || "");
@@ -520,6 +527,7 @@ function ItemRow({
   const platform = item.platform || detectPlatform(item.url);
   const platformTheme = PLATFORM_THEME[platform];
   const summary = getSummary(item);
+  const isPinned = !!item.pinned;
 
   useEffect(() => { if (editIdea) ideaRef.current?.focus(); }, [editIdea]);
 
@@ -551,20 +559,39 @@ function ItemRow({
   };
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, height: 0 }}
-      transition={{ type: "spring", stiffness: 320, damping: 30 }}
+    <div
       className="group relative px-3 py-2.5 rounded-xl border transition-colors"
       style={{
-        background: selected ? "rgba(231,202,121,0.08)" : "rgba(255,255,255,0.025)",
-        borderColor: selected ? "rgba(231,202,121,0.30)" : "rgba(255,255,255,0.06)",
+        background: isDragging
+          ? "rgba(231,202,121,0.12)"
+          : isPinned
+            ? "rgba(231,202,121,0.05)"
+            : selected
+              ? "rgba(231,202,121,0.08)"
+              : "rgba(255,255,255,0.025)",
+        borderColor: isDragging
+          ? "rgba(231,202,121,0.45)"
+          : isPinned
+            ? "rgba(231,202,121,0.20)"
+            : selected
+              ? "rgba(231,202,121,0.30)"
+              : "rgba(255,255,255,0.06)",
         opacity: item.status === "completed" ? 0.65 : 1,
+        boxShadow: isDragging ? "0 8px 24px rgba(0,0,0,0.35)" : undefined,
       }}
     >
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-start gap-2">
+        {/* Drag handle */}
+        <button
+          {...dragHandleProps}
+          className="mt-0.5 shrink-0 cursor-grab active:cursor-grabbing opacity-30 hover:opacity-90 transition-opacity"
+          style={{ color: "#888", touchAction: "none" }}
+          title="Arrastra para reordenar"
+          onClick={(e) => e.preventDefault()}
+        >
+          <GripVertical size={14} />
+        </button>
+
         {/* Selection checkbox */}
         <button
           onClick={() => onToggleSelect(item._id)}
@@ -590,6 +617,9 @@ function ItemRow({
         <div className="flex-1 min-w-0">
           {/* Top row */}
           <div className="flex items-center gap-2 flex-wrap">
+            {isPinned && (
+              <Pin size={11} fill="#e7ca79" color="#e7ca79" className="shrink-0" />
+            )}
             <a
               href={item.url}
               target="_blank"
@@ -645,24 +675,36 @@ function ItemRow({
         </div>
 
         {/* Right column: actions */}
-        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          {!item.idea && !editIdea && (
-            <button onClick={() => setEditIdea(true)} className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#888" }} title="Agregar idea">
-              <Lightbulb size={13} />
+        <div className="flex items-center gap-0.5 shrink-0">
+          {/* Pin button — always visible if pinned */}
+          <button
+            onClick={() => onTogglePin(item)}
+            className={`p-1.5 rounded-md hover:bg-white/5 transition-opacity ${isPinned ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+            style={{ color: isPinned ? "#e7ca79" : "#888" }}
+            title={isPinned ? "Desfijar" : "Fijar arriba"}
+          >
+            <Pin size={13} fill={isPinned ? "#e7ca79" : "none"} />
+          </button>
+
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+            {!item.idea && !editIdea && (
+              <button onClick={() => setEditIdea(true)} className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#888" }} title="Agregar idea">
+                <Lightbulb size={13} />
+              </button>
+            )}
+            <button onClick={() => onEditCategory(item)} className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#888" }} title="Cambiar categoría">
+              <Edit3 size={13} />
             </button>
-          )}
-          <button onClick={() => onEditCategory(item)} className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#888" }} title="Cambiar categoría">
-            <Edit3 size={13} />
-          </button>
-          <a href={item.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#888" }}>
-            <ExternalLink size={13} />
-          </a>
-          <button onClick={() => onDelete(item._id)} className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#d4544e" }}>
-            <Trash2 size={12} />
-          </button>
+            <a href={item.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#888" }}>
+              <ExternalLink size={13} />
+            </a>
+            <button onClick={() => onDelete(item._id)} className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#d4544e" }}>
+              <Trash2 size={12} />
+            </button>
+          </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -670,7 +712,7 @@ function ItemRow({
 
 function CategorySection({
   category, items, expanded, onToggle, selected, onToggleSelect,
-  onCycleStatus, onDelete, onEditCategory, query,
+  onCycleStatus, onDelete, onEditCategory, onTogglePin, query,
 }: {
   category: string;
   items: VaultItem[];
@@ -681,12 +723,14 @@ function CategorySection({
   onCycleStatus: (item: VaultItem) => void;
   onDelete: (id: string) => void;
   onEditCategory: (item: VaultItem) => void;
+  onTogglePin: (item: VaultItem) => void;
   query: string;
 }) {
   const theme = categoryTheme(category);
   const completed = items.filter((i) => i.status === "completed").length;
   const total = items.length;
   const progress = total > 0 ? (completed / total) * 100 : 0;
+  const droppableId = `cat:${category}`;
 
   return (
     <section className="relative">
@@ -738,20 +782,43 @@ function CategorySection({
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             style={{ overflow: "hidden" }}
           >
-            <div className="space-y-1.5 px-2 py-2">
-              {items.map((item) => (
-                <ItemRow
-                  key={item._id}
-                  item={item}
-                  selected={selected.has(item._id)}
-                  onToggleSelect={onToggleSelect}
-                  onCycleStatus={onCycleStatus}
-                  onDelete={onDelete}
-                  onEditCategory={onEditCategory}
-                  query={query}
-                />
-              ))}
-            </div>
+            <Droppable droppableId={droppableId}>
+              {(dropProvided) => (
+                <div
+                  ref={dropProvided.innerRef}
+                  {...dropProvided.droppableProps}
+                  className="space-y-1.5 px-2 py-2"
+                >
+                  {items.map((item, index) => (
+                    <Draggable key={item._id} draggableId={item._id} index={index}>
+                      {(dragProvided, dragSnapshot) => (
+                        <div
+                          ref={dragProvided.innerRef}
+                          {...dragProvided.draggableProps}
+                          style={{
+                            ...dragProvided.draggableProps.style,
+                          }}
+                        >
+                          <ItemRow
+                            item={item}
+                            selected={selected.has(item._id)}
+                            onToggleSelect={onToggleSelect}
+                            onCycleStatus={onCycleStatus}
+                            onDelete={onDelete}
+                            onEditCategory={onEditCategory}
+                            onTogglePin={onTogglePin}
+                            query={query}
+                            dragHandleProps={dragProvided.dragHandleProps as React.HTMLAttributes<HTMLButtonElement> | undefined}
+                            isDragging={dragSnapshot.isDragging}
+                          />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {dropProvided.placeholder}
+                </div>
+              )}
+            </Droppable>
           </motion.div>
         )}
       </AnimatePresence>
@@ -900,7 +967,25 @@ export default function VaultPage() {
       if (!g.has(c)) g.set(c, []);
       g.get(c)!.push(i);
     });
-    return Array.from(g.entries()).sort(([a], [b]) => a.localeCompare(b));
+    // Sort within each category: pinned desc → order desc → created_at desc
+    g.forEach((arr) => {
+      arr.sort((a, b) => {
+        const ap = a.pinned ? 1 : 0;
+        const bp = b.pinned ? 1 : 0;
+        if (ap !== bp) return bp - ap;
+        const ao = typeof a.order === "number" ? a.order : 0;
+        const bo = typeof b.order === "number" ? b.order : 0;
+        if (ao !== bo) return bo - ao;
+        return (b.created_at || "").localeCompare(a.created_at || "");
+      });
+    });
+    // Categories with at least one pinned item bubble to top
+    return Array.from(g.entries()).sort(([catA, a], [catB, b]) => {
+      const ap = a.some((i) => i.pinned) ? 1 : 0;
+      const bp = b.some((i) => i.pinned) ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      return catA.localeCompare(catB);
+    });
   }, [filtered]);
 
   // ── Auto-expand on search ────────────────────────────────────────────────
@@ -950,6 +1035,56 @@ export default function VaultPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: next }),
     });
+  };
+
+  const handleTogglePin = async (item: VaultItem) => {
+    const next = !item.pinned;
+    setItems((prev) => prev.map((i) => i._id === item._id ? { ...i, pinned: next } : i));
+    toast(next ? "success" : "info", next ? "Fijado arriba 📌" : "Desfijado");
+    await fetch(`/api/vault/${item._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned: next }),
+    });
+  };
+
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+    const sourceCat = result.source.droppableId.replace(/^cat:/, "");
+    const destCat = result.destination.droppableId.replace(/^cat:/, "");
+    if (sourceCat !== destCat) return; // only allow reordering within same category
+    if (result.source.index === result.destination.index) return;
+
+    // Compute new order numbers for the affected category
+    const catItems = filtered.filter((i) => (i.category || "Otro") === sourceCat);
+    const sorted = [...catItems].sort((a, b) => {
+      const ap = a.pinned ? 1 : 0; const bp = b.pinned ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      const ao = typeof a.order === "number" ? a.order : 0;
+      const bo = typeof b.order === "number" ? b.order : 0;
+      if (ao !== bo) return bo - ao;
+      return (b.created_at || "").localeCompare(a.created_at || "");
+    });
+
+    const [moved] = sorted.splice(result.source.index, 1);
+    sorted.splice(result.destination.index, 0, moved);
+
+    // Re-assign order numbers (descending so highest = top)
+    const base = Date.now();
+    const updates = sorted.map((it, idx) => ({ id: it._id, order: base - idx }));
+    const orderMap = new Map(updates.map((u) => [u.id, u.order]));
+
+    setItems((prev) => prev.map((i) => orderMap.has(i._id) ? { ...i, order: orderMap.get(i._id)! } : i));
+
+    try {
+      await fetch("/api/vault/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: updates }),
+      });
+    } catch {
+      toast("error", "No se pudo guardar el orden");
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -1152,25 +1287,28 @@ export default function VaultPage() {
             </div>
           )}
 
-          {/* ── List with sticky headers ── */}
+          {/* ── List with sticky headers + drag-and-drop ── */}
           {!loading && grouped.length > 0 && (
-            <div className="rounded-2xl overflow-hidden border" style={{ borderColor: "rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.015)" }}>
-              {grouped.map(([cat, catItems]) => (
-                <CategorySection
-                  key={cat}
-                  category={cat}
-                  items={catItems}
-                  expanded={expanded.has(cat) || !!q}
-                  onToggle={() => toggleSection(cat)}
-                  selected={selected}
-                  onToggleSelect={toggleSelect}
-                  onCycleStatus={handleCycleStatus}
-                  onDelete={handleDelete}
-                  onEditCategory={setEditCatItem}
-                  query={q}
-                />
-              ))}
-            </div>
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <div className="rounded-2xl overflow-hidden border" style={{ borderColor: "rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.015)" }}>
+                {grouped.map(([cat, catItems]) => (
+                  <CategorySection
+                    key={cat}
+                    category={cat}
+                    items={catItems}
+                    expanded={expanded.has(cat) || !!q}
+                    onToggle={() => toggleSection(cat)}
+                    selected={selected}
+                    onToggleSelect={toggleSelect}
+                    onCycleStatus={handleCycleStatus}
+                    onDelete={handleDelete}
+                    onEditCategory={setEditCatItem}
+                    onTogglePin={handleTogglePin}
+                    query={q}
+                  />
+                ))}
+              </div>
+            </DragDropContext>
           )}
         </main>
       </div>

@@ -53,6 +53,8 @@ export async function POST(req: NextRequest) {
       platform: platform || detectPlatform(url),
       status: "unread" as const,
       idea: "",
+      pinned: false,
+      order: Date.now(), // higher = newer; later sorted desc
       created_at: new Date().toISOString(),
     };
 
