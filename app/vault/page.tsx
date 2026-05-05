@@ -341,15 +341,16 @@ function AddLinkModal({
   );
 }
 
-// ─── Bulk Add Modal (AI Pro) ─────────────────────────────────────────────────
+// ─── Bulk Add Modal (AI Pro + Manual OG) ─────────────────────────────────────
 
 function BulkAddModal({
   open, onClose, onCompleted,
 }: {
   open: boolean;
   onClose: () => void;
-  onCompleted: (created: VaultItem[], skipped: number) => void;
+  onCompleted: (created: VaultItem[], skipped: number, aiError?: string) => void;
 }) {
+  const [mode, setMode] = useState<"ai" | "og">("ai");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -365,11 +366,11 @@ function BulkAddModal({
       const res = await fetch("/api/vault/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, mode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "bulk failed");
-      onCompleted(data.created || [], (data.skipped || []).length);
+      onCompleted(data.created || [], (data.skipped || []).length, data.aiError);
       onClose();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Error en el lote");
@@ -379,6 +380,8 @@ function BulkAddModal({
   };
 
   if (!open) return null;
+
+  const isAI = mode === "ai";
 
   return (
     <AnimatePresence>
@@ -397,19 +400,28 @@ function BulkAddModal({
           style={{
             background: "rgba(24,24,24,0.92)",
             backdropFilter: "blur(20px)",
-            borderColor: "rgba(168,85,247,0.25)",
+            borderColor: isAI ? "rgba(168,85,247,0.25)" : "rgba(231,202,121,0.22)",
             boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
           }}
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Header */}
           <div className="px-5 py-4 flex items-center justify-between border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.3)" }}>
-                <Sparkles size={15} color="#c084fc" />
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={isAI
+                  ? { background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.3)" }
+                  : { background: "rgba(231,202,121,0.12)", border: "1px solid rgba(231,202,121,0.28)" }
+                }
+              >
+                {isAI ? <Sparkles size={15} color="#c084fc" /> : <Globe size={15} color="#e7ca79" />}
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-text-primary">Bulk con IA</h3>
-                <p className="text-[11px] text-text-muted mt-0.5">Pega varias URLs — clasificación automática</p>
+                <h3 className="text-sm font-semibold text-text-primary">Importar links en lote</h3>
+                <p className="text-[11px] text-text-muted mt-0.5">
+                  {isAI ? "Clasificación automática con IA" : "Solo OG scraping — sin créditos"}
+                </p>
               </div>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 text-text-muted">
@@ -417,12 +429,37 @@ function BulkAddModal({
             </button>
           </div>
 
+          {/* Mode tabs */}
+          <div className="px-5 pt-4 flex gap-2">
+            {([["ai", "Con IA", "Categoriza y genera resúmenes automáticos"], ["og", "Manual (sin IA)", "Scraping OG — tú asignas la categoría"]] as const).map(([m, label, desc]) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold border transition-all text-left"
+                style={{
+                  background: mode === m
+                    ? m === "ai" ? "rgba(168,85,247,0.15)" : "rgba(231,202,121,0.12)"
+                    : "rgba(255,255,255,0.03)",
+                  borderColor: mode === m
+                    ? m === "ai" ? "rgba(168,85,247,0.4)" : "rgba(231,202,121,0.35)"
+                    : "rgba(255,255,255,0.06)",
+                  color: mode === m
+                    ? m === "ai" ? "#c084fc" : "#e7ca79"
+                    : "#6b7280",
+                }}
+              >
+                <span>{label}</span>
+                <p className="text-[10px] font-normal opacity-75 mt-0.5">{desc}</p>
+              </button>
+            ))}
+          </div>
+
           <div className="p-5 space-y-3">
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={"Pega aquí varias URLs (una por línea o mezcladas en texto):\n\nhttps://...\nhttps://..."}
-              rows={8}
+              rows={7}
               className="w-full text-sm rounded-lg px-3 py-2.5 outline-none resize-none font-mono"
               style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#e8e8e8" }}
             />
@@ -430,7 +467,9 @@ function BulkAddModal({
               <span className="text-text-muted">
                 {urlCount === 0 ? "Aún no detecto URLs" : `${urlCount} URL${urlCount === 1 ? "" : "s"} detectada${urlCount === 1 ? "" : "s"}`}
               </span>
-              <span className="text-text-muted opacity-60">Máx 60 por lote · 1 crédito IA total</span>
+              <span className="text-text-muted opacity-60">
+                {isAI ? "Máx 60 · 1 crédito IA total" : "Máx 60 · sin créditos IA"}
+              </span>
             </div>
 
             {err && (
@@ -440,16 +479,19 @@ function BulkAddModal({
             )}
           </div>
 
-          <div className="px-5 pb-4 flex justify-end gap-2">
+          <div className="px-5 pb-5 flex justify-end gap-2">
             <button onClick={onClose} className="px-3 py-2 rounded-lg text-xs text-text-muted hover:bg-white/5">Cancelar</button>
             <button
               onClick={handleSubmit}
               disabled={busy || urlCount === 0}
               className="px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg, #a855f7, #7c3aed)", color: "#fff" }}
+              style={isAI
+                ? { background: "linear-gradient(135deg, #a855f7, #7c3aed)", color: "#fff" }
+                : { background: "linear-gradient(135deg, #e7ca79, #c4a94f)", color: "#1a1a1a" }
+              }
             >
-              {busy ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-              {busy ? "Procesando..." : `Procesar ${urlCount} link${urlCount === 1 ? "" : "s"}`}
+              {busy ? <Loader2 size={12} className="animate-spin" /> : isAI ? <Sparkles size={12} /> : <Globe size={12} />}
+              {busy ? "Procesando..." : `Importar ${urlCount} link${urlCount === 1 ? "" : "s"}`}
             </button>
           </div>
         </motion.div>
@@ -945,7 +987,7 @@ export default function VaultPage() {
     toast("success", "Link guardado en La Bóveda");
   };
 
-  const handleBulkCompleted = (created: VaultItem[], skipped: number) => {
+  const handleBulkCompleted = (created: VaultItem[], skipped: number, aiError?: string) => {
     setItems((prev) => [...created, ...prev]);
     if (created.length > 0) {
       const cats = new Set(created.map((c) => c.category || "Otro"));
@@ -954,9 +996,12 @@ export default function VaultPage() {
     if (created.length > 0 && skipped > 0) {
       toast("success", `${created.length} agregado${created.length === 1 ? "" : "s"}, ${skipped} duplicado${skipped === 1 ? "" : "s"} ignorado${skipped === 1 ? "" : "s"}`);
     } else if (created.length > 0) {
-      toast("success", `${created.length} link${created.length === 1 ? "" : "s"} agregado${created.length === 1 ? "" : "s"} con IA ✨`);
+      toast("success", `${created.length} link${created.length === 1 ? "" : "s"} importado${created.length === 1 ? "" : "s"} ✓`);
     } else if (skipped > 0) {
       toast("info", `Todos los ${skipped} links ya estaban en tu bóveda`);
+    }
+    if (aiError) {
+      toast("error", aiError);
     }
   };
 

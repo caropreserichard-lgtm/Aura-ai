@@ -236,56 +236,71 @@ export async function classifyVaultUrlsBulk(
 ): Promise<{ category: string; summary: string; title: string }[]> {
   if (items.length === 0) return [];
 
-  const categoryGuide = existingCategories.length > 0
-    ? `Categorías existentes (PREFIERE reutilizarlas): ${existingCategories.join(", ")}`
-    : `Categorías sugeridas: ${VAULT_SUGGESTED_CATEGORIES.join(", ")}`;
+  const catGuide = existingCategories.length > 0
+    ? `Categorías ya existentes en la bóveda (REUTILIZA si encaja): ${existingCategories.join(", ")}.`
+    : `Categorías sugeridas: ${VAULT_SUGGESTED_CATEGORIES.join(", ")}.`;
 
+  // Build concise list — keep context short so Claude doesn't run over token budget
   const list = items
-    .map((it, i) => `${i + 1}. URL: ${it.url}${it.title ? `\n   Título: ${it.title}` : ""}${it.description ? `\n   Desc: ${it.description.slice(0, 200)}` : ""}`)
-    .join("\n\n");
+    .map((it, i) => {
+      const t = it.title?.slice(0, 100) || "";
+      const d = it.description?.slice(0, 150) || "";
+      const u = it.url.slice(0, 80);
+      return `${i + 1}. ${t || u}${d ? ` — ${d}` : ""}`;
+    })
+    .join("\n");
 
   try {
     const message = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 2500,
-      messages: [{
-        role: "user",
-        content: `${VAULT_USER_CONTEXT}
+      max_tokens: 4096,
+      messages: [
+        // Prefill: begin the JSON array so Claude can't add preamble text
+        {
+          role: "user",
+          content: `${VAULT_USER_CONTEXT}
 
-Analiza estos ${items.length} links y clasifica cada uno.
+Clasifica estos ${items.length} links. ${catGuide}
 
 ${list}
 
-${categoryGuide}
+Reglas:
+- "title": título limpio ≤80 chars. Si ya viene bien, úsalo.
+- "category": 1-3 palabras, capitalizada. Infiere del dominio/nombre de usuario si no hay descripción (e.g., cyrilXBT → "Crypto Strategy"; higgsfield → "AI Creative Tools").
+- "summary": frase corta (≤12 palabras) en español explicando el valor para un emprendedor crypto/dev/bar.
 
-Reglas para CADA item:
-- "title": el título limpio (máx 90 caracteres). Si no se provee, infiere uno corto desde la URL.
-- "category": 1-3 palabras capitalizada. REUTILIZA una existente si encaja. Agrupa links similares en la misma categoría.
-- "summary": una frase (máx 14 palabras) en español, explicando POR QUÉ es valioso para él.
+Devuelve SOLO JSON (sin texto adicional, sin markdown):
+[{"title":"...","category":"...","summary":"..."}]
 
-Responde SOLO con un JSON array válido (sin markdown). El array debe tener exactamente ${items.length} elementos en el MISMO orden:
-[{"title":"...","category":"...","summary":"..."}]`,
-      }],
+El array tiene exactamente ${items.length} objetos en el mismo orden.`,
+        },
+        // Assistant prefill — forces the response to start with "[" so no preamble
+        { role: "assistant", content: "[" },
+      ],
     });
 
     const content = message.content[0];
-    if (content.type !== "text") return items.map((it) => ({ category: "Otro", summary: "", title: it.title || "" }));
+    if (content.type !== "text") throw new Error("non-text content");
 
-    const cleaned = content.text.replace(/```(?:json)?\n?|\n?```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+    // Reconstruct: we prefilled "[", Claude continues from there
+    const raw = "[" + content.text;
+    // Strip any trailing markdown fence or extra text after the closing "]"
+    const jsonStr = raw.slice(0, raw.lastIndexOf("]") + 1);
+    const parsed = JSON.parse(jsonStr);
     if (!Array.isArray(parsed)) throw new Error("not array");
+
     return items.map((it, i) => ({
-      category: (parsed[i]?.category || "Otro").trim(),
-      summary: (parsed[i]?.summary || "").trim(),
-      title: (parsed[i]?.title || it.title || "").trim(),
+      category: (String(parsed[i]?.category || "Otro")).trim(),
+      summary:  (String(parsed[i]?.summary  || "")).trim(),
+      title:    (String(parsed[i]?.title    || it.title || "")).trim(),
     }));
   } catch (err) {
-    // Graceful fallback: Claude unreachable or parse error — still save items with blank summary
     console.error("[classifyVaultUrlsBulk] fallback due to error:", err);
+    // Graceful fallback — items still get saved, just without AI classification
     return items.map((it) => ({
       category: "Otro",
-      summary: "",
-      title: it.title || "",
+      summary:  "",
+      title:    it.title || "",
     }));
   }
 }
