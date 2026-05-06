@@ -5,6 +5,15 @@ import { classifyVaultUrl } from "@/lib/claude";
 import { scrapeOgMeta, detectPlatform } from "@/lib/vault-helpers";
 import { ObjectId } from "mongodb";
 
+function slugToTitle(url: string): string {
+  try {
+    const u = new URL(url);
+    const slug = u.pathname.split("/").filter(Boolean).pop() || "";
+    if (!slug || slug.length < 3) return u.hostname.replace(/^www\./, "");
+    return slug.replace(/[-_]/g, " ").replace(/\.\w{2,5}$/, "").replace(/\s+/g, " ").trim().replace(/\b\w/g, (c) => c.toUpperCase());
+  } catch { return ""; }
+}
+
 export const maxDuration = 90;
 export const dynamic = "force-dynamic";
 
@@ -60,7 +69,7 @@ export async function POST(req: NextRequest) {
       await Promise.all(chunk.map(async (it) => {
         try {
           const scraped = await scrapeOgMeta(it.url, 4500);
-          const finalTitle = scraped.title || it.title || it.url;
+          const finalTitle = scraped.title || it.title || slugToTitle(it.url) || it.url;
           const { category, summary } = await classifyVaultUrl(
             it.url,
             finalTitle,

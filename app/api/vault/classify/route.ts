@@ -9,14 +9,20 @@ export const dynamic = "force-dynamic";
 
 async function scrapeUrlMeta(url: string): Promise<{ title: string; description: string }> {
   const meta = await scrapeOgMeta(url);
-  if (meta.title || meta.description) return { title: meta.title || url, description: meta.description };
+  if (meta.title || meta.description) return { title: meta.title, description: meta.description };
   // Fallback: derive a readable title from URL slug
   try {
     const u = new URL(url);
     const slug = u.pathname.split("/").filter(Boolean).pop() || u.hostname;
-    return { title: slug.replace(/[-_]/g, " ").replace(/\.\w+$/, ""), description: "" };
+    const title = slug
+      .replace(/[-_]/g, " ")
+      .replace(/\.\w{2,5}$/, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    return { title: title || u.hostname.replace(/^www\./, ""), description: "" };
   } catch {
-    return { title: url, description: "" };
+    return { title: "", description: "" };
   }
 }
 

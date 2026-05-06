@@ -4,6 +4,20 @@ import { requireUserId } from "@/lib/auth-helpers";
 import { classifyVaultUrlsBulk } from "@/lib/claude";
 import { detectPlatform, extractUrls, normalizeUrlForDedupe, scrapeOgMeta } from "@/lib/vault-helpers";
 
+function slugToTitle(url: string): string {
+  try {
+    const u = new URL(url);
+    const slug = u.pathname.split("/").filter(Boolean).pop() || "";
+    if (!slug || slug.length < 3) return u.hostname.replace(/^www\./, "");
+    return slug
+      .replace(/[-_]/g, " ")
+      .replace(/\.\w{2,5}$/, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  } catch { return url.slice(0, 80); }
+}
+
 // ── Increase Vercel serverless timeout: scraping + Claude + Mongo > 10 s ─────
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -77,7 +91,11 @@ export async function POST(req: NextRequest) {
 
       // ── Single Haiku call for the whole batch ───────────────────────────
       classified = await classifyVaultUrlsBulk(
-        fresh.map((u, i) => ({ url: u, title: scraped[i].title, description: scraped[i].description })),
+        fresh.map((u, i) => ({
+          url: u,
+          title: scraped[i].title || slugToTitle(u),
+          description: scraped[i].description,
+        })),
         existingCategories
       );
 
@@ -88,9 +106,9 @@ export async function POST(req: NextRequest) {
     } else {
       // OG-only mode: no AI, just use scraped data
       classified = fresh.map((u, i) => ({
-        title: scraped[i].title || u,
+        title: scraped[i].title || slugToTitle(u) || u,
         category: "Sin Clasificar",
-        summary: "",
+        summary: scraped[i].description || "",
       }));
     }
 
@@ -99,7 +117,7 @@ export async function POST(req: NextRequest) {
     const docs = fresh.map((url, i) => ({
       userId,
       url,
-      title: classified[i].title || scraped[i].title || url,
+      title: classified[i].title || scraped[i].title || slugToTitle(url) || url,
       category: classified[i].category || "Sin Clasificar",
       summary: classified[i].summary || "",
       insight: classified[i].summary || "",

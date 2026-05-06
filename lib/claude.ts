@@ -168,29 +168,47 @@ async function parseBatch(
 const VAULT_USER_CONTEXT = `Eres un asistente clasificador de links para un emprendedor colombiano de Bucaramanga: dueño de gastro bar/nightclub, crypto trader (memecoins, estrategias DeFi), dev de apps con Next.js usando AI, creador de contenido (marca personal), estudiante autodidacta de historia y ciencia.`;
 
 /**
- * Domain-specific hints for AI classification. Only provides contextual
- * hints about the URL pattern — never generates final summaries or
- * categories. The AI must always analyze the actual scraped content.
+ * Smart fallback for X.com profiles when OG scraping returns no bio.
+ * Uses the handle's character patterns for an educated guess — never
+ * produces generic filler like "Founder/biz creator".
  */
-function patternHint(url: string, title: string, description: string): string {
-  let host = "";
-  try { host = new URL(url).hostname.toLowerCase().replace(/^www\./, ""); } catch { return ""; }
+function xHandleFallback(handle: string): { category: string; summary: string } {
+  const h = handle.toLowerCase().replace(/[^a-z0-9_]/g, "");
+  const cryptoPatterns = /^(0x|xbt|btc|eth|sol|sui|degen|defi|mev|nft|onchain|alpha|hodl|pump|apes|chart|trade|flip|chain|web3|token|dao|vault)/i;
+  const algoPatterns = /(bot|quant|algo|mev|arb|script|code|dev|hack|build|eng|builder|tech)/i;
+  const aiPatterns = /(ai|gpt|llm|ml|prompt|copilot|cursor|claude|openai|agent|model)/i;
+  const mktPatterns = /(market|brand|copy|seo|content|social|grow|ads|hype|viral)/i;
+  const founderPatterns = /(ceo|cto|founder|saas|startup|vc|invest|capital|fund|angel)/i;
 
-  const u = url.toLowerCase();
+  if (cryptoPatterns.test(h)) return { category: "Crypto Strategy", summary: `Cuenta X de trader/analista crypto @${handle} — sin bio pública, clasifica manualmente si lo conoces.` };
+  if (algoPatterns.test(h)) return { category: "Crypto Algorithm", summary: `Cuenta X de dev/quant @${handle} — perfil técnico, verifica manualmente.` };
+  if (aiPatterns.test(h)) return { category: "AI Tools", summary: `Cuenta X de creador/researcher de IA @${handle} — sin bio pública.` };
+  if (mktPatterns.test(h)) return { category: "Marketing", summary: `Cuenta X de marketer/creator @${handle} — sin bio pública.` };
+  if (founderPatterns.test(h)) return { category: "Business Growth", summary: `Cuenta X de founder/investor @${handle} — sin bio pública.` };
+  return { category: "X Profiles", summary: `Cuenta X guardada: @${handle} — sin bio disponible, clasifica manualmente.` };
+}
 
-  if (host === "x.com" || host === "twitter.com") {
-    const handle = (u.match(/(?:x|twitter)\.com\/([^/?#]+)/i)?.[1] || "").toLowerCase();
-    return `Plataforma: X/Twitter. Handle: @${handle}. Analiza el contenido real del título y descripción para clasificar — no asumas la categoría solo por el handle.`;
-  }
-  if (host === "github.com" || host === "gist.github.com") return `Plataforma: GitHub. Analiza el nombre del repo y la descripción para determinar el tema específico.`;
-  if (host === "youtube.com" || host === "youtu.be") return `Plataforma: YouTube. Clasifica según el tema del video, no como "YouTube" genérico.`;
-  if (host === "vercel.com" || host.endsWith(".vercel.app")) return `Plataforma: Vercel. Probablemente una app/demo web.`;
-  if (host === "producthunt.com") return `Plataforma: Product Hunt. Clasifica según el producto específico.`;
-  if (host === "reddit.com" || host.endsWith(".reddit.com")) return `Plataforma: Reddit. Clasifica según el subreddit y tema del post.`;
-  if (host === "medium.com" || host.endsWith(".medium.com")) return `Plataforma: Medium. Clasifica según el tema del artículo.`;
-  if (host === "substack.com" || host.endsWith(".substack.com")) return `Plataforma: Substack. Clasifica según el tema del newsletter/artículo.`;
+/** Convert a URL slug to a readable title. */
+function slugToTitle(url: string): string {
+  try {
+    const u = new URL(url);
+    const slug = u.pathname.split("/").filter(Boolean).pop() || "";
+    if (!slug || slug.length < 3) return "";
+    return slug
+      .replace(/[-_]/g, " ")
+      .replace(/\.\w{2,5}$/, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  } catch { return ""; }
+}
 
-  return title || description ? "" : `Dominio: ${host}. Sin metadata disponible, infiere del URL.`;
+/** True when summary is just a repeat of the title — means AI gave up. */
+function isSummaryEcho(title: string, summary: string): boolean {
+  if (!title || !summary) return false;
+  const t = title.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 60);
+  const s = summary.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 60);
+  return t === s || s.startsWith(t) || t.startsWith(s);
 }
 
 export async function classifyVaultUrl(
@@ -199,85 +217,97 @@ export async function classifyVaultUrl(
   description: string,
   existingCategories: string[] = []
 ): Promise<{ category: string; summary: string }> {
-  const hint = patternHint(url, title, description);
+  let host = "";
+  try { host = new URL(url).hostname.toLowerCase().replace(/^www\./, ""); } catch { /**/ }
+
+  const isXProfile = (host === "x.com" || host === "twitter.com") &&
+    !url.includes("/status/") && !url.includes("/i/");
+  const handle = isXProfile
+    ? (url.match(/(?:x|twitter)\.com\/([^/?#]+)/i)?.[1] || "")
+    : "";
+
+  const hasRealContent = description && description.length > 20 &&
+    !isSummaryEcho(title, description);
+
+  // If it's an X profile with NO bio scraped, skip the AI call entirely
+  // and use deterministic handle inference — it's faster and doesn't waste credits
+  if (isXProfile && !hasRealContent) {
+    return xHandleFallback(handle);
+  }
 
   const existingCatList = existingCategories.length > 0
-    ? `\n[Existing Categories]: ${existingCategories.join(", ")}`
+    ? `[Existing Categories]: ${existingCategories.join(", ")}`
     : "";
 
   const prompt = `${VAULT_USER_CONTEXT}
 
-Tu trabajo: clasificar este link en una categoría ESPECÍFICA y escribir un resumen REAL basado en el contenido.
+Classify this link with a SPECIFIC category and write a REAL summary based on the actual content.
 
 === LINK DATA ===
 URL: ${url}
 Title: ${title || "(no title)"}
-Description: ${description || "(no description available)"}
-${hint ? `Context: ${hint}` : ""}
-${existingCatList}
+Description: ${description}
+${existingCatList ? existingCatList : ""}
 
-=== CORE CLASSIFICATION RULES ===
-1. ANALYZE CONTENT FIRST: Base the category on the Title and Description content. Do NOT categorize based on URL/platform alone.
-2. SPECIFICITY OVER GENERALITY: If the link is about a specific niche (e.g., "GTA", "Claude AI", "SaaS Boilerplates", "Solana MEV"), create a DEDICATED category for that niche. NEVER use generic categories like "General", "Other", "Interesante", or "Varios".
-3. DISTINGUISH SIMILAR TOPICS:
-   - CRYPTO STRATEGY: Focuses on "The What and Why" (trading plans, market narratives, portfolio management, alpha signals).
-   - CRYPTO ALGORITHM: Focuses on "The How" (trading bots, MEV code, smart contract logic, on-chain math).
-4. CATEGORY SELECTION:
-   - Check the [Existing Categories] list above.
-   - If the content fits an existing category PERFECTLY, reuse it.
-   - If the content is >30% different from all existing categories, CREATE a new specific category name.
-   - Categories should be 1-3 words, title case, en español o inglés mixto.
-5. NEVER return "Otro" unless the content is truly unrecognizable with zero context.
-6. SUMMARY RULES:
-   - Must describe the ACTUAL content of the link, not generic filler.
-   - Must be in Spanish, 8-20 words.
-   - Must explain WHAT the link contains, like a WhatsApp link preview.
-   - NEVER write generic phrases like "Insights útiles", "Estrategias accionables", "Cuenta interesante".
-   - If you only have a username/handle, say what domain they appear to work in based on their bio/description.
+=== RULES ===
+1. ANALYZE CONTENT: Category must be based on what the content is actually about. Never categorize by platform alone.
+2. SPECIFIC CATEGORIES: If niche (e.g., "GTA", "Claude AI", "SaaS Boilerplates", "Solana MEV"), use that exact niche as the category. NEVER use "General", "Varios", "Other", "Sin Clasificar".
+3. CRYPTO DISTINCTION:
+   - "Crypto Strategy" = market narratives, alpha, portfolio management, trading plans.
+   - "Crypto Algorithm" = bots, MEV code, smart contract logic, quant math.
+4. REUSE existing categories if content fits perfectly (>70% match). Create new ones for distinct topics.
+5. SUMMARY: Must describe what this link ACTUALLY contains. Spanish, 8-18 words. Like a WhatsApp/Telegram link preview.
+   NEVER echo or repeat the title. NEVER use: "insights útiles", "estrategias accionables", "cuenta interesante".
+   BAD: summary="Nav Toor (@heynavtoor) on X"  ← this is just the title, forbidden.
+   GOOD: summary="Artículo explica cómo los MEV bots extraen valor en Uniswap v3."
+6. For articles/blog posts: summarize the core topic from the description.
+7. For recipe/food sites: category="Cocina" or "Recetas", summary describes the dish.
 
-=== EXAMPLES OF GOOD vs BAD ===
-BAD: category="Business Growth", summary="Founder con estrategias de crecimiento accionables."
-GOOD: category="SaaS Pricing", summary="Guía de Marc Louvion sobre cómo fijar precios en micro-SaaS."
-
-BAD: category="Crypto Strategy", summary="Trader crypto con alpha de memecoins."
-GOOD: category="Solana Trading", summary="Análisis de flujos de liquidez en Solana y oportunidades de MEV."
-
-BAD: category="AI Creative Tools", summary="Herramienta de IA útil para apps Next.js."
-GOOD: category="AI Video Generation", summary="Higgsfield AI genera videos cortos con avatares desde texto."
-
-Respond with ONLY valid JSON on a single line:
+Respond with ONLY valid JSON on one line — no markdown, no backticks:
 {"category":"...","summary":"..."}`;
 
   try {
     const message = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 300,
+      max_tokens: 250,
       messages: [{ role: "user", content: prompt }],
     });
 
     const content = message.content[0];
-    if (content.type !== "text") {
-      return { category: "Otro", summary: title ? `Enlace: ${title.slice(0, 80)}` : "" };
-    }
+    if (content.type !== "text") throw new Error("non-text response");
 
     const cleaned = content.text.replace(/```(?:json)?\n?|\n?```/g, "").trim();
     const parsed = JSON.parse(cleaned);
     let category = (parsed.category || "").trim();
     let summary  = (parsed.summary || "").trim();
 
-    if (!category || category.toLowerCase() === "otro" || category.toLowerCase() === "other") {
-      category = "Sin Clasificar";
+    // Reject echo: if AI returned the title as summary, discard it
+    if (isSummaryEcho(title, summary)) summary = "";
+
+    // Category sanity
+    if (!category || ["otro", "other", "sin clasificar", "general", "varios"].includes(category.toLowerCase())) {
+      category = isXProfile ? "X Profiles" : "Sin Clasificar";
     }
-    if (!summary && title) {
-      summary = title.slice(0, 100);
+
+    // Summary last resort: domain + title, never just the title alone
+    if (!summary) {
+      summary = description
+        ? description.slice(0, 120)
+        : `${host || "Enlace"} — ${title ? title.slice(0, 80) : "sin descripción disponible"}`;
     }
 
     return { category, summary };
   } catch (err) {
     console.error("[classifyVaultUrl] AI error:", String(err));
+    // On complete failure: use handle fallback for X, domain info for rest
+    if (isXProfile && handle) return xHandleFallback(handle);
+    const domain = host || url;
+    const fallbackTitle = title && !isSummaryEcho(title, url) ? title : slugToTitle(url);
     return {
       category: "Sin Clasificar",
-      summary: title ? title.slice(0, 100) : `Link desde ${(() => { try { return new URL(url).hostname; } catch { return url; } })()}`,
+      summary: fallbackTitle
+        ? `${domain} — ${fallbackTitle.slice(0, 100)}`
+        : `Link guardado desde ${domain}`,
     };
   }
 }
