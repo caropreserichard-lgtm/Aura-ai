@@ -69,11 +69,18 @@ export async function POST(req: NextRequest) {
       await Promise.all(chunk.map(async (it) => {
         try {
           const scraped = await scrapeOgMeta(it.url, 4500);
-          const finalTitle = scraped.title || it.title || slugToTitle(it.url) || it.url;
+          const rawTitle = scraped.title || it.title || slugToTitle(it.url) || it.url;
+          const rawDesc = scraped.description || "";
+          // X.com: og:title = "Name on X" (metadata). Use og:description (real content) as title.
+          const isXUrl = /(?:x|twitter)\.com\//i.test(it.url || "");
+          const titleIsXMeta = /^.{1,100}\s+on X$/i.test(rawTitle);
+          const finalTitle = (isXUrl && titleIsXMeta && rawDesc.length > 20)
+            ? rawDesc.slice(0, 160).replace(/\s+/g, " ").trim()
+            : rawTitle;
           const { category, summary } = await classifyVaultUrl(
             it.url,
             finalTitle,
-            scraped.description || "",
+            rawDesc,
             Array.from(knownCats)
           );
           knownCats.add(category);

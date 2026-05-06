@@ -9,10 +9,17 @@ export const dynamic = "force-dynamic";
 // ── Deterministic helpers (zero AI credits) ───────────────────────────────────
 
 function isEcho(title: string, summary: string): boolean {
-  if (!title || !summary) return true; // empty summary counts as broken
-  const t = title.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 80);
-  const s = summary.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 80);
-  return t === s || s.startsWith(t.slice(0, 40)) || t.startsWith(s.slice(0, 40));
+  if (!title || !summary) return true;
+  const t = title.toLowerCase().replace(/\s+/g, " ").trim();
+  const s = summary.toLowerCase().replace(/\s+/g, " ").trim();
+  if (t === s || t.slice(0, 50) === s.slice(0, 50)) return true;
+  if (s.startsWith(t.slice(0, 40)) || t.startsWith(s.slice(0, 40))) return true;
+  // Catch broken "domain — xxx" patterns this endpoint may have previously written
+  if (/^(?:x\.com|twitter\.com|t\.co) —/i.test(s)) return true;
+  // Catch "host — title" where the title part echoes the stored title
+  const hostDashMatch = s.match(/^[a-z0-9.-]+ — (.{10,})$/i);
+  if (hostDashMatch && t.slice(0, 40) === hostDashMatch[1].slice(0, 40)) return true;
+  return false;
 }
 
 function slugToTitle(url: string): string {
@@ -75,26 +82,50 @@ export async function POST() {
         let host = "";
         try { host = new URL(url).hostname.toLowerCase().replace(/^www\./, ""); } catch { /**/ }
 
-        const isXProfile = (host === "x.com" || host === "twitter.com") &&
-          !url.includes("/status/") && !url.includes("/i/");
-
         let newCategory: string = it.category || "Sin Clasificar";
         let newSummary = "";
         let newTitle: string = it.title || "";
 
-        if (isXProfile) {
-          const handle = (url.match(/(?:x|twitter)\.com\/([^/?#]+)/i)?.[1] || "").split("?")[0];
-          const fix = xHandleFix(handle);
-          newCategory = fix.category;
-          newSummary = fix.summary;
+        const isXSite = host === "x.com" || host === "twitter.com";
+        const isXProfile = isXSite && !url.includes("/status/") && !url.includes("/i/");
+
+        if (isXSite) {
+          // Always re-scrape X URLs to check for real tweet/bio content
+          const scraped = await scrapeOgMeta(url, 3500);
+          const ogDesc = scraped.description || "";
+          const ogTitle = scraped.title || it.title || "";
+          const titleIsXMeta = /^.{1,100}\s+on X$/i.test(ogTitle);
+
+          if (ogDesc.length > 20 && titleIsXMeta) {
+            // Real content in og:description — use as card title
+            newTitle = ogDesc.slice(0, 160).replace(/\s+/g, " ").trim();
+            newSummary = ogDesc.slice(0, 200);
+            // Keep existing category if valid, else infer from handle
+            if (!newCategory || newCategory === "Sin Clasificar" || newCategory === "Otro") {
+              const handle = (url.match(/(?:x|twitter)\.com\/([^/?#]+)/i)?.[1] || "").split("?")[0];
+              const fix = xHandleFix(handle);
+              newCategory = fix.category;
+            }
+          } else if (isXProfile) {
+            // Profile with no bio scraped — deterministic handle inference
+            const handle = (url.match(/(?:x|twitter)\.com\/([^/?#]+)/i)?.[1] || "").split("?")[0];
+            const fix = xHandleFix(handle);
+            newCategory = fix.category;
+            newSummary = fix.summary;
+            newTitle = `@${handle} en X`;
+          } else {
+            // Tweet/X link with no description available
+            const slug = slugToTitle(url);
+            newSummary = slug ? `${host} — ${slug}` : `Enlace de X guardado`;
+          }
         } else {
-          // Try to re-scrape and get real OG description
+          // Non-X URLs: re-scrape for real OG description
           const scraped = await scrapeOgMeta(url, 3500);
           if (scraped.title && scraped.title !== it.title) newTitle = scraped.title;
           if (scraped.description && !isEcho(newTitle, scraped.description)) {
             newSummary = scraped.description.slice(0, 200);
           } else {
-            // Slug fallback: at least give a readable summary from the URL
+            // Slug fallback
             const slug = slugToTitle(url);
             newSummary = slug
               ? `${host} — ${slug}`

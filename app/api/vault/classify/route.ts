@@ -47,7 +47,13 @@ export async function POST(req: NextRequest) {
     if (!url) return NextResponse.json({ error: "URL requerida" }, { status: 400 });
 
     const platform = detectPlatform(url);
-    const { title, description } = await scrapeUrlMeta(url);
+    const { title: rawTitle, description } = await scrapeUrlMeta(url);
+    // X.com: og:title = "Name on X" (metadata). Use og:description (real content) as card title.
+    const isXUrl = /(?:x|twitter)\.com\//i.test(url);
+    const titleIsXMeta = /^.{1,100}\s+on X$/i.test(rawTitle);
+    const title = (isXUrl && titleIsXMeta && description.length > 20)
+      ? description.slice(0, 160).replace(/\s+/g, " ").trim()
+      : rawTitle;
 
     if (mode === "og") {
       return NextResponse.json({ title, description, platform, mode: "og" });

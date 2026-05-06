@@ -339,26 +339,34 @@ export async function classifyVaultUrlsBulk(
   async function classifyOne(idx: number): Promise<void> {
     const it = items[idx];
     const cleanTitle = (it.title || "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+    const cleanDesc = (it.description || "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+    // X.com: og:title = "Name on X" (metadata), og:description = actual tweet/bio content.
+    // Use description as the card title so users see the real content, not the account metadata.
+    const isXUrl = /(?:x|twitter)\.com\//i.test(it.url || "");
+    const titleIsXMeta = /^.{1,100}\s+on X$/i.test(cleanTitle);
+    const effectiveTitle = (isXUrl && titleIsXMeta && cleanDesc.length > 20)
+      ? cleanDesc.slice(0, 160).replace(/\s+/g, " ").trim()
+      : cleanTitle;
     try {
       const { category, summary } = await classifyVaultUrl(
         it.url,
-        cleanTitle,
-        it.description || "",
+        effectiveTitle,
+        cleanDesc || (it.description || ""),
         Array.from(knownCats)
       );
-      const cat = (category || "Otro").trim();
+      const cat = (category || "Sin Clasificar").trim();
       knownCats.add(cat);
       out[idx] = {
-        title: cleanTitle,
+        title: effectiveTitle,
         category: cat,
         summary: (summary || "").trim(),
       };
     } catch (err) {
       console.error("[classifyVaultUrlsBulk] item", idx, "failed:", String(err));
       out[idx] = {
-        title: cleanTitle,
+        title: effectiveTitle,
         category: "Sin Clasificar",
-        summary: cleanTitle || `Link desde ${(() => { try { return new URL(it.url).hostname; } catch { return it.url; } })()}`,
+        summary: effectiveTitle || `Link desde ${(() => { try { return new URL(it.url).hostname; } catch { return it.url; } })()}`,
       };
     }
   }
