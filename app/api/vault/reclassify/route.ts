@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     // Filter to items that need reclassification
     const toProcess = force
       ? items
-      : items.filter((it) => !it.summary || it.category === "Otro" || !it.category);
+      : items.filter((it) => !it.summary || it.category === "Otro" || it.category === "Sin Clasificar" || !it.category);
 
     let updated = 0;
     const knownCats = new Set<string>(items.map((it) => it.category).filter(Boolean) as string[]);

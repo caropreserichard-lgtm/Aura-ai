@@ -22,7 +22,7 @@ export async function GET() {
     ]).toArray();
 
     return NextResponse.json({
-      categories: agg.map((c) => ({ name: c._id || "Otro", count: c.count })),
+      categories: agg.map((c) => ({ name: c._id || "Sin Clasificar", count: c.count })),
     });
   } catch (err) {
     console.error("GET /api/vault/categories error:", err);
@@ -72,7 +72,7 @@ export async function PATCH(req: NextRequest) {
 /**
  * DELETE body: { name: string, reassignTo?: string }
  *
- * Reassigns all items in category `name` to `reassignTo` (default: "Otro").
+ * Reassigns all items in category `name` to `reassignTo` (default: "Sin Clasificar").
  * Doesn't delete any items — categories are virtual (derived from items).
  */
 export async function DELETE(req: NextRequest) {
@@ -80,7 +80,7 @@ export async function DELETE(req: NextRequest) {
   try { userId = await requireUserId(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
 
   try {
-    const { name, reassignTo = "Otro" } = await req.json();
+    const { name, reassignTo = "Sin Clasificar" } = await req.json();
     if (!name || typeof name !== "string") {
       return NextResponse.json({ error: "name es requerido" }, { status: 400 });
     }
@@ -88,7 +88,7 @@ export async function DELETE(req: NextRequest) {
     const db = await getDb();
     const res = await db.collection("knowledge_vault").updateMany(
       { userId, category: name.trim() },
-      { $set: { category: String(reassignTo).trim() || "Otro" } }
+      { $set: { category: String(reassignTo).trim() || "Sin Clasificar" } }
     );
 
     return NextResponse.json({ updated: res.modifiedCount });

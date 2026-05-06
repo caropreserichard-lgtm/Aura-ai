@@ -81,8 +81,7 @@ export async function POST(req: NextRequest) {
         existingCategories
       );
 
-      // Detect partial AI failure (>50% of items got "Otro" with empty summary)
-      const failed = classified.filter((c) => c.category === "Otro" && !c.summary).length;
+      const failed = classified.filter((c) => (c.category === "Otro" || c.category === "Sin Clasificar") && !c.summary).length;
       if (failed > Math.ceil(classified.length / 2) && classified.length > 1) {
         aiError = `${failed}/${classified.length} links no pudieron clasificarse automáticamente.`;
       }
@@ -90,7 +89,7 @@ export async function POST(req: NextRequest) {
       // OG-only mode: no AI, just use scraped data
       classified = fresh.map((u, i) => ({
         title: scraped[i].title || u,
-        category: "Otro",
+        category: "Sin Clasificar",
         summary: "",
       }));
     }
@@ -101,7 +100,7 @@ export async function POST(req: NextRequest) {
       userId,
       url,
       title: classified[i].title || scraped[i].title || url,
-      category: classified[i].category || "Otro",
+      category: classified[i].category || "Sin Clasificar",
       summary: classified[i].summary || "",
       insight: classified[i].summary || "",
       platform: detectPlatform(url),

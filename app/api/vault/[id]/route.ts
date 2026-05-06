@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     if (body.status !== undefined)   updates.status   = body.status;
     if (body.idea !== undefined)     updates.idea     = body.idea;
-    if (body.category !== undefined) updates.category = String(body.category).trim() || "Otro";
+    if (body.category !== undefined) updates.category = String(body.category).trim() || "Sin Clasificar";
     if (body.title !== undefined)    updates.title    = String(body.title).trim();
     if (body.platform !== undefined) updates.platform = body.platform;
     if (body.pinned !== undefined)   updates.pinned   = !!body.pinned;

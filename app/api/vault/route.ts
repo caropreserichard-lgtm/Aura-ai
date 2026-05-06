@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       userId,
       url,
       title,
-      category: category || "Otro",
+      category: category || "Sin Clasificar",
       summary: finalSummary,
       insight: finalSummary, // legacy field, keep in sync
       platform: platform || detectPlatform(url),

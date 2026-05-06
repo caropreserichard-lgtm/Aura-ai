@@ -86,12 +86,43 @@ export function extractUrls(text: string): string[] {
 }
 
 /**
+ * Extract readable body text from HTML when OG/meta tags are empty.
+ * Strips scripts, styles, nav, header, footer, then grabs the first
+ * meaningful paragraph or text block.
+ */
+function extractBodyText(html: string): string {
+  let cleaned = html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, "")
+    .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, "")
+    .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, "")
+    .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, "");
+
+  const paragraphs = cleaned.match(/<(?:p|article|section|div)[^>]*>([\s\S]*?)<\/(?:p|article|section|div)>/gi) || [];
+  for (const p of paragraphs) {
+    const text = p.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    if (text.length >= 40 && text.length <= 600) {
+      return text.slice(0, 400);
+    }
+  }
+
+  const h1Match = cleaned.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  if (h1Match) {
+    const h1Text = h1Match[1].replace(/<[^>]+>/g, "").trim();
+    if (h1Text.length >= 5) return h1Text.slice(0, 200);
+  }
+
+  return "";
+}
+
+/**
  * Scrape OG metadata from a URL with a fallback chain of User-Agents.
  * x.com, Instagram, LinkedIn etc. only serve rich OG meta to recognized
  * social-media bots. We try `facebookexternalhit` first (most permissive
  * across sites), then Twitterbot, then a generic browser UA.
  *
- * Returns whatever we find — empty strings if every attempt fails.
+ * When OG tags are empty, falls back to extracting body text from the HTML.
  */
 export async function scrapeOgMeta(url: string, perTryTimeoutMs = 4500): Promise<{ title: string; description: string; image: string }> {
   const userAgents = [
@@ -103,6 +134,7 @@ export async function scrapeOgMeta(url: string, perTryTimeoutMs = 4500): Promise
   let bestTitle = "";
   let bestDesc = "";
   let bestImage = "";
+  let lastHtml = "";
 
   for (const ua of userAgents) {
     try {
@@ -117,6 +149,7 @@ export async function scrapeOgMeta(url: string, perTryTimeoutMs = 4500): Promise
       });
       if (!res.ok) continue;
       const html = await res.text();
+      lastHtml = html;
 
       // Title — try og:title, twitter:title, then <title>
       const ogTitle =
@@ -134,17 +167,28 @@ export async function scrapeOgMeta(url: string, perTryTimeoutMs = 4500): Promise
         html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)?.[1];
       const description = decodeHtmlEntities((ogDesc || "").trim().replace(/\s+/g, " ")).slice(0, 400);
 
-      // Image (optional, we don't use it yet but might in future)
+      // Image
       const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1] || "";
 
-      // Keep best result so far (longer description wins)
       if (title && (!bestTitle || title.length > bestTitle.length)) bestTitle = title;
       if (description && description.length > bestDesc.length) bestDesc = description;
       if (ogImage && !bestImage) bestImage = ogImage;
 
-      // If we got both title AND description with this UA, stop trying — done.
       if (bestTitle && bestDesc) break;
     } catch { /* try next UA */ }
+  }
+
+  // Fallback: extract body text when OG description is empty
+  if (!bestDesc && lastHtml) {
+    const bodyText = extractBodyText(lastHtml);
+    if (bodyText) bestDesc = bodyText;
+  }
+  if (!bestTitle && lastHtml) {
+    const h1 = lastHtml.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+    if (h1) {
+      const h1Text = decodeHtmlEntities(h1[1].replace(/<[^>]+>/g, "").trim());
+      if (h1Text.length >= 3) bestTitle = h1Text.slice(0, 200);
+    }
   }
 
   return { title: bestTitle, description: bestDesc, image: bestImage };

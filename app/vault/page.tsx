@@ -182,7 +182,7 @@ function AddLinkModal({
         body: JSON.stringify({
           url: url.trim(),
           title: title.trim(),
-          category: (category.trim() || "Otro"),
+          category: (category.trim() || "Sin Clasificar"),
           summary: summary.trim(),
           platform,
         }),
@@ -280,7 +280,7 @@ function AddLinkModal({
                     list="vault-categories"
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    placeholder="Otro"
+                    placeholder="Ej: Crypto Strategy, GTA, SaaS..."
                     className="w-full text-sm rounded-lg px-3 py-2 outline-none mt-1"
                     style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#e8e8e8" }}
                   />
@@ -615,7 +615,7 @@ function ItemRow({
 
         {/* Body */}
         <div className="flex-1 min-w-0">
-          {/* Top row */}
+          {/* Title row — bold header */}
           <div className="flex items-center gap-2 flex-wrap">
             {isPinned && (
               <Pin size={11} fill="#e7ca79" color="#e7ca79" className="shrink-0" />
@@ -624,8 +624,14 @@ function ItemRow({
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm font-medium text-text-primary hover:text-[#e7ca79] transition-colors truncate max-w-full"
-              style={{ textDecoration: item.status === "completed" ? "line-through" : "none" }}
+              className="text-[13px] font-semibold text-text-primary hover:text-[#e7ca79] transition-colors leading-snug"
+              style={{
+                textDecoration: item.status === "completed" ? "line-through" : "none",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
             >
               {renderTitle()}
             </a>
@@ -637,13 +643,13 @@ function ItemRow({
             </span>
           </div>
 
-          {/* Summary */}
+          {/* Summary — specific brief below the title */}
           {summary && (
-            <p className="text-[11.5px] text-text-muted mt-0.5 leading-snug line-clamp-2">{summary}</p>
+            <p className="text-[12px] text-text-muted mt-0.5 leading-snug line-clamp-2" style={{ color: "rgba(200,200,200,0.7)" }}>{summary}</p>
           )}
 
           {/* Domain */}
-          <p className="text-[10px] text-text-muted opacity-70 mt-1">{getDomain(item.url)}</p>
+          <p className="text-[10px] text-text-muted opacity-60 mt-1">{getDomain(item.url)}</p>
 
           {/* Idea row */}
           {(item.idea || editIdea) && (
@@ -844,7 +850,7 @@ function EditCategoryModal({
   if (!item) return null;
 
   const handleSave = async () => {
-    const v = value.trim() || "Otro";
+    const v = value.trim() || "Sin Clasificar";
     setSaving(true);
     await fetch(`/api/vault/${item._id}`, {
       method: "PATCH",
@@ -916,21 +922,35 @@ function EditCategoryModal({
 // ─── Manage Categories Modal ─────────────────────────────────────────────────
 
 function ManageCategoriesModal({
-  open, onClose, categories, onChanged,
+  open, onClose, categories, onChanged, onCategoryCreated,
 }: {
   open: boolean;
   onClose: () => void;
   categories: { name: string; count: number }[];
   onChanged: () => void;
+  onCategoryCreated: (name: string) => void;
 }) {
   const [renamingFrom, setRenamingFrom] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [newCategoryValue, setNewCategoryValue] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [createMsg, setCreateMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) { setRenamingFrom(null); setRenameValue(""); setNewCategoryValue(""); }
+    if (!open) { setRenamingFrom(null); setRenameValue(""); setNewCategoryValue(""); setCreateMsg(null); }
   }, [open]);
+
+  const handleCreateCategory = () => {
+    const name = newCategoryValue.trim();
+    if (!name) return;
+    if (categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+      setCreateMsg(`"${name}" ya existe.`);
+      return;
+    }
+    onCategoryCreated(name);
+    setCreateMsg(`"${name}" creada. Ya puedes asignarla a tus links.`);
+    setNewCategoryValue("");
+  };
 
   const handleRename = async (from: string) => {
     const to = renameValue.trim();
@@ -948,24 +968,19 @@ function ManageCategoriesModal({
   };
 
   const handleDelete = async (name: string) => {
-    if (!confirm(`¿Mover todos los links de "${name}" a "Otro"?`)) return;
+    if (!confirm(`¿Mover todos los links de "${name}" a "Sin Clasificar"?`)) return;
     setBusy(name);
     try {
       await fetch("/api/vault/categories", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, reassignTo: "Otro" }),
+        body: JSON.stringify({ name, reassignTo: "Sin Clasificar" }),
       });
       onChanged();
     } finally { setBusy(null); }
   };
 
   if (!open) return null;
-
-  // Note: "creating" a brand-new empty category isn't really a thing —
-  // categories exist when items use them. So the input here is for
-  // creating a NEW category by *renaming an existing one to it* — the
-  // most flexible UX.
 
   return (
     <AnimatePresence>
@@ -1000,28 +1015,30 @@ function ManageCategoriesModal({
           </div>
 
           <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
-            {/* Quick info */}
-            <p className="text-[11px] text-text-muted leading-relaxed">
-              Renombra una categoría para cambiar el nombre en todos sus links. Para crear una nueva, simplemente renombra una existente o asigna ese nombre desde el botón ✏️ en cada link.
-            </p>
-
-            {/* New category quick-create — by typing here you can rename to a new name */}
+            {/* Create new category */}
             <div
               className="flex gap-2 items-center p-3 rounded-lg"
               style={{ background: "rgba(231,202,121,0.05)", border: "1px solid rgba(231,202,121,0.15)" }}
             >
-              <Plus size={13} color="#e7ca79" />
+              <Plus size={13} color="#e7ca79" className="shrink-0" />
               <input
                 value={newCategoryValue}
-                onChange={(e) => setNewCategoryValue(e.target.value)}
-                placeholder="Nombre de nueva categoría (la asignarás desde el ✏️ en cada link)"
+                onChange={(e) => { setNewCategoryValue(e.target.value); setCreateMsg(null); }}
+                onKeyDown={(e) => { if (e.key === "Enter") handleCreateCategory(); }}
+                placeholder="Nombre de nueva categoría..."
                 className="flex-1 bg-transparent text-xs outline-none text-text-primary placeholder:text-text-muted"
               />
+              <button
+                onClick={handleCreateCategory}
+                disabled={!newCategoryValue.trim()}
+                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold shrink-0 disabled:opacity-30 transition-all"
+                style={{ background: "rgba(231,202,121,0.15)", color: "#e7ca79", border: "1px solid rgba(231,202,121,0.25)" }}
+              >
+                Crear
+              </button>
             </div>
-            {newCategoryValue.trim() && (
-              <p className="text-[11px] text-text-muted px-1">
-                ℹ️ &ldquo;{newCategoryValue.trim()}&rdquo; aparecerá como sugerencia al editar la categoría de cualquier link.
-              </p>
+            {createMsg && (
+              <p className="text-[11px] text-[#e7ca79] px-1">{createMsg}</p>
             )}
 
             <div className="space-y-1.5">
@@ -1064,14 +1081,13 @@ function ManageCategoriesModal({
 
                     <datalist id={`existing-cats-${cat.name}`}>
                       {categories.map((c) => c.name !== cat.name && <option key={c.name} value={c.name} />)}
-                      {newCategoryValue.trim() && <option value={newCategoryValue.trim()} />}
                     </datalist>
 
                     <span className="text-[10px] text-text-muted px-1.5 py-0.5 rounded shrink-0" style={{ background: "rgba(255,255,255,0.05)" }}>
                       {cat.count}
                     </span>
 
-                    {!isRenaming && cat.name !== "Otro" && (
+                    {!isRenaming && (
                       <>
                         <button
                           onClick={() => { setRenamingFrom(cat.name); setRenameValue(cat.name); }}
@@ -1085,7 +1101,7 @@ function ManageCategoriesModal({
                           onClick={() => handleDelete(cat.name)}
                           disabled={isBusy}
                           className="p-1 rounded hover:bg-white/5 text-red-400 transition-colors disabled:opacity-30"
-                          title="Eliminar (mueve a Otro)"
+                          title="Eliminar (mueve a Sin Clasificar)"
                         >
                           {isBusy ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
                         </button>
@@ -1124,6 +1140,7 @@ export default function VaultPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [hideCompleted, setHideCompleted] = useState(false);
   const [statusFilter, setStatusFilter] = useState<VaultStatus | "all">("all");
+  const [manualCategories, setManualCategories] = useState<string[]>([]);
   const { toasts, push: toast } = useToast();
 
   // ── Fetch ────────────────────────────────────────────────────────────────
@@ -1142,8 +1159,9 @@ export default function VaultPage() {
   const existingCategories = useMemo(() => {
     const s = new Set<string>();
     items.forEach((i) => i.category && s.add(i.category));
+    manualCategories.forEach((c) => s.add(c));
     return Array.from(s).sort((a, b) => a.localeCompare(b));
-  }, [items]);
+  }, [items, manualCategories]);
 
   // ── Filter & group ───────────────────────────────────────────────────────
   const q = query.trim().toLowerCase();
@@ -1160,7 +1178,7 @@ export default function VaultPage() {
   const grouped = useMemo(() => {
     const g = new Map<string, VaultItem[]>();
     filtered.forEach((i) => {
-      const c = i.category || "Otro";
+      const c = i.category || "Sin Clasificar";
       if (!g.has(c)) g.set(c, []);
       g.get(c)!.push(i);
     });
@@ -1247,7 +1265,7 @@ export default function VaultPage() {
 
   const handleReclassify = async (force = false) => {
     if (reclassifying) return;
-    const candidates = items.filter((i) => force || !getSummary(i) || (i.category || "Otro") === "Otro");
+    const candidates = items.filter((i) => force || !getSummary(i) || (i.category || "Sin Clasificar") === "Sin Clasificar" || i.category === "Otro");
     if (candidates.length === 0) {
       toast("info", "Todos los links ya tienen categoría y resumen");
       return;
@@ -1313,7 +1331,7 @@ export default function VaultPage() {
 
       // Recompute order numbers in the destination category (with the dragged item now there)
       const destItems = items
-        .filter((i) => (i.category || "Otro") === destCat || i._id === draggedId)
+        .filter((i) => (i.category || "Sin Clasificar") === destCat || i._id === draggedId)
         .map((i) => i._id === draggedId ? { ...i, category: destCat } : i);
 
       const sorted = destItems.sort((a, b) => {
@@ -1346,7 +1364,7 @@ export default function VaultPage() {
     }
 
     // ── Same-category reorder ────────────────────────────────────────────
-    const catItems = filtered.filter((i) => (i.category || "Otro") === sourceCat);
+    const catItems = filtered.filter((i) => (i.category || "Sin Clasificar") === sourceCat);
     const sorted = [...catItems].sort((a, b) => {
       const ap = a.pinned ? 1 : 0; const bp = b.pinned ? 1 : 0;
       if (ap !== bp) return bp - ap;
@@ -1673,14 +1691,17 @@ export default function VaultPage() {
         onClose={() => setShowManageCats(false)}
         categories={existingCategories.map((name) => ({
           name,
-          count: items.filter((i) => (i.category || "Otro") === name).length,
+          count: items.filter((i) => (i.category || "Sin Clasificar") === name).length,
         }))}
         onChanged={async () => {
-          // Refetch items to pick up renames/merges
           const r = await fetch("/api/vault");
           const data = await r.json();
           if (Array.isArray(data)) setItems(data);
           toast("success", "Categorías actualizadas");
+        }}
+        onCategoryCreated={(name) => {
+          setManualCategories((prev) => prev.includes(name) ? prev : [...prev, name]);
+          toast("success", `Categoría "${name}" creada`);
         }}
       />
 
