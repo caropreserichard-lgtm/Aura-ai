@@ -85,6 +85,87 @@ export function extractUrls(text: string): string[] {
   return out;
 }
 
+/**
+ * Scrape OG metadata from a URL with a fallback chain of User-Agents.
+ * x.com, Instagram, LinkedIn etc. only serve rich OG meta to recognized
+ * social-media bots. We try `facebookexternalhit` first (most permissive
+ * across sites), then Twitterbot, then a generic browser UA.
+ *
+ * Returns whatever we find — empty strings if every attempt fails.
+ */
+export async function scrapeOgMeta(url: string, perTryTimeoutMs = 4500): Promise<{ title: string; description: string; image: string }> {
+  const userAgents = [
+    "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+    "Mozilla/5.0 (compatible; Twitterbot/1.0)",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0 Safari/537.36",
+  ];
+
+  let bestTitle = "";
+  let bestDesc = "";
+  let bestImage = "";
+
+  for (const ua of userAgents) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": ua,
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
+        },
+        signal: AbortSignal.timeout(perTryTimeoutMs),
+        redirect: "follow",
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+
+      // Title — try og:title, twitter:title, then <title>
+      const ogTitle =
+        html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1] ||
+        html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i)?.[1] ||
+        html.match(/<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']+)["']/i)?.[1];
+      const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
+      const title = decodeHtmlEntities((ogTitle || titleTag || "").trim().replace(/\s+/g, " ")).slice(0, 200);
+
+      // Description — try og:description, twitter:description, meta description
+      const ogDesc =
+        html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i)?.[1] ||
+        html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']/i)?.[1] ||
+        html.match(/<meta[^>]+name=["']twitter:description["'][^>]+content=["']([^"']+)["']/i)?.[1] ||
+        html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)?.[1];
+      const description = decodeHtmlEntities((ogDesc || "").trim().replace(/\s+/g, " ")).slice(0, 400);
+
+      // Image (optional, we don't use it yet but might in future)
+      const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1] || "";
+
+      // Keep best result so far (longer description wins)
+      if (title && (!bestTitle || title.length > bestTitle.length)) bestTitle = title;
+      if (description && description.length > bestDesc.length) bestDesc = description;
+      if (ogImage && !bestImage) bestImage = ogImage;
+
+      // If we got both title AND description with this UA, stop trying — done.
+      if (bestTitle && bestDesc) break;
+    } catch { /* try next UA */ }
+  }
+
+  return { title: bestTitle, description: bestDesc, image: bestImage };
+}
+
+/** Decode common HTML entities (&amp; &lt; &gt; &quot; &#x27; numeric refs). */
+export function decodeHtmlEntities(s: string): string {
+  if (!s) return "";
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)));
+}
+
 /** Normalize a URL for duplicate detection (strip hash, www, trailing slash, common tracking params). */
 export function normalizeUrlForDedupe(url: string): string {
   try {

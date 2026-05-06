@@ -9,7 +9,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import {
   Search, Plus, Sparkles, Trash2, ExternalLink, ChevronRight,
   CheckSquare, Square, X, Lightbulb, Loader2, Check, Edit3,
-  Globe, AlertCircle, Pin, GripVertical,
+  Globe, AlertCircle, Pin, GripVertical, FolderCog, Wand2,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
@@ -913,6 +913,201 @@ function EditCategoryModal({
   );
 }
 
+// ─── Manage Categories Modal ─────────────────────────────────────────────────
+
+function ManageCategoriesModal({
+  open, onClose, categories, onChanged,
+}: {
+  open: boolean;
+  onClose: () => void;
+  categories: { name: string; count: number }[];
+  onChanged: () => void;
+}) {
+  const [renamingFrom, setRenamingFrom] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [newCategoryValue, setNewCategoryValue] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) { setRenamingFrom(null); setRenameValue(""); setNewCategoryValue(""); }
+  }, [open]);
+
+  const handleRename = async (from: string) => {
+    const to = renameValue.trim();
+    if (!to || to === from) { setRenamingFrom(null); return; }
+    setBusy(from);
+    try {
+      await fetch("/api/vault/categories", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to }),
+      });
+      setRenamingFrom(null);
+      onChanged();
+    } finally { setBusy(null); }
+  };
+
+  const handleDelete = async (name: string) => {
+    if (!confirm(`¿Mover todos los links de "${name}" a "Otro"?`)) return;
+    setBusy(name);
+    try {
+      await fetch("/api/vault/categories", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, reassignTo: "Otro" }),
+      });
+      onChanged();
+    } finally { setBusy(null); }
+  };
+
+  if (!open) return null;
+
+  // Note: "creating" a brand-new empty category isn't really a thing —
+  // categories exist when items use them. So the input here is for
+  // creating a NEW category by *renaming an existing one to it* — the
+  // most flexible UX.
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[150] flex items-center justify-center p-4"
+        style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.96, y: 16, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          exit={{ scale: 0.96, y: 8, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="w-full max-w-md rounded-2xl border overflow-hidden"
+          style={{
+            background: "rgba(24,24,24,0.92)",
+            backdropFilter: "blur(20px)",
+            borderColor: "rgba(231,202,121,0.20)",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-5 py-4 flex items-center justify-between border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+            <div className="flex items-center gap-2">
+              <FolderCog size={16} color="#e7ca79" />
+              <h3 className="text-sm font-semibold text-text-primary">Gestionar categorías</h3>
+            </div>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 text-text-muted">
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
+            {/* Quick info */}
+            <p className="text-[11px] text-text-muted leading-relaxed">
+              Renombra una categoría para cambiar el nombre en todos sus links. Para crear una nueva, simplemente renombra una existente o asigna ese nombre desde el botón ✏️ en cada link.
+            </p>
+
+            {/* New category quick-create — by typing here you can rename to a new name */}
+            <div
+              className="flex gap-2 items-center p-3 rounded-lg"
+              style={{ background: "rgba(231,202,121,0.05)", border: "1px solid rgba(231,202,121,0.15)" }}
+            >
+              <Plus size={13} color="#e7ca79" />
+              <input
+                value={newCategoryValue}
+                onChange={(e) => setNewCategoryValue(e.target.value)}
+                placeholder="Nombre de nueva categoría (la asignarás desde el ✏️ en cada link)"
+                className="flex-1 bg-transparent text-xs outline-none text-text-primary placeholder:text-text-muted"
+              />
+            </div>
+            {newCategoryValue.trim() && (
+              <p className="text-[11px] text-text-muted px-1">
+                ℹ️ &ldquo;{newCategoryValue.trim()}&rdquo; aparecerá como sugerencia al editar la categoría de cualquier link.
+              </p>
+            )}
+
+            <div className="space-y-1.5">
+              {categories.length === 0 && (
+                <p className="text-xs text-text-muted text-center py-4">No hay categorías aún.</p>
+              )}
+              {categories.map((cat) => {
+                const isRenaming = renamingFrom === cat.name;
+                const isBusy = busy === cat.name;
+                return (
+                  <div
+                    key={cat.name}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                    style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+                  >
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ background: `hsl(${(() => { let h=0; for(const c of cat.name) h=(h*31+c.charCodeAt(0))%360; return h; })()}, 65%, 65%)` }} />
+
+                    {isRenaming ? (
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleRename(cat.name);
+                          if (e.key === "Escape") { setRenamingFrom(null); setRenameValue(""); }
+                        }}
+                        onBlur={() => handleRename(cat.name)}
+                        list={`existing-cats-${cat.name}`}
+                        className="flex-1 bg-transparent text-xs outline-none text-text-primary"
+                        placeholder={cat.name}
+                      />
+                    ) : (
+                      <button
+                        onClick={() => { setRenamingFrom(cat.name); setRenameValue(cat.name); }}
+                        className="flex-1 text-left text-xs font-medium text-text-primary hover:text-[#e7ca79] transition-colors"
+                      >
+                        {cat.name}
+                      </button>
+                    )}
+
+                    <datalist id={`existing-cats-${cat.name}`}>
+                      {categories.map((c) => c.name !== cat.name && <option key={c.name} value={c.name} />)}
+                      {newCategoryValue.trim() && <option value={newCategoryValue.trim()} />}
+                    </datalist>
+
+                    <span className="text-[10px] text-text-muted px-1.5 py-0.5 rounded shrink-0" style={{ background: "rgba(255,255,255,0.05)" }}>
+                      {cat.count}
+                    </span>
+
+                    {!isRenaming && cat.name !== "Otro" && (
+                      <>
+                        <button
+                          onClick={() => { setRenamingFrom(cat.name); setRenameValue(cat.name); }}
+                          disabled={isBusy}
+                          className="p-1 rounded hover:bg-white/5 text-text-muted hover:text-text-primary transition-colors disabled:opacity-30"
+                          title="Renombrar"
+                        >
+                          <Edit3 size={11} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(cat.name)}
+                          disabled={isBusy}
+                          className="p-1 rounded hover:bg-white/5 text-red-400 transition-colors disabled:opacity-30"
+                          title="Eliminar (mueve a Otro)"
+                        >
+                          {isBusy ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="px-5 pb-4 flex justify-end gap-2 border-t pt-4" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+            <button onClick={onClose} className="px-4 py-2 rounded-lg text-xs font-medium text-text-muted hover:bg-white/5">
+              Cerrar
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function VaultPage() {
@@ -922,6 +1117,8 @@ export default function VaultPage() {
   const [query, setQuery] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
+  const [showManageCats, setShowManageCats] = useState(false);
+  const [reclassifying, setReclassifying] = useState(false);
   const [editCatItem, setEditCatItem] = useState<VaultItem | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -1048,14 +1245,107 @@ export default function VaultPage() {
     });
   };
 
+  const handleReclassify = async (force = false) => {
+    if (reclassifying) return;
+    const candidates = items.filter((i) => force || !getSummary(i) || (i.category || "Otro") === "Otro");
+    if (candidates.length === 0) {
+      toast("info", "Todos los links ya tienen categoría y resumen");
+      return;
+    }
+    if (candidates.length > 60) {
+      toast("error", `Demasiados items (${candidates.length}). Máximo 60 por reclasificación.`);
+      return;
+    }
+    if (!confirm(`Reclasificar ${candidates.length} link${candidates.length === 1 ? "" : "s"} con IA? (≈ ${candidates.length} créditos)`)) return;
+
+    setReclassifying(true);
+    toast("info", `Reclasificando ${candidates.length} links con IA...`);
+    try {
+      const ids = candidates.map((i) => i._id);
+      const res = await fetch("/api/vault/reclassify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, force }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "fail");
+      // Refetch full list to pull new categories/summaries
+      const r = await fetch("/api/vault");
+      const fresh = await r.json();
+      if (Array.isArray(fresh)) setItems(fresh);
+      toast("success", `${data.updated} link${data.updated === 1 ? "" : "s"} reclasificado${data.updated === 1 ? "" : "s"} ✨`);
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "Error al reclasificar");
+    } finally {
+      setReclassifying(false);
+    }
+  };
+
   const handleDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
     const sourceCat = result.source.droppableId.replace(/^cat:/, "");
-    const destCat = result.destination.droppableId.replace(/^cat:/, "");
-    if (sourceCat !== destCat) return; // only allow reordering within same category
-    if (result.source.index === result.destination.index) return;
+    const destCat   = result.destination.droppableId.replace(/^cat:/, "");
+    const sameCat   = sourceCat === destCat;
+    if (sameCat && result.source.index === result.destination.index) return;
 
-    // Compute new order numbers for the affected category
+    // Identify the dragged item via draggableId
+    const draggedId = result.draggableId;
+    const draggedItem = items.find((i) => i._id === draggedId);
+    if (!draggedItem) return;
+
+    // ── Cross-category drop: change the item's category, reorder dest ────
+    if (!sameCat) {
+      // Optimistic update: change category locally
+      setItems((prev) => prev.map((i) => i._id === draggedId ? { ...i, category: destCat } : i));
+
+      // Persist category change
+      try {
+        await fetch(`/api/vault/${draggedId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ category: destCat }),
+        });
+        toast("success", `Movido a "${destCat}"`);
+      } catch {
+        toast("error", "No se pudo mover el link");
+        return;
+      }
+
+      // Recompute order numbers in the destination category (with the dragged item now there)
+      const destItems = items
+        .filter((i) => (i.category || "Otro") === destCat || i._id === draggedId)
+        .map((i) => i._id === draggedId ? { ...i, category: destCat } : i);
+
+      const sorted = destItems.sort((a, b) => {
+        const ap = a.pinned ? 1 : 0; const bp = b.pinned ? 1 : 0;
+        if (ap !== bp) return bp - ap;
+        const ao = typeof a.order === "number" ? a.order : 0;
+        const bo = typeof b.order === "number" ? b.order : 0;
+        if (ao !== bo) return bo - ao;
+        return (b.created_at || "").localeCompare(a.created_at || "");
+      });
+
+      // Remove dragged from current pos, insert at destination index
+      const fromIdx = sorted.findIndex((i) => i._id === draggedId);
+      if (fromIdx >= 0) sorted.splice(fromIdx, 1);
+      sorted.splice(result.destination.index, 0, { ...draggedItem, category: destCat });
+
+      const base = Date.now();
+      const updates = sorted.map((it, idx) => ({ id: it._id, order: base - idx }));
+      const orderMap = new Map(updates.map((u) => [u.id, u.order]));
+      setItems((prev) => prev.map((i) => orderMap.has(i._id) ? { ...i, order: orderMap.get(i._id)! } : i));
+
+      try {
+        await fetch("/api/vault/reorder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: updates }),
+        });
+      } catch {/* non-fatal */}
+      return;
+    }
+
+    // ── Same-category reorder ────────────────────────────────────────────
     const catItems = filtered.filter((i) => (i.category || "Otro") === sourceCat);
     const sorted = [...catItems].sort((a, b) => {
       const ap = a.pinned ? 1 : 0; const bp = b.pinned ? 1 : 0;
@@ -1069,11 +1359,9 @@ export default function VaultPage() {
     const [moved] = sorted.splice(result.source.index, 1);
     sorted.splice(result.destination.index, 0, moved);
 
-    // Re-assign order numbers (descending so highest = top)
     const base = Date.now();
     const updates = sorted.map((it, idx) => ({ id: it._id, order: base - idx }));
     const orderMap = new Map(updates.map((u) => [u.id, u.order]));
-
     setItems((prev) => prev.map((i) => orderMap.has(i._id) ? { ...i, order: orderMap.get(i._id)! } : i));
 
     try {
@@ -1172,7 +1460,7 @@ export default function VaultPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <button
                   onClick={() => setShowAdd(true)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all"
@@ -1187,6 +1475,26 @@ export default function VaultPage() {
                 >
                   <Sparkles size={13} /> Bulk con IA
                 </button>
+                <button
+                  onClick={() => setShowManageCats(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all"
+                  style={{ background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.10)", color: "#cbd5e1" }}
+                  title="Renombrar / fusionar categorías"
+                >
+                  <FolderCog size={13} /> Categorías
+                </button>
+                {items.length > 0 && (
+                  <button
+                    onClick={() => handleReclassify(false)}
+                    disabled={reclassifying}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all disabled:opacity-50"
+                    style={{ background: "rgba(56,189,248,0.10)", borderColor: "rgba(56,189,248,0.28)", color: "#7dd3fc" }}
+                    title="Re-scrapear y reclasificar links sin resumen / categoría"
+                  >
+                    {reclassifying ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
+                    {reclassifying ? "Reclasificando..." : "Reclasificar IA"}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1359,6 +1667,21 @@ export default function VaultPage() {
         existingCategories={existingCategories}
         onClose={() => setEditCatItem(null)}
         onSaved={handleSavedCategory}
+      />
+      <ManageCategoriesModal
+        open={showManageCats}
+        onClose={() => setShowManageCats(false)}
+        categories={existingCategories.map((name) => ({
+          name,
+          count: items.filter((i) => (i.category || "Otro") === name).length,
+        }))}
+        onChanged={async () => {
+          // Refetch items to pick up renames/merges
+          const r = await fetch("/api/vault");
+          const data = await r.json();
+          if (Array.isArray(data)) setItems(data);
+          toast("success", "Categorías actualizadas");
+        }}
       />
 
       <Toaster toasts={toasts} />

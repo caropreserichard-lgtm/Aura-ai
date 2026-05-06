@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { requireUserId } from "@/lib/auth-helpers";
 import { classifyVaultUrlsBulk } from "@/lib/claude";
-import { detectPlatform, extractUrls, normalizeUrlForDedupe } from "@/lib/vault-helpers";
+import { detectPlatform, extractUrls, normalizeUrlForDedupe, scrapeOgMeta } from "@/lib/vault-helpers";
 
 // ── Increase Vercel serverless timeout: scraping + Claude + Mongo > 10 s ─────
 export const maxDuration = 60;
@@ -16,36 +16,6 @@ export const dynamic = "force-dynamic";
  *
  * Response: { created: VaultItem[], skipped: { url, reason }[], aiError?: string }
  */
-async function quickScrape(url: string): Promise<{ title: string; description: string }> {
-  try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; TayronaBot/1.0)" },
-      signal: AbortSignal.timeout(4000),
-      redirect: "follow",
-    });
-    const html = await res.text();
-    // Try double-quote variants first, then single-quote
-    const ogTitle =
-      html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i)?.[1] ||
-      html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:title"/i)?.[1] ||
-      html.match(/<meta[^>]+property='og:title'[^>]+content='([^']+)'/i)?.[1] ||
-      html.match(/<meta[^>]+content='([^']+)'[^>]+property='og:title'/i)?.[1];
-    const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
-    const title = (ogTitle || titleTag || "").trim().replace(/\s+/g, " ").slice(0, 200);
-
-    const ogDesc =
-      html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i)?.[1] ||
-      html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:description"/i)?.[1] ||
-      html.match(/<meta[^>]+property='og:description'[^>]+content='([^']+)'/i)?.[1] ||
-      html.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i)?.[1] ||
-      html.match(/<meta[^>]+content="([^"]+)"[^>]+name="description"/i)?.[1];
-    const description = (ogDesc || "").trim().replace(/\s+/g, " ").slice(0, 300);
-
-    return { title, description };
-  } catch {
-    return { title: "", description: "" };
-  }
-}
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -95,7 +65,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Scrape OG in parallel ─────────────────────────────────────────────
-    const scraped = await Promise.all(fresh.map((u) => quickScrape(u)));
+    const scraped = await Promise.all(fresh.map((u) => scrapeOgMeta(u, 4000)));
 
     let classified: { category: string; summary: string; title: string }[];
     let aiError: string | undefined;

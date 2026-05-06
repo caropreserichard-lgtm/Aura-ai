@@ -2,43 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { requireUserId } from "@/lib/auth-helpers";
 import { classifyVaultUrl } from "@/lib/claude";
-import { detectPlatform } from "@/lib/vault-helpers";
+import { detectPlatform, scrapeOgMeta } from "@/lib/vault-helpers";
 
 export const maxDuration = 30;
 export const dynamic = "force-dynamic";
 
 async function scrapeUrlMeta(url: string): Promise<{ title: string; description: string }> {
+  const meta = await scrapeOgMeta(url);
+  if (meta.title || meta.description) return { title: meta.title || url, description: meta.description };
+  // Fallback: derive a readable title from URL slug
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; TayronaBot/1.0)" },
-      signal: AbortSignal.timeout(8000),
-    });
-    const html = await res.text();
-
-    // Extract title
-    const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1]
-      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i)?.[1];
-    const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
-    const title = (ogTitle || titleTag || url).trim().replace(/\s+/g, " ").slice(0, 200);
-
-    // Extract description
-    const ogDesc = html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i)?.[1]
-      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']/i)?.[1];
-    const metaDesc = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)?.[1]
-      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i)?.[1];
-    const description = (ogDesc || metaDesc || "").trim().replace(/\s+/g, " ").slice(0, 400);
-
-    return { title, description };
+    const u = new URL(url);
+    const slug = u.pathname.split("/").filter(Boolean).pop() || u.hostname;
+    return { title: slug.replace(/[-_]/g, " ").replace(/\.\w+$/, ""), description: "" };
   } catch {
-    // Fallback: extract readable title from URL
-    try {
-      const u = new URL(url);
-      const slug = u.pathname.split("/").filter(Boolean).pop() || u.hostname;
-      const title = slug.replace(/[-_]/g, " ").replace(/\.\w+$/, "");
-      return { title, description: "" };
-    } catch {
-      return { title: url, description: "" };
-    }
+    return { title: url, description: "" };
   }
 }
 
