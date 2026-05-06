@@ -1135,6 +1135,7 @@ export default function VaultPage() {
   const [showBulk, setShowBulk] = useState(false);
   const [showManageCats, setShowManageCats] = useState(false);
   const [reclassifying, setReclassifying] = useState(false);
+  const [fixingEchoes, setFixingEchoes] = useState(false);
   const [editCatItem, setEditCatItem] = useState<VaultItem | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -1296,6 +1297,29 @@ export default function VaultPage() {
       toast("error", e instanceof Error ? e.message : "Error al reclasificar");
     } finally {
       setReclassifying(false);
+    }
+  };
+
+  const handleFixEchoes = async () => {
+    if (fixingEchoes) return;
+    setFixingEchoes(true);
+    toast("info", "Reparando resúmenes rotos sin IA...");
+    try {
+      const res = await fetch("/api/vault/fix-echoes", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "fail");
+      if (data.fixed === 0) {
+        toast("info", "No hay resúmenes rotos");
+      } else {
+        const r = await fetch("/api/vault");
+        const fresh = await r.json();
+        if (Array.isArray(fresh)) setItems(fresh);
+        toast("success", `${data.fixed} resumen${data.fixed === 1 ? "" : "es"} reparado${data.fixed === 1 ? "" : "s"} sin IA`);
+      }
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "Error al reparar");
+    } finally {
+      setFixingEchoes(false);
     }
   };
 
@@ -1503,11 +1527,23 @@ export default function VaultPage() {
                 </button>
                 {items.length > 0 && (
                   <button
+                    onClick={handleFixEchoes}
+                    disabled={fixingEchoes}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all disabled:opacity-50"
+                    style={{ background: "rgba(34,197,94,0.10)", borderColor: "rgba(34,197,94,0.28)", color: "#4ade80" }}
+                    title="Repara resúmenes rotos/repetidos — sin gastar créditos de IA"
+                  >
+                    {fixingEchoes ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                    {fixingEchoes ? "Reparando..." : "Reparar sin IA"}
+                  </button>
+                )}
+                {items.length > 0 && (
+                  <button
                     onClick={() => handleReclassify(false)}
                     disabled={reclassifying}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all disabled:opacity-50"
                     style={{ background: "rgba(56,189,248,0.10)", borderColor: "rgba(56,189,248,0.28)", color: "#7dd3fc" }}
-                    title="Re-scrapear y reclasificar links sin resumen / categoría"
+                    title="Re-scrapear y reclasificar links sin resumen / categoría (usa créditos IA)"
                   >
                     {reclassifying ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
                     {reclassifying ? "Reclasificando..." : "Reclasificar IA"}
