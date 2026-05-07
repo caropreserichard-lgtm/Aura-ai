@@ -522,14 +522,29 @@ function ItemRow({
 }) {
   const [editIdea, setEditIdea] = useState(false);
   const [ideaText, setIdeaText] = useState(item.idea || "");
+  const [editTitle, setEditTitle] = useState(false);
+  const [titleText, setTitleText] = useState(item.title || "");
   const ideaRef = useRef<HTMLTextAreaElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const status = STATUS_THEME[item.status];
   const platform = item.platform || detectPlatform(item.url);
   const platformTheme = PLATFORM_THEME[platform];
-  const summary = getSummary(item);
   const isPinned = !!item.pinned;
 
   useEffect(() => { if (editIdea) ideaRef.current?.focus(); }, [editIdea]);
+  useEffect(() => { if (editTitle) titleInputRef.current?.focus(); }, [editTitle]);
+
+  const saveTitle = async () => {
+    const newTitle = titleText.trim();
+    if (!newTitle || newTitle === item.title) { setEditTitle(false); setTitleText(item.title || ""); return; }
+    await fetch(`/api/vault/${item._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newTitle }),
+    });
+    item.title = newTitle;
+    setEditTitle(false);
+  };
 
   const saveIdea = async () => {
     if (ideaText === (item.idea || "")) { setEditIdea(false); return; }
@@ -615,26 +630,38 @@ function ItemRow({
 
         {/* Body */}
         <div className="flex-1 min-w-0">
-          {/* Title row — bold header */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Title row — bold header, click pencil to edit */}
+          <div className="flex items-start gap-2 flex-wrap">
             {isPinned && (
-              <Pin size={11} fill="#e7ca79" color="#e7ca79" className="shrink-0" />
+              <Pin size={11} fill="#e7ca79" color="#e7ca79" className="shrink-0 mt-1" />
             )}
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[13px] font-semibold text-text-primary hover:text-[#e7ca79] transition-colors leading-snug"
-              style={{
-                textDecoration: item.status === "completed" ? "line-through" : "none",
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
-              {renderTitle()}
-            </a>
+            {editTitle ? (
+              <input
+                ref={titleInputRef}
+                value={titleText}
+                onChange={(e) => setTitleText(e.target.value)}
+                onBlur={saveTitle}
+                onKeyDown={(e) => { if (e.key === "Enter") saveTitle(); if (e.key === "Escape") { setEditTitle(false); setTitleText(item.title || ""); } }}
+                className="flex-1 min-w-0 text-[13px] font-semibold rounded-md px-2 py-0.5 outline-none"
+                style={{ background: "rgba(231,202,121,0.08)", border: "1px solid rgba(231,202,121,0.35)", color: "#e8e8e8" }}
+              />
+            ) : (
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[13px] font-semibold text-text-primary hover:text-[#e7ca79] transition-colors leading-snug"
+                style={{
+                  textDecoration: item.status === "completed" ? "line-through" : "none",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}
+              >
+                {renderTitle()}
+              </a>
+            )}
             <span
               className="text-[10px] px-1.5 py-0.5 rounded-md font-medium border shrink-0"
               style={{ background: platformTheme.bg, color: platformTheme.color, borderColor: platformTheme.border }}
@@ -642,11 +669,6 @@ function ItemRow({
               {platform}
             </span>
           </div>
-
-          {/* Summary — specific brief below the title */}
-          {summary && (
-            <p className="text-[12px] text-text-muted mt-0.5 leading-snug line-clamp-2" style={{ color: "rgba(200,200,200,0.7)" }}>{summary}</p>
-          )}
 
           {/* Domain */}
           <p className="text-[10px] text-text-muted opacity-60 mt-1">{getDomain(item.url)}</p>
@@ -698,8 +720,11 @@ function ItemRow({
                 <Lightbulb size={13} />
               </button>
             )}
-            <button onClick={() => onEditCategory(item)} className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#888" }} title="Cambiar categoría">
+            <button onClick={() => { setEditTitle(true); setTitleText(item.title || ""); }} className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#888" }} title="Editar título">
               <Edit3 size={13} />
+            </button>
+            <button onClick={() => onEditCategory(item)} className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#888" }} title="Cambiar categoría">
+              <FolderCog size={13} />
             </button>
             <a href={item.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-white/5" style={{ color: "#888" }}>
               <ExternalLink size={13} />
@@ -842,15 +867,23 @@ function EditCategoryModal({
   onClose: () => void;
   onSaved: (id: string, category: string) => void;
 }) {
-  const [value, setValue] = useState("");
+  const [selected, setSelected] = useState("");
+  const [customValue, setCustomValue] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { setValue(item?.category || ""); }, [item]);
+  useEffect(() => {
+    if (!item) return;
+    setCustomValue("");
+    setSelected(item.category || "Sin Clasificar");
+  }, [item]);
 
   if (!item) return null;
 
+  const isCustom = selected === "__nueva__";
+  const finalValue = isCustom ? customValue.trim() : selected;
+
   const handleSave = async () => {
-    const v = value.trim() || "Sin Clasificar";
+    const v = finalValue || "Sin Clasificar";
     setSaving(true);
     await fetch(`/api/vault/${item._id}`, {
       method: "PATCH",
@@ -888,20 +921,30 @@ function EditCategoryModal({
             <h3 className="text-sm font-semibold text-text-primary">Cambiar categoría</h3>
             <p className="text-[11px] text-text-muted mt-0.5 truncate">{item.title}</p>
           </div>
-          <div className="p-5">
-            <input
+          <div className="p-5 space-y-3">
+            <select
               autoFocus
-              list="vault-categories-edit"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
-              placeholder="Nombre de categoría"
-              className="w-full text-sm rounded-lg px-3 py-2 outline-none"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#e8e8e8" }}
-            />
-            <datalist id="vault-categories-edit">
-              {existingCategories.map((c) => <option key={c} value={c} />)}
-            </datalist>
+              value={selected}
+              onChange={(e) => { setSelected(e.target.value); setCustomValue(""); }}
+              className="w-full text-sm rounded-lg px-3 py-2.5 outline-none appearance-none cursor-pointer"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(231,202,121,0.35)", color: "#e8e8e8" }}
+            >
+              {existingCategories.sort().map((c) => (
+                <option key={c} value={c} style={{ background: "#1c1c1c", color: "#e8e8e8" }}>{c}</option>
+              ))}
+              <option value="__nueva__" style={{ background: "#1c1c1c", color: "#e7ca79" }}>＋ Nueva categoría...</option>
+            </select>
+            {isCustom && (
+              <input
+                autoFocus
+                value={customValue}
+                onChange={(e) => setCustomValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+                placeholder="Nombre de la nueva categoría"
+                className="w-full text-sm rounded-lg px-3 py-2 outline-none"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(231,202,121,0.3)", color: "#e8e8e8" }}
+              />
+            )}
           </div>
           <div className="px-5 pb-4 flex justify-end gap-2">
             <button onClick={onClose} className="px-3 py-2 rounded-lg text-xs text-text-muted hover:bg-white/5">Cancelar</button>
