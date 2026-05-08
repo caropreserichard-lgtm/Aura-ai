@@ -13,7 +13,7 @@ import {
   Download, LogOut, Trash2, Globe, Clock, Calendar, Languages,
   Timer, AlertTriangle, X, Eye, EyeOff, Shield,
   Link2, Unlink, RefreshCw, CheckCircle2, AlertCircle,
-  FolderKanban,
+  FolderKanban, Ban,
 } from "lucide-react";
 import { useLanguage } from "@/lib/LanguageContext";
 
@@ -105,6 +105,17 @@ function ProfileContent() {
   const toggleAncestralConnections = (enabled: boolean) => {
     setAncestralConnections(enabled);
     localStorage.setItem("ancestral-connections-enabled", enabled ? "true" : "false");
+  };
+
+  // ── Not-To-Do Mode feature flag (localStorage only) ──
+  const [notToDoMode, setNotToDoMode] = useState(false);
+  useEffect(() => {
+    setNotToDoMode(localStorage.getItem("not-to-do-mode-enabled") === "true");
+  }, []);
+  const toggleNotToDoMode = (enabled: boolean) => {
+    setNotToDoMode(enabled);
+    localStorage.setItem("not-to-do-mode-enabled", enabled ? "true" : "false");
+    window.dispatchEvent(new Event("not-to-do-mode-changed"));
   };
 
   // ── New project position (localStorage only) ──
@@ -633,6 +644,23 @@ function ProfileContent() {
                   <button onClick={() => toggleAncestralConnections(!ancestralConnections)}
                     className={`relative w-11 h-6 rounded-full transition-colors ${ancestralConnections ? "bg-[#e7ca79]" : "bg-bg-tertiary border border-border"}`}>
                     <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${ancestralConnections ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                <div className="border-t border-border" />
+
+                {/* Not-To-Do Mode */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Ban size={16} className="text-text-muted" />
+                    <div>
+                      <p className="text-sm text-text-primary font-medium">Not-To-Do Mode</p>
+                      <p className="text-xs text-text-muted">Activa el módulo &quot;The Forbidden Path&quot; para tu disciplina</p>
+                    </div>
+                  </div>
+                  <button onClick={() => toggleNotToDoMode(!notToDoMode)}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${notToDoMode ? "bg-[#e7ca79]" : "bg-bg-tertiary border border-border"}`}>
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${notToDoMode ? "translate-x-5" : "translate-x-0"}`} />
                   </button>
                 </div>
 

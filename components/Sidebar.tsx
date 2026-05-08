@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import {
   Home, CalendarDays, Inbox, ListTodo, BarChart3, Timer, Focus,
-  Settings2, FolderKanban, Wrench, Archive, LogOut, User, Shield, Library, Cake, X,
+  Settings2, FolderKanban, Wrench, Archive, LogOut, User, Shield, Library, Cake, X, Ban,
 } from "lucide-react";
 import TayronaLogo from "@/components/TayronaLogo";
 
@@ -32,8 +32,20 @@ export default function Sidebar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const [ancestralEnabled, setAncestralEnabled] = useState(true);
+  const [notToDoEnabled, setNotToDoEnabled] = useState(false);
   const [todayBirthdays, setTodayBirthdays] = useState<string[]>([]);
   const [bannerVisible, setBannerVisible] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setNotToDoEnabled(localStorage.getItem("not-to-do-mode-enabled") === "true");
+    sync();
+    window.addEventListener("not-to-do-mode-changed", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("not-to-do-mode-changed", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   useEffect(() => {
     const enabled = localStorage.getItem("ancestral-connections-enabled") !== "false";
@@ -157,6 +169,20 @@ export default function Sidebar() {
                 {todayBirthdays.length > 0 && (
                   <span className="ml-auto w-2 h-2 rounded-full flex-shrink-0" style={{ background: GOLD }} />
                 )}
+              </Link>
+            );
+          })()}
+
+          {/* Not-To-Do — shown only when enabled */}
+          {notToDoEnabled && (() => {
+            const isActive = pathname.startsWith("/not-to-do");
+            return (
+              <Link href="/not-to-do"
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-[13px] font-medium ${
+                  isActive ? "bg-accent-subtle text-accent-text" : "text-text-secondary hover:bg-bg-hover hover:text-text-primary"
+                }`}>
+                <Ban size={18} strokeWidth={isActive ? 2 : 1.5} style={isActive ? {} : { color: GOLD, opacity: 0.8 }} />
+                <span>Forbidden Path</span>
               </Link>
             );
           })()}

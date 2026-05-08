@@ -15,6 +15,7 @@ import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
+import NotToDoReminder from "@/components/NotToDoReminder";
 import AddTaskModal from "@/components/AddTaskModal";
 import TaskDetailPanel from "@/components/TaskDetailPanel";
 import { Task, CATEGORIES, Category } from "@/lib/types";
@@ -1036,6 +1037,7 @@ export default function HomePage() {
       <Sidebar />
       <main className="flex-1 md:ml-60">
         <TopBar onAddTask={() => setShowAddModal(true)} />
+        <NotToDoReminder />
 
         <div className="p-4 md:p-6 pb-24 md:pb-6">
           {/* ── Global Header: Today + Filter + Nav ─────── */}
