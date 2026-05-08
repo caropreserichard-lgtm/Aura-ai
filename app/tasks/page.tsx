@@ -23,8 +23,8 @@ export default function TasksPage() {
   const [filterPriority, setFilterPriority] = useState<Priority | "all">("all");
   const [filterStatus, setFilterStatus] = useState<TaskStatus | "all">("all");
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (typeof window !== "undefined") return (localStorage.getItem("ricky-view-mode") as ViewMode) || "list";
-    return "list";
+    if (typeof window !== "undefined") return (localStorage.getItem("ricky-view-mode") as ViewMode) || "kanban";
+    return "kanban";
   });
 
   const fetchTasks = useCallback(async () => {
@@ -108,7 +108,7 @@ export default function TasksPage() {
           ) : filteredTasks.length === 0 ? (
             <div className="text-center py-12 rounded-lg bg-bg-secondary border border-border"><p className="text-text-muted text-sm">No tasks match these filters</p></div>
           ) : viewMode === "kanban" ? (
-            <KanbanBoard tasks={filteredTasks} onStatusChange={handleStatusChange} onEditTask={(t) => { setEditingTask(t); setShowAddModal(true); }} />
+            <KanbanBoard tasks={filteredTasks} onStatusChange={handleStatusChange} onEditTask={(t) => { setEditingTask(t); setShowAddModal(true); }} onDeleteTask={handleDelete} onTasksChanged={fetchTasks} />
           ) : (
             <div className="space-y-1">{filteredTasks.map((task) => (
               <TaskCard key={task._id} task={task} onComplete={handleComplete} onDelete={handleDelete} onFocus={() => {}} onEdit={(t) => { setEditingTask(t); setShowAddModal(true); }} />
