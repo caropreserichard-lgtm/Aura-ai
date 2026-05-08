@@ -37,13 +37,16 @@ export default function Sidebar() {
   const [bannerVisible, setBannerVisible] = useState(false);
 
   useEffect(() => {
-    const sync = () => setNotToDoEnabled(localStorage.getItem("not-to-do-mode-enabled") === "true");
+    const sync = () => {
+      fetch("/api/auth/profile")
+        .then((r) => r.json())
+        .then((d) => setNotToDoEnabled(!!d?.preferences?.notToDoMode))
+        .catch(() => {});
+    };
     sync();
     window.addEventListener("not-to-do-mode-changed", sync);
-    window.addEventListener("storage", sync);
     return () => {
       window.removeEventListener("not-to-do-mode-changed", sync);
-      window.removeEventListener("storage", sync);
     };
   }, []);
 

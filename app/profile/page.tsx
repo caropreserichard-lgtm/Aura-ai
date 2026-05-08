@@ -31,6 +31,7 @@ interface UserProfile {
     startOfWeek: string;
     language: string;
     countPlannedAsActual: boolean;
+    notToDoMode: boolean;
   };
 }
 
@@ -107,15 +108,18 @@ function ProfileContent() {
     localStorage.setItem("ancestral-connections-enabled", enabled ? "true" : "false");
   };
 
-  // ── Not-To-Do Mode feature flag (localStorage only) ──
+  // ── Not-To-Do Mode (server-backed user preference) ──
   const [notToDoMode, setNotToDoMode] = useState(false);
-  useEffect(() => {
-    setNotToDoMode(localStorage.getItem("not-to-do-mode-enabled") === "true");
-  }, []);
-  const toggleNotToDoMode = (enabled: boolean) => {
+  const toggleNotToDoMode = async (enabled: boolean) => {
     setNotToDoMode(enabled);
-    localStorage.setItem("not-to-do-mode-enabled", enabled ? "true" : "false");
     window.dispatchEvent(new Event("not-to-do-mode-changed"));
+    try {
+      await fetch("/api/auth/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: { notToDoMode: enabled } }),
+      });
+    } catch {}
   };
 
   // ── New project position (localStorage only) ──
@@ -151,6 +155,7 @@ function ProfileContent() {
           setStartOfWeek(data.preferences.startOfWeek     || "monday");
           setLanguage(data.preferences.language            || "es");
           setCountPlannedAsActual(data.preferences.countPlannedAsActual || false);
+          setNotToDoMode(data.preferences.notToDoMode || false);
         }
       })
       .catch(() => {})

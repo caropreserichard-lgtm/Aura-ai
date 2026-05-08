@@ -7,16 +7,15 @@ import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 
 const GOLD = "#e7ca79";
-const STORAGE_KEY = "not-to-do-list";
 
 export type EnergyTag = "Distracción" | "Gasto innecesario" | "Fuga de energía";
 
-export type NotToDoItem = {
-  id: string;
+type NotToDoItem = {
+  _id: string;
   text: string;
   why?: string;
   tag?: EnergyTag;
-  createdAt: number;
+  createdAt: string;
   mastered?: boolean;
 };
 
@@ -26,22 +25,9 @@ const TAGS: { value: EnergyTag; label: string }[] = [
   { value: "Fuga de energía", label: "Fuga de energía" },
 ];
 
-function loadItems(): NotToDoItem[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as NotToDoItem[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveItems(items: NotToDoItem[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
-
 export default function NotToDoPage() {
   const [items, setItems] = useState<NotToDoItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
   const [why, setWhy] = useState("");
   const [tag, setTag] = useState<EnergyTag | "">("");
@@ -50,10 +36,13 @@ export default function NotToDoPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setItems(loadItems());
+    fetch("/api/not-to-do")
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setItems(data); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  // Weekly reflection prompt — once per ISO week
   useEffect(() => {
     const now = new Date();
     const onejan = new Date(now.getFullYear(), 0, 1);
@@ -64,22 +53,19 @@ export default function NotToDoPage() {
     }
   }, []);
 
-  const persist = (next: NotToDoItem[]) => {
-    setItems(next);
-    saveItems(next);
-  };
-
-  const addItem = () => {
+  const addItem = async () => {
     const t = text.trim();
     if (!t) return;
-    const item: NotToDoItem = {
-      id: crypto.randomUUID(),
-      text: t,
-      why: why.trim() || undefined,
-      tag: tag || undefined,
-      createdAt: Date.now(),
-    };
-    persist([item, ...items]);
+    const res = await fetch("/api/not-to-do", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: t, why: why.trim() || undefined, tag: tag || undefined }),
+    });
+    if (res.ok) {
+      const created = await res.json();
+      setItems((prev) => [created, ...prev]);
+      window.dispatchEvent(new Event("not-to-do-list-changed"));
+    }
     setText("");
     setWhy("");
     setTag("");
@@ -87,21 +73,40 @@ export default function NotToDoPage() {
     inputRef.current?.focus();
   };
 
-  const removeItem = (id: string) => {
-    persist(items.filter((i) => i.id !== id));
+  const removeItem = async (id: string) => {
+    setItems((prev) => prev.filter((i) => i._id !== id));
+    await fetch(`/api/not-to-do/${id}`, { method: "DELETE" }).catch(() => {});
+    window.dispatchEvent(new Event("not-to-do-list-changed"));
   };
 
-  const markMastered = (id: string, mastered: boolean) => {
-    persist(items.map((i) => (i.id === id ? { ...i, mastered } : i)));
+  const setMastered = async (id: string, mastered: boolean) => {
+    setItems((prev) => prev.map((i) => (i._id === id ? { ...i, mastered } : i)));
+    await fetch(`/api/not-to-do/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mastered }),
+    }).catch(() => {});
+    window.dispatchEvent(new Event("not-to-do-list-changed"));
   };
 
-  const closeReflection = (anyMastered: boolean) => {
+  const closeReflection = async (anyMastered: boolean) => {
     const now = new Date();
     const onejan = new Date(now.getFullYear(), 0, 1);
     const week = Math.ceil(((+now - +onejan) / 86400000 + onejan.getDay() + 1) / 7);
     localStorage.setItem(`not-to-do-reflection-${now.getFullYear()}-${week}`, "1");
     if (anyMastered) {
-      persist(items.map((i) => ({ ...i, mastered: true })));
+      const updated = items.map((i) => ({ ...i, mastered: true }));
+      setItems(updated);
+      await Promise.all(
+        items.map((i) =>
+          fetch(`/api/not-to-do/${i._id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mastered: true }),
+          }).catch(() => {})
+        )
+      );
+      window.dispatchEvent(new Event("not-to-do-list-changed"));
     }
     setReflectionOpen(false);
   };
@@ -112,7 +117,6 @@ export default function NotToDoPage() {
       <main className="flex-1 md:ml-60">
         <TopBar />
         <div className="p-4 md:p-8 pb-24 md:pb-8 max-w-3xl mx-auto">
-          {/* Header */}
           <div className="mb-8">
             <h1 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight text-text-primary">
               The Forbidden Path
@@ -122,7 +126,6 @@ export default function NotToDoPage() {
             </p>
           </div>
 
-          {/* Glass container */}
           <div
             className="rounded-2xl p-5 md:p-7 border"
             style={{
@@ -132,7 +135,6 @@ export default function NotToDoPage() {
               WebkitBackdropFilter: "blur(14px)",
             }}
           >
-            {/* Input row */}
             <div className="space-y-2.5">
               <div className="flex items-center gap-2.5">
                 <Ban size={16} style={{ color: GOLD, opacity: 0.7 }} />
@@ -140,9 +142,7 @@ export default function NotToDoPage() {
                   ref={inputRef}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") addItem();
-                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") addItem(); }}
                   placeholder="Add a prohibition..."
                   className="flex-1 bg-transparent border-0 border-b border-border focus:border-[#e7ca79]/60 outline-none py-2 text-[15px] text-text-primary placeholder:text-text-muted transition-colors"
                 />
@@ -192,23 +192,22 @@ export default function NotToDoPage() {
               </AnimatePresence>
             </div>
 
-            {/* List */}
             <div className="mt-6 space-y-1.5">
               <AnimatePresence initial={false}>
-                {items.length === 0 ? (
-                  <motion.p
-                    key="empty"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="text-sm text-text-muted/80 italic py-6 text-center"
-                  >
+                {loading ? (
+                  <motion.p key="loading" initial={{ opacity: 0 }} animate={{ opacity: 0.5 }} exit={{ opacity: 0 }}
+                    className="text-sm text-text-muted/70 italic py-6 text-center">
+                    Loading...
+                  </motion.p>
+                ) : items.length === 0 ? (
+                  <motion.p key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    className="text-sm text-text-muted/80 italic py-6 text-center">
                     Nothing forbidden yet. Discipline begins with a single line.
                   </motion.p>
                 ) : (
                   items.map((item) => (
                     <motion.div
-                      key={item.id}
+                      key={item._id}
                       layout
                       initial={{ opacity: 0, y: -8, scale: 0.98 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -217,7 +216,7 @@ export default function NotToDoPage() {
                       className="group relative flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.02] transition-colors"
                     >
                       <button
-                        onClick={() => markMastered(item.id, !item.mastered)}
+                        onClick={() => setMastered(item._id, !item.mastered)}
                         title={item.mastered ? "Mastered" : "Mark as forbidden"}
                         className="mt-0.5 flex-shrink-0 transition-all"
                         style={{
@@ -229,21 +228,13 @@ export default function NotToDoPage() {
                       </button>
                       <div className="flex-1 min-w-0">
                         <p
-                          className={`text-[14px] leading-snug ${
-                            item.mastered ? "text-[#e7ca79]" : "text-text-primary"
-                          }`}
-                          style={
-                            item.mastered
-                              ? { textShadow: `0 0 12px ${GOLD}40` }
-                              : undefined
-                          }
+                          className={`text-[14px] leading-snug ${item.mastered ? "text-[#e7ca79]" : "text-text-primary"}`}
+                          style={item.mastered ? { textShadow: `0 0 12px ${GOLD}40` } : undefined}
                         >
                           {item.text}
                         </p>
                         {item.why && (
-                          <p className="text-[11px] italic text-text-muted mt-0.5">
-                            {item.why}
-                          </p>
+                          <p className="text-[11px] italic text-text-muted mt-0.5">{item.why}</p>
                         )}
                         {item.tag && (
                           <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider border border-[#e7ca79]/25 text-[#e7ca79]/80">
@@ -252,7 +243,7 @@ export default function NotToDoPage() {
                         )}
                       </div>
                       <button
-                        onClick={() => removeItem(item.id)}
+                        onClick={() => removeItem(item._id)}
                         className="opacity-0 group-hover:opacity-100 transition-opacity text-text-muted hover:text-red-400 p-1 rounded"
                         title="Habit mastered — remove"
                       >
@@ -271,7 +262,6 @@ export default function NotToDoPage() {
         </div>
       </main>
 
-      {/* Weekly reflection */}
       <AnimatePresence>
         {reflectionOpen && items.length > 0 && (
           <motion.div
@@ -330,9 +320,7 @@ function ForbiddenIcon({ mastered }: { mastered: boolean }) {
       viewBox="0 0 18 18"
       fill="none"
       className="transition-all hover:scale-110"
-      style={{
-        filter: mastered ? `drop-shadow(0 0 4px ${GOLD})` : undefined,
-      }}
+      style={{ filter: mastered ? `drop-shadow(0 0 4px ${GOLD})` : undefined }}
     >
       <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.4" />
       <line x1="4" y1="14" x2="14" y2="4" stroke="currentColor" strokeWidth="1.4" />

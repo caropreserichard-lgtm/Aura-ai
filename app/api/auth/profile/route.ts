@@ -25,6 +25,7 @@ export async function GET() {
       startOfWeek: user.preferences?.startOfWeek || "monday",
       language: user.preferences?.language || "es",
       countPlannedAsActual: user.preferences?.countPlannedAsActual || false,
+      notToDoMode: user.preferences?.notToDoMode || false,
     },
   });
 }
@@ -72,6 +73,7 @@ export async function PATCH(req: NextRequest) {
     if (prefs.startOfWeek !== undefined) updates["preferences.startOfWeek"] = prefs.startOfWeek;
     if (prefs.language !== undefined) updates["preferences.language"] = prefs.language;
     if (prefs.countPlannedAsActual !== undefined) updates["preferences.countPlannedAsActual"] = prefs.countPlannedAsActual;
+    if (prefs.notToDoMode !== undefined) updates["preferences.notToDoMode"] = !!prefs.notToDoMode;
   }
 
   if (Object.keys(updates).length === 0) {
@@ -102,6 +104,7 @@ export async function DELETE() {
     db.collection("stats").deleteMany({ userId }),
     db.collection("subcategories").deleteMany({ userId }),
     db.collection("calendar_tokens").deleteMany({ userId }),
+    db.collection("not_to_do").deleteMany({ userId }),
   ]);
 
   return NextResponse.json({ success: true });

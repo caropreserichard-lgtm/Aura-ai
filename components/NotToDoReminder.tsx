@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const GOLD = "#e7ca79";
 
-type Item = { id: string; text: string; why?: string; mastered?: boolean };
+type Item = { _id: string; text: string; why?: string; mastered?: boolean };
 
 export default function NotToDoReminder() {
   const [enabled, setEnabled] = useState(false);
@@ -20,29 +20,28 @@ export default function NotToDoReminder() {
       setDismissed(true);
       return;
     }
-    const sync = () => {
-      const on = localStorage.getItem("not-to-do-mode-enabled") === "true";
-      setEnabled(on);
-      if (!on) return;
+
+    const sync = async () => {
       try {
-        const raw = localStorage.getItem("not-to-do-list");
-        const items: Item[] = raw ? JSON.parse(raw) : [];
-        const active = items.filter((i) => !i.mastered);
-        if (active.length > 0) {
-          setItem(active[Math.floor(Math.random() * active.length)]);
-        } else {
-          setItem(null);
-        }
-      } catch {
-        setItem(null);
-      }
+        const profileRes = await fetch("/api/auth/profile");
+        if (!profileRes.ok) { setEnabled(false); return; }
+        const profile = await profileRes.json();
+        const on = !!profile?.preferences?.notToDoMode;
+        setEnabled(on);
+        if (!on) return;
+        const listRes = await fetch("/api/not-to-do");
+        if (!listRes.ok) return;
+        const items: Item[] = await listRes.json();
+        const active = Array.isArray(items) ? items.filter((i) => !i.mastered) : [];
+        setItem(active.length > 0 ? active[Math.floor(Math.random() * active.length)] : null);
+      } catch {}
     };
     sync();
     window.addEventListener("not-to-do-mode-changed", sync);
-    window.addEventListener("storage", sync);
+    window.addEventListener("not-to-do-list-changed", sync);
     return () => {
       window.removeEventListener("not-to-do-mode-changed", sync);
-      window.removeEventListener("storage", sync);
+      window.removeEventListener("not-to-do-list-changed", sync);
     };
   }, []);
 
@@ -69,12 +68,8 @@ export default function NotToDoReminder() {
         >
           <Ban size={15} style={{ color: GOLD }} className="flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] uppercase tracking-wider text-text-muted">
-              Today, do not...
-            </p>
-            <p className="text-sm font-medium truncate" style={{ color: GOLD }}>
-              {item.text}
-            </p>
+            <p className="text-[11px] uppercase tracking-wider text-text-muted">Today, do not...</p>
+            <p className="text-sm font-medium truncate" style={{ color: GOLD }}>{item.text}</p>
           </div>
           <Link
             href="/not-to-do"
