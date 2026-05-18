@@ -20,6 +20,8 @@ export interface Task {
   recurring?: {
     type: "daily" | "weekdays" | "weekends" | "weekly" | "custom";
     days?: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
+    startDate?: string; // "YYYY-MM-DD" — recurrence_start_date (first occurrence)
+    endDate?: string;   // "YYYY-MM-DD" — recurrence_end_date (last occurrence, inclusive)
   };
   completions?: string[]; // "YYYY-MM-DD" dates when done
   skips?: string[];       // "YYYY-MM-DD" dates when skipped

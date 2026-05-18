@@ -63,6 +63,30 @@ function formatMins(m: number) { return m >= 60 ? `${Math.floor(m / 60)}:${Strin
 
 function isRecurringOnDate(task: Task, date: Date): boolean {
   if (!task.recurring || task.status === "done") return false;
+
+  // ── Bound the recurrence window so the calendar isn't flooded indefinitely.
+  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  const startStr = task.recurring.startDate || (task.createdAt ? task.createdAt.split("T")[0] : "");
+  if (startStr) {
+    const [sy, sm, sd] = startStr.split("-").map(Number);
+    if (sy && sm && sd) {
+      const startBound = new Date(sy, sm - 1, sd);
+      if (dayStart < startBound) return false;
+    }
+  }
+
+  // End: explicit endDate, otherwise default to 3 months after the start.
+  let endBound: Date | null = null;
+  if (task.recurring.endDate) {
+    const [ey, em, ed] = task.recurring.endDate.split("-").map(Number);
+    if (ey && em && ed) endBound = new Date(ey, em - 1, ed);
+  } else if (startStr) {
+    const [sy, sm, sd] = startStr.split("-").map(Number);
+    if (sy && sm && sd) endBound = new Date(sy, sm - 1 + 3, sd);
+  }
+  if (endBound && dayStart > endBound) return false;
+
   const dow = date.getDay();
   switch (task.recurring.type) {
     case "daily": return true;

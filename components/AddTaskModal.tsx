@@ -24,7 +24,7 @@ interface AddTaskModalProps {
     priority: Priority;
     roi: number;
     joy: number;
-    recurring: { type: "daily" | "weekdays" | "weekends" | "weekly" | "custom"; days?: number[] } | null;
+    recurring: { type: "daily" | "weekdays" | "weekends" | "weekly" | "custom"; days?: number[]; startDate?: string; endDate?: string } | null;
     tags: string[];
   }) => void;
   editTask?: {
@@ -36,7 +36,7 @@ interface AddTaskModalProps {
     priority: Priority;
     roi: number;
     joy: number;
-    recurring?: { type: "daily" | "weekdays" | "weekends" | "weekly" | "custom"; days?: number[] } | null;
+    recurring?: { type: "daily" | "weekdays" | "weekends" | "weekly" | "custom"; days?: number[]; startDate?: string; endDate?: string } | null;
     tags?: string[];
   } | null;
 }
@@ -52,6 +52,8 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddT
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringType, setRecurringType] = useState<"daily" | "weekdays" | "weekends" | "custom">("daily");
   const [customDays, setCustomDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [recStartDate, setRecStartDate] = useState("");
+  const [recEndDate, setRecEndDate] = useState("");
   const { subcategories: dynamicSubs } = useSubcategories();
 
   useEffect(() => {
@@ -68,6 +70,11 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddT
         const t = editTask.recurring.type as "daily" | "weekdays" | "weekends" | "custom";
         setRecurringType(t);
         if (editTask.recurring.days) setCustomDays(editTask.recurring.days);
+        setRecStartDate(editTask.recurring.startDate || "");
+        setRecEndDate(editTask.recurring.endDate || "");
+      } else {
+        setRecStartDate("");
+        setRecEndDate("");
       }
     } else {
       setTitle("");
@@ -78,6 +85,8 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddT
       setRoi(5);
       setJoy(5);
       setIsRecurring(false);
+      setRecStartDate("");
+      setRecEndDate("");
     }
   }, [editTask, isOpen, dynamicSubs]);
 
@@ -93,7 +102,12 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddT
     e.preventDefault();
     if (!title.trim()) return;
     const recurringData = isRecurring
-      ? { type: recurringType, ...(recurringType === "custom" ? { days: customDays } : {}) }
+      ? {
+          type: recurringType,
+          ...(recurringType === "custom" ? { days: customDays } : {}),
+          ...(recStartDate ? { startDate: recStartDate } : {}),
+          ...(recEndDate ? { endDate: recEndDate } : {}),
+        }
       : null;
     onSave({ title: title.trim(), description: description.trim(), category, subcategory, priority, roi, joy, recurring: recurringData, tags: [] });
     onClose();
@@ -236,6 +250,32 @@ export default function AddTaskModal({ isOpen, onClose, onSave, editTask }: AddT
                       );
                     })}
                   </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <label className="block text-[10px] text-text-muted uppercase tracking-wide mb-1">Start date</label>
+                    <input type="date" value={recStartDate}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setRecStartDate(v);
+                        if (recEndDate && v && recEndDate < v) setRecEndDate("");
+                      }}
+                      className="w-full px-2 py-1.5 rounded-lg bg-bg-tertiary border border-border text-text-primary text-xs focus:outline-none focus:border-accent" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-text-muted uppercase tracking-wide mb-1">End date</label>
+                    <input type="date" value={recEndDate} min={recStartDate || undefined}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v && recStartDate && v < recStartDate) return;
+                        setRecEndDate(v);
+                      }}
+                      className="w-full px-2 py-1.5 rounded-lg bg-bg-tertiary border border-border text-text-primary text-xs focus:outline-none focus:border-accent" />
+                  </div>
+                </div>
+                {!recEndDate && (
+                  <p className="text-[10px] text-text-muted">No end date — capped at 3 months from start to avoid flooding the calendar.</p>
                 )}
               </div>
             )}

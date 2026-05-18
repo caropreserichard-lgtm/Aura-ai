@@ -36,9 +36,23 @@ interface TaskDetailPanelProps {
 }
 
 export default function TaskDetailPanel({ task, dateKey, onClose, onUpdate, onComplete, onDelete, deleteLabel, onStartTimer }: TaskDetailPanelProps) {
+  // Normalize any date/datetime string to a calendar date ("YYYY-MM-DD").
+  // task.startDate may be a full ISO datetime (e.g. "2026-05-17T14:00:00.000Z"),
+  // which breaks <input type="date"> and `new Date(d + "T00:00:00")` → Invalid Date.
+  const toDateOnly = (s?: string) => {
+    if (!s) return "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
   const [description, setDescription] = useState(task.description || "");
-  const [startDate, setStartDate] = useState(task.startDate || task.dueDate || "");
-  const [dueDate, setDueDate] = useState(task.dueDate || "");
+  const [startDate, setStartDate] = useState(toDateOnly(task.startDate || task.dueDate));
+  const [dueDate, setDueDate] = useState(toDateOnly(task.dueDate));
   const [newSubtask, setNewSubtask] = useState("");
   const [subtasks, setSubtasks] = useState<{ text: string; done: boolean }[]>(task.subtasks || []);
   const [sourceUrl, setSourceUrl] = useState(task.sourceUrl || "");
@@ -63,6 +77,10 @@ export default function TaskDetailPanel({ task, dateKey, onClose, onUpdate, onCo
     (task.recurring?.type as "daily" | "weekdays" | "weekends" | "custom") || "daily"
   );
   const [customDays, setCustomDays] = useState<number[]>(task.recurring?.days || [1, 2, 3, 4, 5]);
+  const [recStartDate, setRecStartDate] = useState<string>(
+    task.recurring?.startDate || (task.createdAt ? task.createdAt.split("T")[0] : "")
+  );
+  const [recEndDate, setRecEndDate] = useState<string>(task.recurring?.endDate || "");
 
   // Schedule time state — extracted from startDate if it's a full datetime
   const parseScheduledTime = (sd: string) => {
@@ -253,10 +271,25 @@ export default function TaskDetailPanel({ task, dateKey, onClose, onUpdate, onCo
     onUpdate({ dueDate: val || null });
   };
 
-  const handleRecurringChange = (enabled: boolean, type?: typeof recurringType, days?: number[]) => {
+  const handleRecurringChange = (
+    enabled: boolean,
+    type?: typeof recurringType,
+    days?: number[],
+    start?: string,
+    end?: string,
+  ) => {
     const t = type ?? recurringType;
     const d = days ?? customDays;
-    const recurring = enabled ? { type: t, ...(t === "custom" ? { days: d } : {}) } : null;
+    const s = start ?? recStartDate;
+    const e = end ?? recEndDate;
+    const recurring = enabled
+      ? {
+          type: t,
+          ...(t === "custom" ? { days: d } : {}),
+          ...(s ? { startDate: s } : {}),
+          ...(e ? { endDate: e } : {}),
+        }
+      : null;
     onUpdate({ recurring });
   };
 
@@ -304,8 +337,9 @@ export default function TaskDetailPanel({ task, dateKey, onClose, onUpdate, onCo
   };
 
   const formatDateShort = (d: string) => {
-    if (!d) return "";
-    return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const norm = toDateOnly(d);
+    if (!norm) return "";
+    return new Date(norm + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
   const formatSize = (bytes: number) => {
@@ -641,6 +675,46 @@ export default function TaskDetailPanel({ task, dateKey, onClose, onUpdate, onCo
                     );
                   })}
                 </div>
+              )}
+
+              {/* Recurrence date bounds */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <label className="block text-[10px] text-text-muted uppercase tracking-wide mb-1">Start date</label>
+                  <input
+                    type="date"
+                    value={recStartDate}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setRecStartDate(v);
+                      // Keep end date valid relative to the new start
+                      const fixedEnd = recEndDate && v && recEndDate < v ? "" : recEndDate;
+                      if (fixedEnd !== recEndDate) setRecEndDate(fixedEnd);
+                      handleRecurringChange(true, undefined, undefined, v, fixedEnd);
+                    }}
+                    className="w-full px-2 py-1.5 rounded-lg bg-bg-tertiary border border-border text-text-primary text-xs focus:outline-none focus:border-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-text-muted uppercase tracking-wide mb-1">End date</label>
+                  <input
+                    type="date"
+                    value={recEndDate}
+                    min={recStartDate || undefined}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v && recStartDate && v < recStartDate) return; // guard: end can't precede start
+                      setRecEndDate(v);
+                      handleRecurringChange(true, undefined, undefined, recStartDate, v);
+                    }}
+                    className="w-full px-2 py-1.5 rounded-lg bg-bg-tertiary border border-border text-text-primary text-xs focus:outline-none focus:border-accent"
+                  />
+                </div>
+              </div>
+              {!recEndDate && (
+                <p className="text-[10px] text-text-muted">
+                  No end date set — recurrence is capped at 3 months from the start to avoid flooding the calendar.
+                </p>
               )}
             </div>
           )}
